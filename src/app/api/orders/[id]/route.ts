@@ -1,11 +1,14 @@
 import { NextRequest,NextResponse } from 'next/server';
 import { db } from '@/lib/firebase-admin';
 import { staffUser,handleError,jsonBody,ApiError } from '@/lib/http';
-import { occupiedDays,slotId,positiveVnd,vietnamToday } from '@/lib/rental';
-import { RentalOrder, ReturnInspection } from '@/lib/types';
+import { occupiedDays,slotId,positiveVnd,vietnamToday,assertSlotCapacity } from '@/lib/rental';
+import { extraStartDate, lineOccupiedDays, makeAddedLines, mustBeReadyAtPickup } from '@/lib/booking-rules';
+import { assertItems } from '@/lib/booking-server';
+import type { RentalOrder, ReturnInspection, InventoryItem } from '@/lib/types';
 import { calculateInspection } from '@/lib/inspection';
 import { auditInTransaction } from '@/lib/audit';
 export const runtime='nodejs';
+export const preferredRegion='sin1';
 export async function PATCH(req:NextRequest,ctx:{params:Promise<{id:string}>}) {
   try {
     const me=await staffUser(req);
@@ -13,47 +16,81 @@ export async function PATCH(req:NextRequest,ctx:{params:Promise<{id:string}>}) {
     if(!/^[a-zA-Z0-9]{10,64}$/.test(id))throw new ApiError(400,'Mã đơn hàng không hợp lệ.');
     const b=await jsonBody(req);
     const action=String(b.action);
-    if(!['PICKUP','RETURN','CANCEL','PAY'].includes(action))throw new ApiError(400,'Thao tác không hợp lệ.');
+    if(!['PICKUP','RETURN','CANCEL','PAY','ADD_ITEMS'].includes(action))throw new ApiError(400,'Thao tác không hợp lệ.');
     const amount=action==='PAY'?positiveVnd(b.amount,'Số tiền thanh toán'):0;
+    const addIds=action==='ADD_ITEMS'?b.itemIds:[];
+    if(action==='ADD_ITEMS'&&(!Array.isArray(addIds)||!addIds.length||addIds.some(x=>typeof x!=='string'||!/^[a-zA-Z0-9]{10,64}$/.test(x))||new Set(addIds).size!==addIds.length))
+      throw new ApiError(400,'Chọn ít nhất một sản phẩm hợp lệ, không trùng nhau.');
     const ref=db().collection('orders').doc(id);
     await db().runTransaction(async tx=>{
       const snap=await tx.get(ref);
       if(!snap.exists)throw new ApiError(404,'Không tìm thấy đơn hàng.');
       const order={id:snap.id,...snap.data()} as RentalOrder;
+      const today=vietnamToday();
       if(action==='PICKUP'&&order.status!=='RESERVED')throw new ApiError(409,'Chỉ đơn đặt trước mới được giao hàng.');
-      if(action==='PICKUP'&&order.pickupDate>vietnamToday())throw new ApiError(409,'Chưa đến ngày nhận hàng của đơn.');
+      if(action==='PICKUP'&&(order.pickupDate>today||order.returnDate<today))throw new ApiError(409,'Chưa đến lịch nhận hoặc đã qua ngày trả; cần điều chỉnh lịch trước.');
       if(action==='RETURN'&&order.status!=='PICKED_UP')throw new ApiError(409,'Chỉ đơn đã giao mới được kiểm nhận trả hàng.');
       if(action==='CANCEL'&&order.status!=='RESERVED')throw new ApiError(409,'Chỉ có thể hủy đơn chưa giao.');
       if(action==='CANCEL'&&order.paid>0)throw new ApiError(409,'Đơn đã thu tiền. Cần xử lý hoàn tiền trước khi hủy.');
       if(action==='PAY'&&order.status==='CANCELLED')throw new ApiError(409,'Đơn đã hủy không thể thu tiền.');
       if(action==='PAY'&&order.paid+amount>order.total+(order.compensationTotal||0))throw new ApiError(400,'Số tiền vượt công nợ gồm cả phí đền bù.');
-      // On RETURN checklist must include exactly one decision per rental line.
+
+      if(action==='ADD_ITEMS'){
+        let start:string;
+        try{start=extraStartDate(order,today);}catch(e){throw new ApiError(409,(e as Error).message);}
+        const existing=new Set(order.lines.map(l=>l.itemId));
+        if((addIds as string[]).some(x=>existing.has(x)))throw new ApiError(409,'Sản phẩm đã có trong đơn.');
+        const itemRefs=(addIds as string[]).map(x=>db().collection('items').doc(x));
+        const itemSnaps=await Promise.all(itemRefs.map(x=>tx.get(x)));
+        if(itemSnaps.some(s=>!s.exists))throw new ApiError(404,'Không tìm thấy sản phẩm thêm vào.');
+        const newItems=itemSnaps.map(s=>({id:s.id,...s.data()} as InventoryItem));
+        assertItems(newItems);
+        if(order.status==='PICKED_UP')mustBeReadyAtPickup(newItems);
+        const newLines=makeAddedLines(newItems,start,order.returnDate);
+        const slotList=newLines.flatMap(l=>lineOccupiedDays(l,order).map(day=>({line:l,day,ref:db().collection('rentalSlots').doc(slotId(l.itemId,day))})));
+        // Count every existing lock and new lock for transaction safety.
+        assertSlotCapacity(slotList.length+order.lines.reduce((s,l)=>s+lineOccupiedDays(l,order).length,0));
+        const locks=await Promise.all(slotList.map(x=>tx.get(x.ref)));
+        const conflicts=locks.flatMap((s,i)=>s.exists?[{sku:slotList[i].line.sku,date:slotList[i].day}]:[]);
+        if(conflicts.length)throw new ApiError(409,'Các sản phẩm thêm vào đã có người giữ lịch.',conflicts.slice(0,10));
+        const now=new Date().toISOString();
+        tx.update(ref,{lines:[...order.lines,...newLines],total:order.total+newLines.reduce((s,l)=>s+l.lineTotal,0),updatedAt:now,
+          history:[...order.history,{action:'ADD_ITEMS',by:me.uid,at:now,detail:'Thêm '+newLines.map(l=>l.sku).join(', ')}]});
+        slotList.forEach(({line,day,ref:r})=>tx.create(r,{orderId:id,itemId:line.itemId,date:day}));
+        if(order.status==='PICKED_UP')itemRefs.forEach(r=>tx.update(r,{status:'RENTED',currentOrderId:id,expectedReturnDate:order.returnDate}));
+        auditInTransaction(tx,me,'ORDER_ADD_ITEMS','order',id,`Thêm ${newLines.map(l=>l.sku).join(', ')} vào ${order.code}`,now);
+        return;
+      }
 
       const itemRefs=order.lines.map(l=>db().collection('items').doc(l.itemId));
-      const slots=order.lines.flatMap(l=>occupiedDays(order.pickupDate,order.returnDate,l.bufferDays).map(day=>db().collection('rentalSlots').doc(slotId(l.itemId,day))));
+      const slots=order.lines.flatMap(l=>lineOccupiedDays(l,order).map(day=>db().collection('rentalSlots').doc(slotId(l.itemId,day))));
       const itemSnaps=action==='PICKUP'||action==='RETURN'?await Promise.all(itemRefs.map(r=>tx.get(r))):[];
       const lockSnaps=action==='CANCEL'||action==='RETURN'?await Promise.all(slots.map(r=>tx.get(r))):[];
       if(itemSnaps.some(s=>!s.exists))throw new ApiError(409,'Có sản phẩm trong đơn không còn tồn tại.');
-      if(action==='PICKUP'&&itemSnaps.some(s=>s.data()?.status!=='AVAILABLE'))throw new ApiError(409,'Có sản phẩm đang giặt, bảo trì hoặc chưa sẵn sàng.');
+      if(action==='PICKUP'&&itemSnaps.some(s=>s.data()?.status!=='AVAILABLE'))throw new ApiError(409,'Có sản phẩm đang giặt, đang cho thuê, bảo trì hoặc chưa sẵn sàng.');
       if((action==='CANCEL'||action==='RETURN')&&lockSnaps.some(s=>s.exists&&s.data()?.orderId!==id))throw new ApiError(409,'Lịch giữ hàng có xung đột; cần kiểm tra thủ công.');
       let inspections:ReturnInspection[]=[];
-      if(action==='RETURN') {
-        try{
-          inspections=calculateInspection(order.lines,b.inspection,Object.fromEntries(order.lines.map((l,i)=>[l.itemId,Number(itemSnaps[i].data()?.replacementValue||0)])));
-        }catch(e){const message=e instanceof Error?e.message:'Checklist không hợp lệ.';throw new ApiError(message.startsWith('Admin')?409:400,message);}
+      if(action==='RETURN'){
+        try{inspections=calculateInspection(order.lines,b.inspection,Object.fromEntries(order.lines.map((l,i)=>[l.itemId,Number(itemSnaps[i].data()?.replacementValue||0)])));}
+        catch(e){const message=e instanceof Error?e.message:'Checklist không hợp lệ.';throw new ApiError(message.startsWith('Admin')?409:400,message);}
       }
       const compensationTotal=inspections.reduce((s,c)=>s+c.compensation,0);
       const now=new Date().toISOString();
       const status=action==='PICKUP'?'PICKED_UP':action==='RETURN'?'RETURNED':action==='CANCEL'?'CANCELLED':order.status;
-      tx.update(ref,{
-        status, paid:order.paid+amount, updatedAt:now,
+      tx.update(ref,{status,paid:order.paid+amount,updatedAt:now,
         ...(action==='RETURN'?{compensationTotal,returnInspection:inspections,returnedAt:now}:{}),
         history:[...order.history,{action,by:me.uid,at:now,
           ...(action==='PAY'?{amount,detail:`Đã thu ${amount} VND`}:{}),
           ...(action==='RETURN'?{detail:`Nhận ${inspections.filter(x=>x.status==='OK').length} món, thiếu ${inspections.filter(x=>x.status==='MISSING').length} món, đền bù ${compensationTotal} VND`}:{})}]
       });
       if(action==='PICKUP')itemRefs.forEach(r=>tx.update(r,{status:'RENTED',currentOrderId:id,expectedReturnDate:order.returnDate}));
-      if(action==='RETURN')itemRefs.forEach((r,i)=>tx.update(r,{status:inspections[i].status==='MISSING'?'MISSING':'LAUNDRY',currentOrderId:null,expectedReturnDate:null}));
+      if(action==='RETURN')itemRefs.forEach((r,i)=>{
+        const item={...itemSnaps[i].data()} as InventoryItem;
+        const laundry=item.requiresLaundry ?? ((item.bufferDays||0)>0);
+        const status=inspections[i].status==='MISSING'?'MISSING':laundry?'LAUNDRY':'AVAILABLE';
+        tx.update(r,{status,currentOrderId:null,expectedReturnDate:null,
+          ...(status==='LAUNDRY'?{laundryStartedAt:now,laundryCompletedAt:null}:{})});
+      });
       if(action==='CANCEL'||action==='RETURN')lockSnaps.forEach((snap,i)=>{if(snap.exists)tx.delete(slots[i]);});
       auditInTransaction(tx,me,`ORDER_${action}`,'order',id,
         `Đơn ${order.code}${action==='RETURN'?`; thiếu ${inspections.filter(x=>x.status==='MISSING').map(x=>x.sku).join(', ')||'không'}; phí ${compensationTotal} VND`:action==='PAY'?`; thu ${amount} VND`:''}`,now);

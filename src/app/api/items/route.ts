@@ -19,11 +19,12 @@ export async function POST(req:NextRequest) {
     const dailyRate=positiveVnd(b.dailyRate,'Giá thuê/ngày');
     if(!Number.isInteger(b.bufferDays)||![0,1,2].includes(b.bufferDays as number))throw new ApiError(400,'Ngày đệm phải là 0, 1 hoặc 2.');
     if(!Array.isArray(b.imagePaths)||b.imagePaths.length>5||b.imagePaths.some(p=>!validProductImageUrl(p,me.uid,process.env.CLOUDINARY_CLOUD_NAME||'')))throw new ApiError(400,'Ảnh phải được tải lên từ tài khoản của bạn (tối đa 5 ảnh).');
+    if(typeof b.requiresLaundry!=='boolean')throw new ApiError(400,'Vui lòng chọn sản phẩm có cần giặt sau thuê hay không.');
     const replacementValue=me.role==='admin'?positiveVnd(b.replacementValue,'Giá trị đền bù'):0;
     const ref=db().collection('items').doc();
     const skuRef=db().collection('skuIndex').doc(encodeURIComponent(sku));
     const now=new Date().toISOString();
-    const item={name,sku,size,color,category,dailyRate,bufferDays:b.bufferDays as number,replacementValue,imagePaths:b.imagePaths as string[],status:'AVAILABLE',createdAt:now,createdBy:me.uid};
+    const item={name,sku,size,color,category,dailyRate,bufferDays:b.bufferDays as number,requiresLaundry:b.requiresLaundry as boolean,replacementValue,imagePaths:b.imagePaths as string[],status:'AVAILABLE',createdAt:now,createdBy:me.uid};
     await db().runTransaction(async tx=>{
       const exists=await tx.get(skuRef);
       if(exists.exists)throw new ApiError(409,'SKU đã tồn tại; mỗi món đồ vật lý cần mã riêng.');

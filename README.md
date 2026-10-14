@@ -1,164 +1,89 @@
-# GU - Thuê đồ xinh v2.1 · Firebase gugu-547e3 + Cloudinary Free + Codespaces + Vercel
+# GU - Thuê đồ xinh v2.2.0
 
-**Mục tiêu:** chạy web quản lý GU mà **không cần bật Firebase Storage hoặc nâng Firebase lên Blaze**. Đây là bản cập nhật mã nguồn v2.0: tính năng đơn hàng, kho, nhân viên, log, nhắc trả trễ và checklist giữ nguyên; ảnh sản phẩm chuyển sang **Cloudinary Free**.
+**Stack:** Next.js 16 + TypeScript, Firebase Authentication / Firestore (`gugu-547e3`), Cloudinary Free (ảnh sản phẩm), GitHub Codespaces, Vercel. **Không yêu cầu Firebase Storage/Blaze chỉ để lưu ảnh.**
 
-> TRẠNG THÁI: đã chạy 11 unit tests bằng Node.js 22, tất cả đạt. Chưa kiểm thử trực tiếp được API với Firebase/Cloudinary thật và chưa hoàn thành build Next.js vì môi trường kiểm thử không tải được npm dependencies. Hãy kiểm tra Codespaces trước khi dùng dữ liệu thật.
+## Cập nhật trong v2.2
 
-## Kiến trúc
+- Thuê **1 ngày** = ngày nhận **trùng** ngày trả. Mặc định tạo đơn mới trong ngày, không tự cộng thêm ngày mai. Khoảng ngày khách thuê hiển thị riêng; `bufferDays` chỉ là ngày khóa lịch kỹ thuật (nếu đã chọn).
+- **Đặt lịch trước:** tạo đơn `RESERVED`, giữ kho bằng Firestore Transaction; bất kỳ nhân viên hợp lệ nào cũng xác nhận `PICKUP` khi khách đến.
+- **Tạo đơn giao ngay:** tạo đơn ở trạng thái `PICKED_UP`, cập nhật món thành `RENTED` ngay; bắt buộc ngày nhận là hôm nay (giờ Việt Nam).
+- Form thuê: tra SĐT/tên khách, tìm SĐT bằng server kể cả khi khách không nằm trong 500 hồ sơ tải sẵn; thêm khách nhanh, tự chọn khách; sản phẩm tìm theo SKU, tên, màu, size, danh mục và lọc danh mục.
+- Bỏ ngưỡng cố định **5 món/đơn**. Do giới hạn Firestore Transaction, một lượt ghi hiện có tối đa **400 ô lịch** (mỗi món × số ngày + ngày đệm). Khi vượt, giao diện hiện thông báo rõ ràng; không được tự ý bỏ kiểm tra nguyên tử để cho phép trùng lịch.
+- Trong chi tiết đơn `RESERVED`/`PICKED_UP`: **Thêm sản phẩm**, khóa lịch nguyên tử. Với đơn đã nhận, món thêm tính từ ngày thêm đến ngày trả, không thu ngược các ngày trước đó.
+- Tạo **danh mục kho**; theo dõi yêu cầu giặt cho từng SKU khi tạo sản phẩm.
+- Trả hàng có checklist đầy đủ: nếu sản phẩm được đánh dấu cần giặt, trả đủ chuyển sang `LAUNDRY`; đồ không yêu cầu giặt chuyển `AVAILABLE`. Khi đang `LAUNDRY`, chỉ thao tác **Đã giặt** mới đưa về `AVAILABLE`; cả Admin và nhân viên được xác nhận, tất cả được ghi nhật ký. Danh sách đồ cần giặt nằm trong tab **Đơn thuê** và chi tiết đơn sau trả, nút **Đã giặt** cũng có trong Kho.
+- Giữ Firebase token verification, Cloudinary upload, kiểm tra trùng ngày, phí đền bù, thanh toán, cảnh báo trả trễ và lịch sử audit.
 
-- Firebase Authentication: tài khoản Admin + nhân viên.
-- Firestore (`gugu-547e3`): staff, items, bookings, slot locks, audit, customers. **Không đòi Blaze riêng cho Firestore trong giới hạn Spark.**
-- Cloudinary **Programmable Media** Free: ảnh sản phẩm **công khai theo URL**. Không tải ảnh khách, giấy tờ hoặc dữ liệu nhạy cảm.
-- Next.js API `/api/uploads`: server kiểm tra Firebase ID token và `staff/{uid}` trước khi tải lên Cloudinary bằng API secret. Browser không thấy secret.
-- GitHub Codespaces: chạy bản thử. Vercel: deploy (cần gói phù hợp mục đích kinh doanh).
+## Lưu ý dữ liệu đang hoạt động (QUAN TRỌNG)
 
-## Bước 1: Cập nhật mã nguồn trong GitHub Codespaces
+1. **Không xóa / tạo lại Firestore, Authentication, khách hàng hay đơn thuê.** Bản v2.2 dùng tiếp cấu trúc cũ; hai collection mới `categories`, `phoneIndex` được tạo khi có dữ liệu tương ứng.
+2. Các **đơn cũ không bị tính lại lịch hoặc giá thuê**. Nếu trước đây đơn được tạo với ngày trả là ngày hôm sau thì ngày trả cũ được giữ nguyên, vì không thể tự đoán ý định nhân viên. Hãy đối chiếu và xử lý từng đơn trước khi sử dụng. Bản mới mặc định 1 ngày là cùng ngày.
+3. Các **SKU cũ** không có `requiresLaundry`: hệ thống mặc định cần giặt khi `bufferDays > 0`, nhằm tránh giao đồ chưa giặt. Admin có thể đổi ngày đệm cho đơn **mới** bằng nút Đổi ngày đệm trong Kho. Lịch đã khóa từ đơn cũ dùng `bufferDays` đã lưu trong đơn; không xóa khóa lịch cũ.
+4. Sản phẩm mới mặc định `bufferDays = 0`, `requiresLaundry = true`: trả hàng vào `LAUNDRY`, sau khi giặt xong nhấn **Đã giặt**. Ngày đệm 0 không có nghĩa là bỏ giặt.
+5. Không sửa trực tiếp `status` hoặc `rentalSlots` trong Firestore để “mở khóa” nhanh vì có thể gây trùng lịch. Kiểm tra tất cả nghiệp vụ trên dữ liệu thử trước khi dùng thật.
+6. `phoneIndex` áp dụng cho khách được tạo từ bản này; khách cũ vẫn tìm được bằng truy vấn số điện thoại trùng chuẩn hóa, còn các số cũ lưu dấu cách/định dạng khác có thể cần chuẩn hóa sau.
 
-**Cách an toàn nhất khi repo GU đang trống:** Download ZIP mới `GU-Thue-Do-Xinh-v2.1-Cloudinary-No-Blaze.zip`, đưa file ZIP vào Codespaces qua Explorer > Upload, sau đó tại thư mục repo (nơi có `.git`):
+## Cập nhật GitHub Codespaces hiện tại `/workspaces/Gu`
 
-```bash
-unzip -q GU-Thue-Do-Xinh-v2.1-Cloudinary-No-Blaze.zip -d /tmp/gu-v21
-cp -a /tmp/gu-v21/gu-thue-do-xinh-v2.1-cloudinary/. .
-rm GU-Thue-Do-Xinh-v2.1-Cloudinary-No-Blaze.zip
-node -v
-ls package.json .env.example
-```
+**Không cần tạo Firebase/Cloudinary mới hoặc nhập lại API key.** Giữ nguyên `.env.local`, không đưa khóa bí mật lên GitHub.
 
-**Nếu repo đã có GU v2.0 hoặc bất cứ dữ liệu/code đã chỉnh sửa**, tạo một nhánh dự phòng trước và chỉ sao chép nguồn sau khi so sánh:
+1. Tải ZIP `GU-Thue-Do-Xinh-v2.2.0.zip`, upload vào thư mục `/workspaces/Gu` bằng Explorer của Codespaces.
+2. Sao lưu nhánh hiện tại (và đảm bảo working tree sạch):
 
-```bash
-git switch -c backup-before-cloudinary
-# sao lưu; xem git status, kiểm tra mọi file quan trọng
-```
+   ```bash
+   cd /workspaces/Gu
+   git status
+   git switch -c backup-before-gu-v22
+   git switch main
+   ```
 
-Không sao chép đè `.env.local` hoặc thư mục `.git`, không trộn project GU vào Amorri Studio. Phiên bản Node.js khuyến nghị 22 LTS.
+3. Giải nén vào `/tmp` và sao chép mã nguồn. **Các file trùng tên sẽ bị ghi đè**, không thực hiện nếu đang có sửa đổi chưa commit:
 
-## Bước 2: Firebase project gugu-547e3
+   ```bash
+   unzip -q GU-Thue-Do-Xinh-v2.2.0.zip -d /tmp/gu-v22
+   cp -a /tmp/gu-v22/Gu-Thue-Do-Xinh-v2.2/. .
+   rm GU-Thue-Do-Xinh-v2.2.0.zip
+   ```
 
-1. https://console.firebase.google.com/project/gugu-547e3/overview
-2. Authentication > Sign-in method > bật **Email/Password**.
-3. Firestore Database > Create database > Production mode > chọn region phù hợp.
-4. Firestore > Rules > dán nội dung file `firestore.rules` trong dự án > Publish.
-5. **Bỏ qua mục Storage**: không dùng `storage.rules`, không cần bucket hoặc Blaze.
-6. Project settings > Your apps > Web app: Register app `GU Web`; lấy `apiKey`, `authDomain`, `projectId`, `appId`.
-7. Project settings > Service accounts > Generate new private key; đọc `project_id`, `client_email`, `private_key`. Tuyệt đối không commit/service account JSON hoặc gửi khóa qua chat.
+4. Cài và kiểm tra trong Codespaces:
 
-### Khởi tạo Admin một lần
+   ```bash
+   npm install
+   npm run test
+   npm run typecheck
+   npm run build
+   npm run dev
+   ```
 
-Authentication > Users > Add User bằng email/mật khẩu quản trị. Copy chính xác UID. Firestore > Data > collection `staff` > document ID = UID, field:
+5. Port 3000 → Open in Browser, đăng nhập Admin/nhân viên, kiểm tra tất cả nghiệp vụ bên dưới bằng dữ liệu giả. Khi lỗi build hãy dừng, đừng push.
+6. Khi đã đạt, commit và push:
 
-| Key | Type | Value |
-|---|---|---|
-| `name` | string | `Admin GU` |
-| `email` | string | Email Admin |
-| `role` | string | `admin` |
-| `disabled` | boolean | `false` |
+   ```bash
+   git status
+   git add src tests tsconfig.json package.json README.md firebase.json firestore.rules .env.example .gitignore next.config.ts public scripts
+   git add package-lock.json  # chỉ khi tệp tồn tại sau npm install
+   git commit -m "GU v2.2 rental flow, fast customers, laundry"
+   git push origin main
+   ```
 
-Sau đó Admin tạo tài khoản nhân viên trong giao diện GU, không cần thao tác Firebase Console nữa.
+7. Vercel → Deployments: kiểm tra bản mới **Ready**; dùng production URL. Nếu cần cập nhật biến môi trường thì Redeploy.
 
-## Bước 3: Tạo Cloudinary Free
+## Kịch bản kiểm thử bắt buộc
 
-1. Đăng ký ở https://cloudinary.com/users/register_free (chọn Programmable Media / Image & Video API).
-2. Vào Cloudinary Console > API Keys/Cloud credentials.
-3. Lấy **Cloud name**, **API Key**, **API Secret**. Không cần tạo unsigned Upload Preset.
-4. Cloudinary có Free 25 credits/tháng dùng chung cho lưu trữ, băng thông và biến đổi ảnh; xem Usage để tránh vượt hạn mức.
+- Tạo một SKU cần giặt `bufferDays=0`; đặt ngày nhận/trả cùng hôm nay => đúng 1 ngày và 1 ngày tiền thuê.
+- Đặt lịch trước cho ngày sau, nhân viên A tạo `RESERVED`; nhân viên B xem đơn, xác nhận `PICKUP` đúng ngày đã đặt. Tạo lịch đè cùng SKU/ngày phải trả **409**.
+- Tạo đơn **giao ngay** hôm nay => `PICKED_UP`, SKU chuyển `RENTED`. Thử 2 nhân viên giao cùng SKU cùng lúc => chỉ một đơn thành công.
+- Trong đơn đặt trước và trong đơn đã giao, bấm **Thêm sản phẩm** để xác nhận lịch được khóa thêm. Với đơn đã giao nhiều ngày, kiểm tra món mới chỉ tính tiền từ ngày thêm.
+- Tra khách qua số điện thoại; tạo khách mới ngay form, xác nhận khách mới tự được chọn. Trùng SĐT chuẩn hóa không tạo thêm hồ sơ mới.
+- Tạo danh mục mới, thêm sản phẩm đúng danh mục, tìm/lọc được. Thử tạo đơn trên 5 SKU.
+- Trả một SKU `requiresLaundry=true` với checklist đủ => SKU `LAUNDRY`, không được giao đơn khác. Bấm **Đã giặt** => `AVAILABLE`, nhật ký có `ITEM_CLEANED`.
+- Trả một SKU không cần giặt => `AVAILABLE`; đánh dấu thiếu => `MISSING` và phí đền bù đúng giá Admin duyệt.
+- Đặt `bufferDays=1` để kiểm tra ngày đệm vẫn khóa lịch nhưng **không** hiển thị là ngày khách thuê và **không** tính phí ngày đệm.
 
-## Bước 4: Cấu hình `.env.local` trong Codespaces
+## Bảo mật và hạn chế
 
-```bash
-cp .env.example .env.local
-```
-
-Mở `.env.local`, điền chính xác:
-
-```dotenv
-NEXT_PUBLIC_FIREBASE_API_KEY=AIza...THUC_TE
-NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=gugu-547e3.firebaseapp.com
-NEXT_PUBLIC_FIREBASE_PROJECT_ID=gugu-547e3
-NEXT_PUBLIC_FIREBASE_APP_ID=1:...:web:...
-
-FIREBASE_PROJECT_ID=gugu-547e3
-FIREBASE_CLIENT_EMAIL=firebase-adminsdk-...@gugu-547e3.iam.gserviceaccount.com
-FIREBASE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n"
-
-CLOUDINARY_CLOUD_NAME=cloud_name_thuc_te
-CLOUDINARY_API_KEY=api_key_thuc_te
-CLOUDINARY_API_SECRET=api_secret_thuc_te
-```
-
-- **Không** cần `NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET`.
-- **Không** thêm `NEXT_PUBLIC_` vào Cloudinary API Secret hay Firebase private key.
-- `.env.local` đã nằm trong `.gitignore`. Kiểm tra `git check-ignore .env.local` và `git status`.
-- Codespaces có thể lưu secrets dưới GitHub Repo > Settings > Secrets and variables > Codespaces, nếu muốn tránh file cục bộ.
-
-## Bước 5: Khởi chạy
-
-```bash
-npm install
-npm run test
-npm run typecheck
-npm run build
-npm run dev
-```
-
-Trong tab PORTS của Codespaces, mở port 3000 và giữ **Private**. Nếu Firebase báo `auth/unauthorized-domain`, vào Firebase Auth > Settings > Authorized domains, thêm hostname Codespace (không có `https://`, không có path).
-
-## Bước 6: Kiểm tra chức năng
-
-1. Đăng nhập Admin, tạo staff từ menu Nhân viên.
-2. Tạo sản phẩm từ Kho: ảnh JPG/PNG/WebP <=3MB/ảnh, tối đa 5 ảnh; ấn chọn ảnh để test tải lên. Chỉ Admin và staff đã cấp quyền mới upload được.
-3. Xem ảnh sản phẩm hiện ở bảng kho. Kiểm tra Firestore `items/{id}` có `imagePaths` dạng `https://res.cloudinary.com/...` (URL), **không phải** Firebase Storage path nữa.
-4. Admin duyệt giá đền bù; tạo đơn/đặt cùng một món trùng ngày phải bị từ chối; trả hàng thử checklist thiếu/mất; kiểm tra audit và cảnh báo trễ.
-
-Ảnh đã tải lên Cloudinary nhưng bạn hủy form tạo sản phẩm có thể thành ảnh dư. Định kỳ dọn hình ảnh không sử dụng trong Cloudinary Media Library. Không tải ảnh riêng tư của khách lên Cloudinary với thiết kế ảnh URL công khai này.
-
-## Bước 7: GitHub + Vercel
-
-```bash
-git status
-git add .
-git commit -m "GU v2.1 switch product photos to Cloudinary Free"
-git push origin main
-```
-
-Nếu bạn đang dùng nhánh khác thì push đúng nhánh / tạo pull request. Không push `.env.local`. Tại https://vercel.com/new, import GitHub repo GU, framework Next.js, root directory `./`; thêm **10 biến môi trường** ở trên vào Project Settings > Environment Variables (4 `NEXT_PUBLIC_`, 3 `FIREBASE_`, 3 `CLOUDINARY_` = tổng **10** biến), sau đó Deploy. Nếu sửa biến sau khi đã deploy, Redeploy. Thêm domain `xxx.vercel.app` của GU vào Firebase Authorized domains.
-
-**Quan trọng:** Vercel Hobby dành cho mục đích phi thương mại. GU là web quản lý cửa hàng nên chọn Vercel Pro hoặc nền tảng hosting cho phép thương mại trước khi sử dụng chính thức.
-
-## Xử lý lỗi
-
-| Lỗi | Kiểm tra |
-|---|---|
-| `Chưa thiết lập Cloudinary trên máy chủ` | `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET` |
-| `Cloudinary từ chối tải ảnh` | API keys, hạn mức Free, quyền tài khoản, Cloudinary Dashboard/Usage |
-| `401 / 403` khi upload | Firebase Auth, Firestore `staff/{UID}`, `disabled` |
-| `Ảnh phải được tải lên từ tài khoản của bạn` | URL Cloudinary đúng project và UID, không nhập URL thủ công |
-| Firebase báo thiếu Web Config | `NEXT_PUBLIC_FIREBASE_*` và restart dev server |
-| Ảnh cũ Firebase Storage không hiển thị | bản mới lưu URL Cloudinary; cần upload lại ảnh ở nguồn cũ |
-
-## Bảo mật và giới hạn
-
-- Upload chỉ chạy trong server API và xác minh quyền nhân viên; server tự đặt đường dẫn ảnh `gu/products/<UID>/<uuid>`. Chỉ URL đúng định dạng, đúng Cloud name, đúng UID tạo mới được lưu khi tạo sản phẩm.
-- Không đồng nghĩa ảnh được giữ bí mật: người có URL có thể xem ảnh sản phẩm. Đây là thiết kế dành cho ảnh catalog quần áo, phụ kiện.
-- Max 5 ảnh/sản phẩm, 3MB/ảnh. Tối đa 3MB và một request qua server khi upload nên tránh ảnh khổng lồ.
-- Thiết kế này chưa tự dọn ảnh tải lên rồi hủy biểu mẫu, chưa chuyển ảnh cũ Firebase Storage, chưa có công cụ chỉnh sửa album ảnh sản phẩm đã tạo.
-- Firebase Firestore vẫn có hạn mức đọc/ghi Spark riêng; Cloudinary có giới hạn Free riêng. Không có dịch vụ nào bảo đảm lưu trữ không giới hạn.
-
-## GU v2.1.1 – sửa báo lỗi phiên đăng nhập
-
-Lỗi v2.1 `Phiên đăng nhập không hợp lệ hoặc đã hết hạn` xuất hiện cho *mọi* lỗi `verifyIdToken(token, true)`, kể cả Service Account sai. Bản 2.1.1 giữ nguyên kiểm tra token bị thu hồi, nhưng phân loại phản hồi: 401 (token sai/hết hạn), 403 (Firebase Auth disabled), 503 (lỗi cấu hình/quyền máy chủ hoặc không liên lạc được Firebase). API tự thử lại 1 lần với token làm mới khi nhận 401.
-
-Trên Codespaces, với file `.env.local` chứa thông tin thực và tuyệt đối không được commit:
-
-```bash
-npm install
-npm run diagnose:firebase
-npm run test
-npm run typecheck
-npm run build
-npm run dev
-```
-
-`diagnose:firebase` kiểm tra *hình thức* 7 biến Firebase mà không in khóa, không gọi dịch vụ bên ngoài. Kết quả OK không đảm bảo private key thật sự hợp lệ, hoặc API Key cùng project: đối chiếu Firebase Console Project `gugu-547e3`. Nếu nhận lỗi 503, đọc terminal Codespaces dòng `GU Firebase token verification failed` và kiểm tra `FIREBASE_CLIENT_EMAIL` / `FIREBASE_PRIVATE_KEY` từ đúng Service Account `gugu-547e3`. Không gửi key/token hoặc `.env.local` để nhờ hỗ trợ.
-
-Nếu sửa `.env.local`, dừng `npm run dev` rồi khởi động lại, thoát tài khoản GU và đăng nhập lại; nếu dùng Vercel, cập nhật Environment Variables rồi Redeploy. Đừng vô hiệu hóa `verifyIdToken` hoặc mở Firestore rules công khai để giải quyết sự cố đăng nhập.
+- Chỉ API có xác minh Firebase token và `staff/{uid}` mới được sửa dữ liệu. File `firestore.rules` vẫn từ chối client truy cập thẳng.
+- Không bao giờ commit `.env.local`, service-account JSON hoặc Cloudinary API Secret.
+- Chưa kiểm thử integration trực tiếp với Firestore/Vercel từ môi trường đóng gói. Bản này đã vượt qua **22 unit tests** và kiểm tra cú pháp TypeScript; cần `npm run typecheck` và `npm run build` trong Codespaces trước khi lên production.
+- Đơn thuê lớn phải chịu giới hạn 400 ô lịch/transaction; việc chia đơn nếu vượt giới hạn không làm mất tính chống trùng của từng đơn.
+- Vercel dùng cho cửa hàng thương mại cần chọn gói phù hợp; Codespaces dùng để phát triển, không phải server phục vụ khách lâu dài.

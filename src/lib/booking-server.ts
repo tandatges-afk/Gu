@@ -1,14 +1,16 @@
 import 'server-only';
 import { db } from './firebase-admin';
 import { ApiError } from './http';
-import { occupiedDays, slotId, daysInclusive, vietnamToday } from './rental';
+import { occupiedDays, slotId, daysInclusive, vietnamToday, assertSlotCapacity } from './rental';
 import { InventoryItem } from './types';
 
 export function rentalRequest(b: Record<string,unknown>) {
-  if (!Array.isArray(b.itemIds) || b.itemIds.length < 1 || b.itemIds.length > 5 || b.itemIds.some(x=>typeof x!=='string' || !/^[a-zA-Z0-9]{10,64}$/.test(x)) || new Set(b.itemIds).size!==b.itemIds.length)
-    throw new ApiError(400,'Chọn 1–5 bộ trang phục/phụ kiện khác nhau.');
+  if (!Array.isArray(b.itemIds) || b.itemIds.length < 1 || b.itemIds.some(x=>typeof x!=='string' || !/^[a-zA-Z0-9]{10,64}$/.test(x)) || new Set(b.itemIds).size!==b.itemIds.length)
+    throw new ApiError(400,'Hãy chọn ít nhất một sản phẩm, không chọn trùng món.');
   if (typeof b.pickupDate!=='string' || typeof b.returnDate!=='string') throw new ApiError(400,'Vui lòng chọn ngày nhận và trả.');
   const rentalDays=daysInclusive(b.pickupDate,b.returnDate);
+  const totalSlots = b.itemIds.length * (rentalDays + 2);
+  assertSlotCapacity(totalSlots);
   if (b.pickupDate < vietnamToday()) throw new ApiError(400,'Không thể tạo đơn cho ngày đã qua (giờ Việt Nam).');
   return {itemIds:b.itemIds as string[], pickupDate:b.pickupDate,returnDate:b.returnDate,rentalDays};
 }

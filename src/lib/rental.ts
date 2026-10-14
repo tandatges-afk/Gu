@@ -42,3 +42,21 @@ export function positiveVnd(value: unknown, label: string, allowZero = false): n
     throw new Error(`${label} phải là số tiền VND hợp lệ.`);
   return value;
 }
+
+/** Normalize Vietnamese phone for matching existing customers and uniqueness keys. */
+export function normalizePhone(value: unknown): string {
+  if (typeof value !== 'string') throw new Error('Số điện thoại không hợp lệ.');
+  const phone = value.trim().replace(/[\s.()-]/g, '');
+  if (!/^\+?\d{9,13}$/.test(phone)) throw new Error('Số điện thoại không hợp lệ.');
+  return phone.startsWith('+84') ? '0' + phone.slice(3) : phone.startsWith('84') && phone.length===11 ? '0'+phone.slice(2):phone;
+}
+
+/** New items only require laundry after return when the product is marked so. Legacy bufferDays=1 means laundry. */
+export function requiresLaundry(item: {requiresLaundry?:boolean; bufferDays?:number}): boolean {
+  return typeof item.requiresLaundry === 'boolean' ? item.requiresLaundry : (item.bufferDays || 0) > 0;
+}
+
+/** Protect Firestore transactions from growing past Firestore's 500-write limit. */
+export function assertSlotCapacity(slotCount:number): void {
+  if(slotCount > 400) throw new Error('Đơn có quá nhiều ngày chiếm lịch (tối đa 400 ô lịch cho một lần lưu). Hãy chia thành nhiều đơn hoặc rút ngắn thời gian thuê.');
+}

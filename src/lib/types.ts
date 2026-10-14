@@ -4,13 +4,14 @@ export type Role = 'admin' | 'staff';
 export interface InventoryItem {
   id: string; name: string; sku: string; category: string; size: string; color: string;
   dailyRate: number; bufferDays: number; replacementValue: number;
-  imagePaths?: string[]; expectedReturnDate?: string|null; currentOrderId?: string|null; status: ItemStatus; createdAt: string; createdBy?: string;
+  imagePaths?: string[]; requiresLaundry?: boolean; laundryStartedAt?: string|null; laundryCompletedAt?: string|null; expectedReturnDate?: string|null; currentOrderId?: string|null; status: ItemStatus; createdAt: string; createdBy?: string;
 }
 export interface Customer { id: string; name: string; phone: string; sizeNote: string; note: string; createdAt: string; }
 export interface RentalLine {
   itemId: string; name: string; sku: string; size: string;
-  dailyRate: number; bufferDays: number; replacementValue: number; lineTotal: number;
+  dailyRate: number; bufferDays: number; replacementValue: number; lineTotal: number; startDate?: string;
 }
+export interface ProductCategory { id: string; name: string; createdAt: string; }
 export type InspectionStatus = 'OK' | 'MISSING';
 export interface ReturnInspection { itemId: string; sku: string; status: InspectionStatus; compensation: number; }
 export interface RentalEvent { action: string; at: string; by: string; detail?: string; amount?: number; }
@@ -27,6 +28,6 @@ export interface AuditRecord {
   action: string; entityType: string; entityId: string; detail: string; createdAt: string;
 }
 export interface DashboardData {
-  items: InventoryItem[]; customers: Customer[]; orders: RentalOrder[];
+  items: InventoryItem[]; customers: Customer[]; orders: RentalOrder[]; categories: ProductCategory[];
   me: { uid: string; role: Role; name: string };
 }
