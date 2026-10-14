@@ -1,0 +1,15 @@
+node_modules/
+.next/
+out/
+.env
+.env.*
+!.env.example
+*.log
+.DS_Store
+*.tsbuildinfo
+service-account*.json
+firebase-adminsdk*.json
+
+# Credentials downloaded from Firebase Console
+*-firebase-adminsdk-*.json
+service-account*.json
