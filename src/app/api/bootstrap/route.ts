@@ -18,7 +18,7 @@ export async function GET(req: NextRequest) {
       categories:categories.docs.map(d=>({id:d.id,...d.data()})),
       items: items.docs.map(d => ({id:d.id,...d.data()})) as InventoryItem[],
       customers: customers.docs.map(d => ({id:d.id,...d.data()})) as Customer[],
-      orders: orders.docs.map(d => ({id:d.id,...d.data()})) as RentalOrder[],
+      orders: orders.docs.map(d => ({id:d.id,...d.data()} as RentalOrder)).filter(o => me.role==='admin' || !['RETURNED','CANCELLED'].includes(o.status)),
     }, {headers:{'Cache-Control':'no-store'}});
   } catch (e) {return handleError(e);}
 }
