@@ -30,6 +30,15 @@ export function slotId(itemId: string, date: string): string {
 export function vietnamToday(): string {
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Ho_Chi_Minh', year:'numeric', month:'2-digit', day:'2-digit' }).format(new Date());
 }
+/** Number of calendar dates after the scheduled return; never changes the original booking. */
+export function lateDays(returnDate:string, actualDate:string):number {
+  const delta=Math.round((parseDate(actualDate)-parseDate(returnDate))/DAY_MS);
+  return Math.max(0,delta);
+}
+/** Base charge for every overdue day; input rates were snapshotted at booking time. */
+export function lateBaseCharge(lines:{dailyRate:number}[],returnDate:string,actualDate:string):number {
+  return lateDays(returnDate,actualDate)*lines.reduce((sum,line)=>sum+line.dailyRate,0);
+}
 export function money(value: number): string { return new Intl.NumberFormat('vi-VN').format(value) + ' ₫'; }
 export function assertText(value: unknown, label: string, max = 160, required = true): string {
   if (typeof value !== 'string') throw new Error(`${label} không hợp lệ.`);
