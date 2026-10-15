@@ -15,9 +15,9 @@ export function rentalRequest(b: Record<string,unknown>) {
   return {itemIds:b.itemIds as string[], pickupDate:b.pickupDate,returnDate:b.returnDate,rentalDays};
 }
 export function requiredSlots(items:InventoryItem[], start:string,end:string) {
-  return items.flatMap(item=>occupiedDays(start,end,item.bufferDays).map(day=>({item,day,ref:db().collection('rentalSlots').doc(slotId(item.id,day))})));
+  return items.flatMap(item=>occupiedDays(start,end,0).map(day=>({item,day,ref:db().collection('rentalSlots').doc(slotId(item.id,day))})));
 }
 export function assertItems(items:InventoryItem[]) {
-  const blocked=items.filter(x=>x.status==='MAINTENANCE' || x.status==='LAUNDRY' || x.status==='MISSING' || !(x.replacementValue > 0) || (x.status==='RENTED' && !!x.expectedReturnDate && x.expectedReturnDate < vietnamToday()));
+  const blocked=items.filter(x=>Boolean(x.archivedAt) || x.status==='MAINTENANCE' || x.status==='LAUNDRY' || x.status==='MISSING' || !(x.replacementValue > 0) || (x.status==='RENTED' && !!x.expectedReturnDate && x.expectedReturnDate < vietnamToday()));
   if (blocked.length) throw new ApiError(409,'Sản phẩm đang giặt/bảo trì/thất lạc hoặc chưa được Admin định giá: '+blocked.map(x=>x.sku).join(', '));
 }

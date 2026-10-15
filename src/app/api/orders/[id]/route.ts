@@ -1,7 +1,7 @@
 import { NextRequest,NextResponse } from 'next/server';
 import { db } from '@/lib/firebase-admin';
 import { staffUser,handleError,jsonBody,ApiError } from '@/lib/http';
-import { occupiedDays,slotId,positiveVnd,vietnamToday,assertSlotCapacity } from '@/lib/rental';
+import { occupiedDays,slotId,positiveVnd,vietnamToday,assertSlotCapacity,lateDays,lateBaseCharge,assertText } from '@/lib/rental';
 import { extraStartDate, lineOccupiedDays, makeAddedLines, mustBeReadyAtPickup } from '@/lib/booking-rules';
 import { assertItems } from '@/lib/booking-server';
 import type { RentalOrder, ReturnInspection, InventoryItem } from '@/lib/types';
@@ -32,8 +32,9 @@ export async function PATCH(req:NextRequest,ctx:{params:Promise<{id:string}>}) {
       if(action==='RETURN'&&order.status!=='PICKED_UP')throw new ApiError(409,'Chỉ đơn đã giao mới được kiểm nhận trả hàng.');
       if(action==='CANCEL'&&order.status!=='RESERVED')throw new ApiError(409,'Chỉ có thể hủy đơn chưa giao.');
       if(action==='CANCEL'&&order.paid>0)throw new ApiError(409,'Đơn đã thu tiền. Cần xử lý hoàn tiền trước khi hủy.');
+      if(me.role==='staff'&&['RETURNED','CANCELLED'].includes(order.status))throw new ApiError(403,'Đơn đã hoàn tất chỉ Admin được truy cập.');
       if(action==='PAY'&&order.status==='CANCELLED')throw new ApiError(409,'Đơn đã hủy không thể thu tiền.');
-      if(action==='PAY'&&order.paid+amount>order.total+(order.compensationTotal||0))throw new ApiError(400,'Số tiền vượt công nợ gồm cả phí đền bù.');
+      if(action==='PAY'&&order.paid+amount>order.total+(order.compensationTotal||0)+(order.lateFeeTotal||0)+(order.otherFeeTotal||0))throw new ApiError(400,'Số tiền vượt công nợ gồm cả phí đền bù.');
 
       if(action==='ADD_ITEMS'){
         let start:string;
@@ -75,13 +76,23 @@ export async function PATCH(req:NextRequest,ctx:{params:Promise<{id:string}>}) {
         catch(e){const message=e instanceof Error?e.message:'Checklist không hợp lệ.';throw new ApiError(message.startsWith('Admin')?409:400,message);}
       }
       const compensationTotal=inspections.reduce((s,c)=>s+c.compensation,0);
+      const overdue=action==='RETURN'?lateDays(order.returnDate,today):0;
+      const lateBase=action==='RETURN'?lateBaseCharge(order.lines,order.returnDate,today):0;
+      const specifiedLate=action==='RETURN'&&b.lateFeeTotal!==undefined?positiveVnd(b.lateFeeTotal,'Phí trả trễ',true):lateBase;
+      const otherFee=action==='RETURN'&&b.otherFeeTotal!==undefined?positiveVnd(b.otherFeeTotal,'Phụ thu khác',true):0;
+      const surchargeNote=action==='RETURN'?assertText(b.surchargeNote??'','Lý do phụ thu',300,false):'';
+      if(action==='RETURN'&&(specifiedLate<lateBase||(!overdue&&specifiedLate>0)))throw new ApiError(400,'Phí trả trễ không được thấp hơn giá thuê ngày phát sinh và chỉ tính khi có trả trễ.');
+      if(action==='RETURN'&&(specifiedLate>lateBase||otherFee>0)&&!surchargeNote)throw new ApiError(400,'Hãy nhập lý do khi tăng phụ phí hoặc thêm phụ thu khác.');
+      const collectedAtReturn=action==='RETURN'&&b.collectedAtReturn!==undefined?positiveVnd(b.collectedAtReturn,'Tiền thu khi trả',true):0;
+      const maxCollection=order.total+compensationTotal+specifiedLate+otherFee-order.paid;
+      if(action==='RETURN'&&collectedAtReturn>maxCollection)throw new ApiError(400,'Số tiền thu vượt công nợ sau khi tính tất cả phụ thu.');
       const now=new Date().toISOString();
       const status=action==='PICKUP'?'PICKED_UP':action==='RETURN'?'RETURNED':action==='CANCEL'?'CANCELLED':order.status;
-      tx.update(ref,{status,paid:order.paid+amount,updatedAt:now,
-        ...(action==='RETURN'?{compensationTotal,returnInspection:inspections,returnedAt:now}:{}),
+      tx.update(ref,{status,paid:order.paid+amount+collectedAtReturn,updatedAt:now,
+        ...(action==='RETURN'?{compensationTotal,returnInspection:inspections,returnedAt:now,lateDays:overdue,lateFeeTotal:specifiedLate,otherFeeTotal:otherFee,surchargeNote}:{}),
         history:[...order.history,{action,by:me.uid,at:now,
           ...(action==='PAY'?{amount,detail:`Đã thu ${amount} VND`}:{}),
-          ...(action==='RETURN'?{detail:`Nhận ${inspections.filter(x=>x.status==='OK').length} món, thiếu ${inspections.filter(x=>x.status==='MISSING').length} món, đền bù ${compensationTotal} VND`}:{})}]
+          ...(action==='RETURN'?{detail:`Nhận ${inspections.filter(x=>x.status==='OK').length} món, thiếu ${inspections.filter(x=>x.status==='MISSING').length} món, đền bù ${compensationTotal} VND, trễ ${overdue} ngày/${specifiedLate} VND, phụ thu khác ${otherFee} VND (${surchargeNote})`}:{})},...(collectedAtReturn>0?[{action:'PAY',by:me.uid,at:now,amount:collectedAtReturn,detail:'Thu tiền khi nhận trả'}]:[])]
       });
       if(action==='PICKUP')itemRefs.forEach(r=>tx.update(r,{status:'RENTED',currentOrderId:id,expectedReturnDate:order.returnDate}));
       if(action==='RETURN')itemRefs.forEach((r,i)=>{

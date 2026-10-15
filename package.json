@@ -1,6 +1,6 @@
 {
   "name": "gu-thue-do-xinh",
-  "version": "2.2.0",
+  "version": "3.0.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -26,6 +26,6 @@
     "typescript": "^5.8.0"
   },
   "engines": {
-    "node": ">=20.9.0"
+    "node": "22.x"
   }
 }
