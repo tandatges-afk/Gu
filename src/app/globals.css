@@ -227,7 +227,9 @@ img { max-inline-size: 100%; }
   object-fit: contain;
   flex: none;
 }
-/* Full-width timeline for laptops/tablets: each calendar slot is square. */
+/* GU 4.0.1 — Compact rental slots on desktop, square image tiles remain unchanged.
+   The day column fills the table, but the actionable square is capped at 72px.
+   Do not use width:100% on desktop: that created oversized ~140px buttons. */
 .calendar-panel { min-width: 0; }
 .calendar-grid {
   grid-template-columns: 210px repeat(7, minmax(94px, 1fr));
@@ -236,19 +238,28 @@ img { max-inline-size: 100%; }
 }
 .calendar-item {
   min-width: 0;
-  gap: 10px;
-  padding: 9px 12px;
+  min-height: 82px;
+  gap: 9px;
+  padding: 8px 12px;
 }
 .calendar-item > div { min-width: 0; overflow: hidden; }
 .calendar-item strong, .calendar-item span { text-overflow: ellipsis; overflow: hidden; white-space: nowrap; }
-.calendar-cell {
+.calendar-grid .calendar-cell {
   aspect-ratio: 1 / 1;
+  width: min(72px, calc(100% - 12px));
+  max-width: 72px;
   min-height: 0;
-  width: calc(100% - 10px);
-  margin: 5px;
-  padding: 7px 5px;
+  margin: 5px auto;
+  padding: 5px;
+  justify-self: center;
   align-self: center;
   overflow: hidden;
+  border-radius: 9px;
+  transition: background-color .15s ease, border-color .15s ease, box-shadow .15s ease;
+}
+.calendar-grid .calendar-cell:not(:disabled):focus-visible {
+  outline: 2px solid #51785c;
+  outline-offset: 2px;
 }
 .calendar-cell-result {
   display: block;
@@ -318,7 +329,7 @@ img { max-inline-size: 100%; }
   .gu-mobile-days-grid {
     display: grid;
     grid-auto-flow: column;
-    grid-auto-columns: 96px;
+    grid-auto-columns: 80px;
     gap: 8px;
     width: max-content;
     min-width: 100%;
@@ -329,12 +340,12 @@ img { max-inline-size: 100%; }
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 5px;
+    gap: 3px;
     width: 100%;
     height: auto;
     min-height: 0;
     margin: 0;
-    padding: 8px 5px;
+    padding: 6px 4px;
     aspect-ratio: 1 / 1;
     scroll-snap-align: start;
     border-radius: 11px;
@@ -349,13 +360,13 @@ img { max-inline-size: 100%; }
     line-height: 1.2;
     color: #6b766b;
   }
-  .gu-calendar-cell-date strong { font-size: 11px; color: inherit; }
-  .gu-calendar-cell-date small { font-size: 10px; color: inherit; }
+  .gu-calendar-cell-date strong { font-size: 10px; color: inherit; }
+  .gu-calendar-cell-date small { font-size: 9px; color: inherit; }
   .gu-calendar-mobile-cell .gu-calendar-cell-result {
     display: block;
     max-width: 100%;
     color: inherit;
-    font-size: 12px;
+    font-size: 11px;
     font-weight: 700;
   }
   .gu-calendar-cell-today { outline: 2px solid #a0bba5; outline-offset: -2px; }
@@ -363,7 +374,7 @@ img { max-inline-size: 100%; }
   .gu-mobile-quick-actions { display: none; }
 }
 @media (max-width: 380px) {
-  .gu-mobile-days-grid { grid-auto-columns: 88px; }
+  .gu-mobile-days-grid { grid-auto-columns: 74px; }
   .gu-mobile-calendar-card { padding: 9px; }
   .gu-mobile-calendar { padding: 9px; gap: 10px; }
 }
