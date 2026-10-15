@@ -22,7 +22,7 @@ export function lineOccupiedDays(line:Pick<RentalLine,'bufferDays'|'startDate'>,
 }
 export function makeAddedLines(items:InventoryItem[],start:string,end:string):RentalLine[] {
   const days=daysInclusive(start,end);
-  assertSlotCapacity(items.reduce((count,item)=>count+occupiedDays(start,end,item.bufferDays).length,0));
-  return items.map(item=>({itemId:item.id,name:item.name,sku:item.sku,size:item.size,dailyRate:item.dailyRate,bufferDays:item.bufferDays,replacementValue:item.replacementValue,lineTotal:days*item.dailyRate,startDate:start}));
+  assertSlotCapacity(items.reduce((count,item)=>count+occupiedDays(start,end,0).length,0));
+  return items.map(item=>({itemId:item.id,name:item.name,sku:item.sku,size:item.size,dailyRate:item.dailyRate,bufferDays:0,replacementValue:item.replacementValue,lineTotal:days*item.dailyRate,startDate:start}));
 }
 export { requiresLaundry };

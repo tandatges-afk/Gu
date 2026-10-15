@@ -31,13 +31,13 @@ export async function POST(req:NextRequest) {
       const items=itemSnaps.map(s=>({id:s.id,...s.data()} as InventoryItem));
       assertItems(items);
       if(mode==='PICKUP')mustBeReadyAtPickup(items);
-      const slots=items.flatMap(item=>occupiedDays(parsed.pickupDate,parsed.returnDate,item.bufferDays)
+      const slots=items.flatMap(item=>occupiedDays(parsed.pickupDate,parsed.returnDate,0)
         .map(day=>({item,day,ref:db().collection('rentalSlots').doc(slotId(item.id,day))})));
       assertSlotCapacity(slots.length);
       const lockSnaps=await Promise.all(slots.map(s=>tx.get(s.ref)));
       const conflicts=lockSnaps.flatMap((snap,i)=>snap.exists?[{sku:slots[i].item.sku,date:slots[i].day}]:[]);
       if(conflicts.length) throw new ApiError(409,'Lịch thuê đã bị giữ bởi đơn khác.',conflicts.slice(0,10));
-      const lines:RentalLine[]=items.map(item=>({itemId:item.id,name:item.name,sku:item.sku,size:item.size,dailyRate:item.dailyRate,bufferDays:item.bufferDays,replacementValue:item.replacementValue,lineTotal:item.dailyRate*parsed.rentalDays,startDate:parsed.pickupDate}));
+      const lines:RentalLine[]=items.map(item=>({itemId:item.id,name:item.name,sku:item.sku,size:item.size,dailyRate:item.dailyRate,bufferDays:0,replacementValue:item.replacementValue,lineTotal:item.dailyRate*parsed.rentalDays,startDate:parsed.pickupDate}));
       const total=lines.reduce((sum,l)=>sum+l.lineTotal,0);
       if(depositDue>total) throw new ApiError(400,'Tiền cọc không thể cao hơn tổng đơn.');
       const code='TH-'+now.slice(2,10).replace(/-/g,'')+'-'+ref.id.slice(0,5).toUpperCase();
