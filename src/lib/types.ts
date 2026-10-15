@@ -4,9 +4,9 @@ export type Role = 'admin' | 'staff';
 export interface InventoryItem {
   id: string; name: string; sku: string; category: string; size: string; color: string;
   dailyRate: number; bufferDays: number; replacementValue: number;
-  imagePaths?: string[]; requiresLaundry?: boolean; laundryStartedAt?: string|null; laundryCompletedAt?: string|null; expectedReturnDate?: string|null; currentOrderId?: string|null; status: ItemStatus; createdAt: string; createdBy?: string;
+  archivedAt?: string|null; imagePaths?: string[]; requiresLaundry?: boolean; laundryStartedAt?: string|null; laundryCompletedAt?: string|null; expectedReturnDate?: string|null; currentOrderId?: string|null; status: ItemStatus; createdAt: string; createdBy?: string;
 }
-export interface Customer { id: string; name: string; phone: string; sizeNote: string; note: string; createdAt: string; }
+export interface Customer { id: string; name: string; phone: string; sizeNote?: string; note: string; createdAt: string; }
 export interface RentalLine {
   itemId: string; name: string; sku: string; size: string;
   dailyRate: number; bufferDays: number; replacementValue: number; lineTotal: number; startDate?: string;
@@ -19,7 +19,7 @@ export interface RentalOrder {
   id: string; code: string; customerId: string; customerName: string; customerPhone: string;
   pickupDate: string; returnDate: string; rentalDays: number;
   lines: RentalLine[]; total: number; paid: number; depositDue: number;
-  compensationTotal?: number; returnInspection?: ReturnInspection[];
+  compensationTotal?: number; returnInspection?: ReturnInspection[]; lateDays?: number; lateFeeTotal?: number; otherFeeTotal?: number; surchargeNote?: string; returnedAt?: string;
   note: string; status: OrderStatus; createdAt: string; updatedAt: string; createdBy: string; history: RentalEvent[];
 }
 export interface StaffProfile { uid: string; name: string; email: string; role: Role; disabled: boolean; createdAt?: string; }
