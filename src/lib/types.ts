@@ -2,13 +2,13 @@ export type ItemStatus = 'AVAILABLE' | 'RENTED' | 'LAUNDRY' | 'MAINTENANCE' | 'M
 export type OrderStatus = 'RESERVED' | 'PICKED_UP' | 'RETURNED' | 'CANCELLED';
 export type Role = 'admin' | 'staff';
 export interface InventoryItem {
-  id: string; name: string; sku: string; category: string; size: string; color: string;
+  id: string; name: string; sku: string; hangerCode?: string; category: string; size: string; color: string;
   dailyRate: number; bufferDays: number; replacementValue: number;
   archivedAt?: string|null; imagePaths?: string[]; requiresLaundry?: boolean; laundryStartedAt?: string|null; laundryCompletedAt?: string|null; expectedReturnDate?: string|null; currentOrderId?: string|null; status: ItemStatus; createdAt: string; createdBy?: string;
 }
 export interface Customer { id: string; name: string; phone: string; sizeNote?: string; note: string; createdAt: string; }
 export interface RentalLine {
-  itemId: string; name: string; sku: string; size: string;
+  itemId: string; name: string; sku: string; hangerCode?: string; size: string;
   dailyRate: number; bufferDays: number; replacementValue: number; lineTotal: number; startDate?: string;
 }
 export interface ProductCategory { id: string; name: string; createdAt: string; }
@@ -20,7 +20,7 @@ export interface RentalOrder {
   pickupDate: string; returnDate: string; rentalDays: number;
   lines: RentalLine[]; total: number; paid: number; depositDue: number;
   compensationTotal?: number; returnInspection?: ReturnInspection[]; lateDays?: number; lateFeeTotal?: number; otherFeeTotal?: number; surchargeNote?: string; returnedAt?: string;
-  note: string; status: OrderStatus; createdAt: string; updatedAt: string; createdBy: string; history: RentalEvent[];
+  note: string; status: OrderStatus; createdAt: string; updatedAt: string; createdBy: string; createdByName?: string; history: RentalEvent[];
 }
 export interface StaffProfile { uid: string; name: string; email: string; role: Role; disabled: boolean; createdAt?: string; }
 export interface AuditRecord {
@@ -29,5 +29,5 @@ export interface AuditRecord {
 }
 export interface DashboardData {
   items: InventoryItem[]; customers: Customer[]; orders: RentalOrder[]; categories: ProductCategory[];
-  me: { uid: string; role: Role; name: string };
+  me: { uid: string; role: Role; name: string }; staffNames?: Record<string,string>;
 }
