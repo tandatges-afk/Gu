@@ -1,6 +1,6 @@
-# GU — Thuê đồ xinh v4.1.2 (BẢN MÃ NGUỒN TỔNG HỢP)
+# GU — Thuê đồ xinh v4.1.3 (BẢN MÃ NGUỒN TỔNG HỢP)
 
-Đây là **toàn bộ dự án** GU v4.1.2, không phải bản vá. Nó tổng hợp các thay đổi đã có từ GU 2.x, 3.x, 4.0 và 4.1, bao gồm bước **kiểm đồ trước, tính tiền sau** của v4.1.2.
+Đây là **toàn bộ dự án** GU v4.1.3, không phải bản vá. Nó tổng hợp các thay đổi đã có từ GU 2.x, 3.x, 4.0 và 4.1, bao gồm bước **kiểm đồ trước, tính tiền sau** của v4.1.2.
 
 ## 1. Có gì trong gói?
 

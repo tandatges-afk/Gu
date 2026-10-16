@@ -20,7 +20,7 @@ export interface RentalOrder {
   pickupDate: string; returnDate: string; rentalDays: number;
   lines: RentalLine[]; total: number; paid: number; depositDue: number;
   compensationTotal?: number; returnInspection?: ReturnInspection[]; lateDays?: number; lateFeeTotal?: number; otherFeeTotal?: number; surchargeNote?: string; returnedAt?: string;
-  note: string; status: OrderStatus; createdAt: string; updatedAt: string; createdBy: string; history: RentalEvent[];
+  note: string; status: OrderStatus; createdAt: string; updatedAt: string; createdBy: string; createdByName?: string; history: RentalEvent[];
 }
 export interface StaffProfile { uid: string; name: string; email: string; role: Role; disabled: boolean; createdAt?: string; }
 export interface AuditRecord {
@@ -29,5 +29,5 @@ export interface AuditRecord {
 }
 export interface DashboardData {
   items: InventoryItem[]; customers: Customer[]; orders: RentalOrder[]; categories: ProductCategory[];
-  me: { uid: string; role: Role; name: string };
+  me: { uid: string; role: Role; name: string }; staffNames?: Record<string,string>;
 }

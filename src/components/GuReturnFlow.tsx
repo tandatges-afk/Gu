@@ -52,12 +52,12 @@ export function GuReturnFlow({order,items,today,busy,onSubmit}:{
       <div><strong>Nhận trả đồ</strong><small>{stage==='check'?'Bước 1/2 · Kiểm tra đủ / thiếu từng món':'Bước 2/2 · Xem tiền hệ thống tính tự động'}</small></div>
     </div>
     {stage==='check'?<>
-      <p className="hint">Kiểm tra đúng mã móc trên từng bộ. Chỉ sau khi kiểm đủ mới hiển thị phần thanh toán.</p>
+      
       <div className="gu-return-progress">Đã kiểm <b>{estimate.verified}/{order.lines.length}</b> món</div>
       {order.lines.map(line=><div className="gu-return-item" key={line.itemId}>
         <div className="gu-return-item-title">
           <strong>{line.name}</strong>
-          <small>Size {line.size} · Móc: {items.find(i=>i.id===line.itemId)?.hangerCode||line.hangerCode||'Chưa cấp mã'}</small>
+          <small>Size {line.size} · Mã sản phẩm: {items.find(i=>i.id===line.itemId)?.hangerCode||line.hangerCode||'Chưa cấp mã'}</small>
         </div>
         <div className="gu-return-choices" role="group" aria-label={'Kiểm nhận '+line.name}>
           <button type="button" className={'gu-return-choice '+(checks[line.itemId]==='OK'?'is-ok':'')} aria-pressed={checks[line.itemId]==='OK'} onClick={()=>setChecks(v=>({...v,[line.itemId]:'OK'}))}>Đã nhận đủ</button>
@@ -77,7 +77,7 @@ export function GuReturnFlow({order,items,today,busy,onSubmit}:{
         <div><span>Đã thanh toán</span><strong>− {money(order.paid)}</strong></div>
         <div className="gu-return-total"><span>Còn phải thu</span><strong>{money(estimate.remaining)}</strong></div>
       </div>
-      <p className="hint">Phí trễ tự động tính bằng số ngày trễ × tổng giá thuê mỗi ngày. Không cần nhập lại tiền trễ.</p>
+      
       {!showExtra?<button className="gu-return-add-fee" type="button" onClick={()=>setShowExtra(true)}><Plus size={15}/> Thêm phụ phí khác (nếu có)</button>:<div className="gu-return-extras">
         <label className="form-field"><span>Phụ phí khác (VND)</span><input className="input" type="number" min="0" max="1000000000" inputMode="numeric" placeholder="Để trống nếu không có" value={extraText} onChange={e=>{setExtraText(e.target.value);setCollected(false);}}/></label>
         {extraNumber>0&&<label className="form-field"><span>Lý do phụ phí</span><input className="input" maxLength={300} placeholder="Ví dụ: vệ sinh đặc biệt, hỏng phụ kiện…" value={extraReason} onChange={e=>setExtraReason(e.target.value)}/></label>}
@@ -89,7 +89,7 @@ export function GuReturnFlow({order,items,today,busy,onSubmit}:{
         <button type="button" className="btn btn-white" onClick={()=>{setStage('check');setCollected(false);}} disabled={busy}><ArrowLeft size={16}/> Sửa kiểm nhận</button>
         <button type="button" className="btn btn-dark" disabled={busy||!validExtras} onClick={()=>void submit()}><Wallet size={16}/> {busy?'Đang lưu…':'Hoàn tất nhận trả'}</button>
       </div>
-      <p className="hint">Máy chủ tính lại toàn bộ phí ngay khi lưu. Đơn hoàn thành sẽ ẩn với nhân viên; Admin vẫn xem công nợ và nhật ký.</p>
+      
     </>}
   </section>;
 }

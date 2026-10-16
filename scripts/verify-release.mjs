@@ -6,6 +6,9 @@ const required = [
   'src/app/page.tsx',
   'src/app/globals.css',
   'src/app/api/bootstrap/route.ts',
+  'src/app/api/debts/route.ts',
+  'src/components/GuDebts.tsx',
+  'src/lib/debts.ts',
   'src/app/api/smart-calendar/route.ts',
   'src/app/api/items/hanger-codes/route.ts',
   'src/app/api/orders/[id]/route.ts',
@@ -16,6 +19,7 @@ const required = [
   'src/lib/rental.ts',
   'src/lib/return-settlement.ts',
   'src/lib/hanger-code.ts',
+  'src/lib/order-creator.ts',
   'src/lib/smart-calendar.ts',
   'src/lib/rental-extension.ts',
   'public/gu-sw.js',
@@ -25,7 +29,10 @@ const required = [
 const missing = required.filter(p => !existsSync(join(root,p)));
 const read = p => readFileSync(join(root,p),'utf8');
 const checks = [
-  ['mã móc tự động', /hangerCode\??:/, 'src/lib/types.ts'],
+  ['công nợ theo khách', /buildDebtSummary/, 'src/lib/debts.ts'],
+  ['mã sản phẩm tự động', /hangerCode\??:/, 'src/lib/types.ts'],
+  ['lưu tên nhân viên tạo đơn', /createdByName:me\.name/, 'src/app/api/orders/route.ts'],
+  ['tên nhân viên trong lịch', /gu-calendar-cell-creator/, 'src/app/page.tsx'],
   ['sản phẩm lưu trữ', /archivedAt\??:/, 'src/lib/types.ts'],
   ['số ngày trả trễ', /lateDays\??:/, 'src/lib/types.ts'],
   ['phí trả trễ', /lateFeeTotal\??:/, 'src/lib/types.ts'],
@@ -35,7 +42,7 @@ const checks = [
 ];
 const absent = checks.filter(([name,pattern,file]) => missing.includes(file) || !pattern.test(read(file))).map(([name])=>name);
 const pkg = JSON.parse(read('package.json'));
-if (pkg.version !== '4.1.2') absent.push('phiên bản 4.1.2 trong package.json');
+if (pkg.version !== '4.1.4') absent.push('phiên bản 4.1.4 trong package.json');
 if (missing.length || absent.length) {
   console.error('KHÔNG ĐỒNG BỘ. Thiếu tệp:', missing.join(', ') || 'không');
   console.error('Thiếu thành phần:', absent.join(', ') || 'không');

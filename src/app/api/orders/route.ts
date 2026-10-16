@@ -44,7 +44,7 @@ export async function POST(req:NextRequest) {
       const status=mode==='PICKUP'?'PICKED_UP':'RESERVED';
       const order:Omit<RentalOrder,'id'>={code,customerId,customerName:customer.name,customerPhone:customer.phone,
         pickupDate:parsed.pickupDate,returnDate:parsed.returnDate,rentalDays:parsed.rentalDays,lines,total,paid:0,depositDue,note,status,
-        createdAt:now,updatedAt:now,createdBy:me.uid,history:[{action:status==='RESERVED'?'RESERVED':'PICKUP',by:me.uid,at:now,detail:mode==='PICKUP'?'Tạo đơn và giao đồ ngay':'Đặt lịch, chờ giao đồ'}]};
+        createdAt:now,updatedAt:now,createdBy:me.uid,createdByName:me.name,history:[{action:status==='RESERVED'?'RESERVED':'PICKUP',by:me.uid,at:now,detail:mode==='PICKUP'?'Tạo đơn và giao đồ ngay':'Đặt lịch, chờ giao đồ'}]};
       tx.create(ref,order);
       auditInTransaction(tx,me,mode==='PICKUP'?'ORDER_CREATE_PICKUP':'ORDER_RESERVE','order',ref.id,`${code} / ${customer.name} / ${items.length} món`,now);
       slots.forEach(({item,day,ref:lockRef})=>tx.create(lockRef,{orderId:ref.id,itemId:item.id,date:day}));

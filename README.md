@@ -1,8 +1,22 @@
-# GU - Thuê đồ xinh — Bản mã nguồn đầy đủ v4.1.2
+# GU - Thuê đồ xinh — Bản mã nguồn đầy đủ v4.1.4
 
 **Hướng dẫn nâng cấp từ bất kỳ phiên bản cũ nào:** [`docs/HUONG-DAN-CAI-DAT-BAN-TOAN-BO.md`](docs/HUONG-DAN-CAI-DAT-BAN-TOAN-BO.md). Không cần tải/ghép các bản vá 2.x, 3.x, 4.0 hay 4.1.1.
 
 Lệnh kiểm tra đồng bộ: `npm run verify:release`; kiểm thử: `npm run test`; trước khi deploy: `npm run typecheck && npm run build`.
+
+---
+
+## GU v4.1.4 — UX/UI dễ phân biệt & công nợ theo khách
+
+- Bộ màu có độ tương phản cao: trống xanh lá, giữ chỗ cam, đang thuê xanh dương, đang giặt tím, thiếu/trễ đỏ, bảo trì xám.
+- Chọn sản phẩm có viền xanh đậm, nền xanh rõ và nhãn **Đã chọn** (không chỉ đổi sắc độ nhẹ).
+- Menu chia nhóm Công việc / Kho & vận hành / Admin; hành động phụ trong kho gộp dưới **Khác**; bỏ danh sách giặt trùng lặp khỏi trang Đơn thuê.
+- **Admin → Công nợ:** biết ai còn nợ, số điện thoại, từng mã đơn, số phải thu/đã thu/còn nợ và nút mở đơn/gọi khách.
+- Đơn **Đặt trước** chưa giao là **Dự kiến thu**, không trộn vào công nợ thực tế; đơn đã giao hoặc đã trả nhưng thiếu tiền mới tính công nợ.
+- Công nợ quét lịch sử nhiều trang trên Firestore (không chỉ 300 đơn bootstrap). Nếu vượt ngưỡng 10.000 đơn, hệ thống báo lỗi thay vì hiện số tổng sai.
+- Gọi lại GET từng đơn lịch sử cho Admin để xem/thu tiền được cả các đơn đã ra khỏi danh sách 300 đơn mới nhất.
+
+Hướng dẫn nâng cấp và kiểm thử: [`docs/CHANGELOG-v4.1.4.md`](docs/CHANGELOG-v4.1.4.md).
 
 ---
 
@@ -12,9 +26,9 @@ Xem [`docs/CHANGELOG-v4.1.2.md`](docs/CHANGELOG-v4.1.2.md) và [`README-v4.1.2.m
 
 ---
 
-## GU v4.1.1 — Mã móc tự động, không nhập tay
+## GU v4.1.1 — Mã sản phẩm tự động, không nhập tay
 
-Mỗi món đồ thật có mã móc riêng `GU-00001`, `GU-00002`… Mã xuất hiện trong Kho, Lịch, Tạo đơn, Chi tiết đơn, Nhận trả và Giặt. Mã không chỉnh sửa được trong form. Giữ mã trên móc cố định cho đúng món; trường hợp khách chỉ mang áo về mà không mang móc, phải có quy trình đối chiếu trước khi giao và khi trả vì móc riêng không tự chứng minh danh tính của quần áo.
+Mỗi món đồ thật có mã sản phẩm riêng `GU-00001`, `GU-00002`… Mã xuất hiện trong Kho, Lịch, Tạo đơn, Chi tiết đơn, Nhận trả và Giặt. Mã không chỉnh sửa được trong form. Giữ mã trên móc cố định cho đúng món; trường hợp khách chỉ mang áo về mà không mang móc, phải có quy trình đối chiếu trước khi giao và khi trả vì móc riêng không tự chứng minh danh tính của quần áo.
 
 **Kho cũ:** Admin → Kho sản phẩm → **Cấp mã cho đồ cũ**. Mỗi lần cấp tối đa 25 món, lặp lại nếu còn. Không xóa hay tạo lại món cũ. Chuẩn bị nhãn và ghi lên móc đúng theo dòng trong kho. Bộ đếm được tăng trong Firestore transaction; không nhập/sửa thủ công document `inventoryCounters/hanger`.
 
@@ -187,3 +201,14 @@ Chỉ push/merge lên Vercel sau khi `typecheck` và `build` đều hoàn thành
 - Giữ nguyên 10 biến trong `.env.local` và Vercel Environment Variables; không có biến mới cho v4.0.
 - Tài khoản nhân viên cần quyền `staff` để tạo đơn, nhận trả, giặt và gia hạn; Admin xem nhật ký. Mọi gia hạn qua API được ghi log.
 - Vì sao cần kết nối mạng: nếu lưu đơn offline, hai nhân viên có thể giữ lịch một bộ đồ cùng ngày; GU chỉ ghi xác nhận thuê khi Firestore đã lưu thành công.
+
+
+## GU v4.1.4 — Lịch thuê theo nhân viên, mã sản phẩm, giao diện gọn
+
+- Nhân viên tạo đơn được máy chủ xác định từ Firebase Authentication (`staffUser`), lưu `createdBy` (UID) và `createdByName` (tên tại thời điểm lập). Không lấy người tạo từ biểu mẫu client.
+- Lịch trên desktop và điện thoại hiển thị người tạo từng đơn; Admin lọc sản phẩm có lịch do nhân viên được chọn tạo, click ô để xem tên đầy đủ trong chi tiết đơn. Xuất CSV có thêm cột nhân viên tạo.
+- Đơn cũ: ưu tiên tra cứu nhân viên qua UID còn lưu trong Firestore. Nếu hồ sơ nhân viên không còn, GU hiển thị “Chưa rõ nhân viên” thay vì đoán.
+- Đổi tất cả nhãn hiển thị “mã móc” thành “mã sản phẩm”, nhưng giữ giá trị và trường Firestore `hangerCode`, đường dẫn API `items/hanger-codes` để không mất mã đang dùng hay ảnh hưởng đơn cũ. Không có hành động đổi mã hàng loạt.
+- Bỏ `gu-smart-hint` và các đoạn văn nhắc quy trình không cần thiết. Vẫn giữ các thông báo lỗi, xác nhận thanh toán, và tình trạng cần xử lý.
+- Lưu ý lịch hiện chỉ tải tối đa 300 đơn mới nhất theo endpoint bootstrap hiện có. Dữ liệu công nợ lịch sử được Admin mở riêng.
+- Trước khi triển khai, chạy `npm run verify:release && npm run test && npm run typecheck && npm run build` ở Codespaces.

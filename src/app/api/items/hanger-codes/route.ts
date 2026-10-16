@@ -9,7 +9,7 @@ export const preferredRegion='sin1';
 export async function POST(req: NextRequest) {
   try {
     const me=await staffUser(req);
-    if(me.role!=='admin')throw new ApiError(403,'Chỉ Admin được cấp mã móc cho kho cũ.');
+    if(me.role!=='admin')throw new ApiError(403,'Chỉ Admin được cấp mã sản phẩm cho kho cũ.');
     const items=await db().collection('items').limit(300).get();
     const legacy=items.docs.filter(s=>!s.data().hangerCode&&!s.data().archivedAt).slice(0,25);
     if(!legacy.length)return NextResponse.json({assigned:0,remaining:0});
@@ -25,7 +25,7 @@ export async function POST(req: NextRequest) {
         value=nextHangerSequence(value);
         const code=formatHangerCode(value);
         tx.update(snap.ref,{hangerCode:code});
-        auditInTransaction(tx,me,'ITEM_HANGER_CODE','item',snap.id,`Cấp mã móc ${code}`,now);
+        auditInTransaction(tx,me,'ITEM_HANGER_CODE','item',snap.id,`Cấp mã sản phẩm ${code}`,now);
         count++;
       }
       if(count)tx.set(counterRef,{value,updatedAt:now});

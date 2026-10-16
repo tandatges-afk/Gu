@@ -10,6 +10,26 @@ import { auditInTransaction } from '@/lib/audit';
 import { planRentalExtension } from '@/lib/rental-extension';
 export const runtime='nodejs';
 export const preferredRegion='sin1';
+
+// Allow administrators to open historical unpaid orders outside the bootstrap 300-row window.
+export async function GET(req:NextRequest,ctx:{params:Promise<{id:string}>}) {
+  try {
+    const me=await staffUser(req);
+    if(me.role!=='admin')throw new ApiError(403,'Chỉ Admin được mở đơn công nợ lịch sử.');
+    const {id}=await ctx.params;
+    if(!/^[a-zA-Z0-9]{10,64}$/.test(id))throw new ApiError(400,'Mã đơn không hợp lệ.');
+    const doc=await db().collection('orders').doc(id).get();
+    if(!doc.exists)throw new ApiError(404,'Không tìm thấy đơn.');
+    const order={id:doc.id,...doc.data()} as RentalOrder;
+    // For old orders without a name snapshot, resolve the creator using their immutable UID.
+    if(!order.createdByName&&order.createdBy){
+      const creator=await db().collection('staff').doc(order.createdBy).get();
+      if(creator.exists)order.createdByName=String(creator.data()?.name||'').trim();
+    }
+    return NextResponse.json(order,{headers:{'Cache-Control':'private, no-store'}});
+  } catch(e){return handleError(e);}
+}
+
 export async function PATCH(req:NextRequest,ctx:{params:Promise<{id:string}>}) {
   try {
     const me=await staffUser(req);
