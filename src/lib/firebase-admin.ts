@@ -14,5 +14,6 @@ function app() {
     throw new Error('Firebase Web Project ID không khớp Firebase Admin Project ID.');
   return initializeApp({ credential: cert({ projectId, clientEmail, privateKey }) });
 }
+export function serverCredential() { return app().options.credential; }
 export function serverAuth() { return getAuth(app()); }
 export function db() { return getFirestore(app()); }

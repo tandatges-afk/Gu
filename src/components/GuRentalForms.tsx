@@ -4,13 +4,14 @@ import {AlertCircle, CheckCircle2, Plus, Search, LoaderCircle, ShoppingBag} from
 import {daysInclusive, money, vietnamToday} from '@/lib/rental';
 import type {Customer, InventoryItem, RentalOrder} from '@/lib/types';
 import {ProductImage} from './GuExtras';
+import {GuMoneyInput} from './GuMoneyInput';
 
 type Api=<T=unknown>(path:string,init?:RequestInit)=>Promise<T>;
 type Availability={available:boolean;conflicts:{itemId:string;sku:string;date:string}[];reason:string};
 type Booking={customerId:string;itemIds:string[];pickupDate:string;returnDate:string;depositDue:number;note:string};
 const defaultCategory='Tất cả danh mục';
 const isBlocked=(item:InventoryItem,mode:'RESERVE'|'PICKUP')=>
-  ['LAUNDRY','MAINTENANCE','MISSING'].includes(item.status)||!(item.replacementValue>0)||
+  Boolean(item.archivedAt)||['LAUNDRY','MAINTENANCE','MISSING'].includes(item.status)||!(item.replacementValue>0)||
   (mode==='PICKUP'&&item.status!=='AVAILABLE')||
   (item.status==='RENTED'&&Boolean(item.expectedReturnDate&&item.expectedReturnDate<vietnamToday()));
 export function NewRentalForm({items,customers,api,initial,mode,onClose,onSuccess,onCustomerCreated}:{
@@ -20,6 +21,7 @@ export function NewRentalForm({items,customers,api,initial,mode,onClose,onSucces
   const [booking,setBooking]=useState<Booking>(initial);
   const [phoneQuery,setPhoneQuery]=useState('');
   const [productQuery,setProductQuery]=useState('');
+  const [remoteProducts,setRemoteProducts]=useState<InventoryItem[]>([]);
   const [category,setCategory]=useState(defaultCategory);
   const [inlineCustomer,setInlineCustomer]=useState(false);
   const [newCustomer,setNewCustomer]=useState({name:'',phone:'',note:''});
@@ -37,12 +39,20 @@ export function NewRentalForm({items,customers,api,initial,mode,onClose,onSucces
     const t=setTimeout(()=>{api<{customers:Customer[]}>('customers?phone='+encodeURIComponent(digits)).then(r=>{if(!cancelled)setRemoteCustomers(r.customers);}).catch(()=>{});},300);
     return()=>{cancelled=true;clearTimeout(t);};
   },[phoneQuery,api]);
+  useEffect(()=>{
+    if(productQuery.trim().length<2){setRemoteProducts([]);return;}
+    let cancel=false;
+    const timer=setTimeout(()=>{api<{results:InventoryItem[]}>('catalog?kind=items&q='+encodeURIComponent(productQuery.trim())+'&size=50')
+      .then(result=>{if(!cancel)setRemoteProducts(result.results);}).catch(()=>{});},350);
+    return()=>{cancel=true;clearTimeout(timer);};
+  },[productQuery,api]);
+  const productSource=useMemo(()=>Array.from(new Map([...items,...remoteProducts].map(i=>[i.id,i])).values()),[items,remoteProducts]);
   const matchingCustomers=customerList.filter(c=>(c.phone+' '+c.name).toLocaleLowerCase('vi-VN').includes(phoneQuery.trim().toLocaleLowerCase('vi-VN'))).slice(0,30);
   const categories=Array.from(new Set(items.map(x=>x.category))).sort();
-  const matchingItems=items.filter(i=>(category===defaultCategory||i.category===category)&&
+  const matchingItems=productSource.filter(i=>(category===defaultCategory||i.category===category)&&
     (i.name+' '+i.size+' '+i.color+' '+i.category+' '+(i.hangerCode||'')).toLocaleLowerCase('vi-VN').includes(productQuery.trim().toLocaleLowerCase('vi-VN')));
   const rentalDays=(()=>{try{return daysInclusive(booking.pickupDate,booking.returnDate);}catch{return 0;}})();
-  const selected=items.filter(x=>booking.itemIds.includes(x.id));
+  const selected=productSource.filter(x=>booking.itemIds.includes(x.id));
   const total=selected.reduce((sum,x)=>sum+x.dailyRate*rentalDays,0);
   useEffect(()=>{
     if(!booking.itemIds.length||!rentalDays||mode==='PICKUP'&&booking.pickupDate!==vietnamToday()){setChecking(false);setAvailability(null);return;}
@@ -93,7 +103,7 @@ export function NewRentalForm({items,customers,api,initial,mode,onClose,onSucces
         {checking?<LoaderCircle size={18} className="spin"/>:availability?.available?<CheckCircle2 size={18}/>:<AlertCircle size={18}/>}
         <div><strong>{!selected.length?'Hãy chọn sản phẩm':checking?'Đang đối chiếu lịch…':availability?.available?'Các món đã chọn đang trống lịch':'Chưa thể giữ các món đã chọn'}</strong><small>{availability?.reason||availability?.conflicts?.slice(0,5).map(c=>(items.find(i=>i.id===c.itemId)?.name||'Sản phẩm')+' · '+c.date.split('-').reverse().join('/')).join('; ')||'Khi lưu, máy chủ sẽ kiểm tra trùng lần cuối.'}</small></div>
       </div>
-      <div className="form-grid"><label className="form-field"><span>Tiền cọc cần thu (VND)</span><input type="number" min={0} max={total} className="input" value={booking.depositDue||''} placeholder="Nhập tiền cọc nếu có" onChange={e=>setBooking({...booking,depositDue:Number(e.target.value)})}/></label><label className="form-field"><span>Ghi chú đơn</span><input className="input" value={booking.note} onChange={e=>setBooking({...booking,note:e.target.value})}/></label></div>
+      <div className="form-grid"><label className="form-field"><span>Tiền cọc cần thu (VND)</span><GuMoneyInput className="input" value={booking.depositDue||''} placeholder="Nhập tiền cọc nếu có" maxLength={17} onValueChange={raw=>setBooking({...booking,depositDue:Number(raw)})}/></label><label className="form-field"><span>Ghi chú đơn</span><input className="input" value={booking.note} onChange={e=>setBooking({...booking,note:e.target.value})}/></label></div>
       <div className="booking-total"><div><span>Giá thuê dự kiến</span><small>{selected.length} sản phẩm · {rentalDays} ngày (tính cả ngày nhận và trả)</small></div><strong>{money(total)}</strong></div>
       <div className="modal-actions"><button type="button" className="btn btn-white" onClick={onClose}>Đóng</button><button className="btn btn-dark" disabled={busy||checking||!availability?.available||!booking.customerId||booking.depositDue>total||mode==='PICKUP'&&booking.pickupDate!==today}>{busy?<LoaderCircle size={17} className="spin"/>:<ShoppingBag size={17}/>} {mode==='RESERVE'?'Đặt lịch & giữ chỗ':'Tạo đơn & đã giao đồ'}</button></div>
     </form>

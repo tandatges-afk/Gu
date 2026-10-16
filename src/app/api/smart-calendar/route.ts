@@ -14,17 +14,28 @@ export async function POST(req:NextRequest){
     const start=String(b.pickupDate||''),end=String(b.returnDate||'');
     const rentalDays=validateSmartRange(start,end,today);
     if(b.mode==='FIND_AVAILABLE'){
-      // The date index on rentalSlots is a built-in Firestore single-field index.
-      // Query all occupied slots for the selected interval, not the possibly-truncated dashboard's recent orders.
-      // Fail closed if the store is beyond the safe query cap.
-      const [stock,locks]=await Promise.all([
-        db().collection('items').limit(300).get(),
-        db().collection('rentalSlots').where('date','>=',start).where('date','<=',end).limit(4001).get()
-      ]);
-      if(locks.size>4000)throw new ApiError(409,'Lịch thuê có quá nhiều bản ghi; vui lòng thu hẹp ngày tra cứu.');
-      const occupied=new Set(locks.docs.map(d=>String(d.data().itemId||'')));
-      const availableIds=stock.docs.filter(d=>!blockedReason({id:d.id,...d.data()} as InventoryItem,today)&&!occupied.has(d.id)).map(d=>d.id);
-      return NextResponse.json({mode:'FIND_AVAILABLE',pickupDate:start,returnDate:end,availableIds,checkedItems:stock.size,checkedAt:new Date().toISOString()},{headers:{'Cache-Control':'no-store'}});
+      const q=String(b.query||'').trim().slice(0,80);
+      const limit=40;
+      // Cheap discovery: only a page of products, then exact per-item locks. Never scan all rentalSlots.
+      let itemQuery=db().collection('items').orderBy('name').limit(limit);
+      if(q)itemQuery=db().collection('items').orderBy('name').startAt(q).endAt(q+'\uf8ff').limit(limit);
+      const stock=await itemQuery.get();
+      const candidates=stock.docs.map(d=>({id:d.id,...d.data()} as InventoryItem))
+        .filter(item=>!blockedReason(item,today));
+      const dates=Array.from({length:rentalDays},(_,index)=>addDays(start,index));
+      if(dates.length>31)throw new ApiError(400,'Chỉ tra cứu nhanh trong khoảng tối đa 31 ngày.');
+      const pairs=candidates.flatMap(item=>dates.map(date=>({item,date,ref:db().collection('rentalSlots').doc(slotId(item.id,date))})));
+      const busyIds=new Set<string>();
+      for(let offset=0;offset<pairs.length;offset+=300){
+        const batch=pairs.slice(offset,offset+300);
+        const snaps=await db().getAll(...batch.map(p=>p.ref));
+        snaps.forEach((snap,i)=>{if(snap.exists)busyIds.add(batch[i].item.id);});
+      }
+      const available=candidates.filter(i=>!busyIds.has(i.id));
+      return NextResponse.json({mode:'FIND_AVAILABLE',pickupDate:start,returnDate:end,
+        availableIds:available.map(i=>i.id),products:available,checkedItems:stock.size,
+        checkedAt:new Date().toISOString(),hasMore:stock.size===limit},
+        {headers:{'Cache-Control':'no-store'}});
     }
     if(b.mode==='NEXT_AVAILABLE'){
       const itemId=b.itemId;

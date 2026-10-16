@@ -8,6 +8,8 @@ import type { RentalOrder, ReturnInspection, InventoryItem } from '@/lib/types';
 import { calculateInspection } from '@/lib/inspection';
 import { auditInTransaction } from '@/lib/audit';
 import { planRentalExtension } from '@/lib/rental-extension';
+import {syncDebtIndex} from '@/lib/debt-index';
+import {FieldValue} from 'firebase-admin/firestore';
 export const runtime='nodejs';
 export const preferredRegion='sin1';
 
@@ -76,6 +78,7 @@ export async function PATCH(req:NextRequest,ctx:{params:Promise<{id:string}>}) {
         if(order.status==='PICKED_UP' && itemSnaps.some(s=>s.data()?.status!=='RENTED'||s.data()?.currentOrderId!==id))
           throw new ApiError(409,'Có sản phẩm không còn ở trạng thái thuê của đơn này.');
         const now=new Date().toISOString();
+        syncDebtIndex(tx,db(),{...order,total:plan.newTotal,returnDate:plan.nextReturnDate,updatedAt:now});
         tx.update(ref,{
           returnDate:plan.nextReturnDate,rentalDays:plan.rentalDays,
           total:plan.newTotal,lines:plan.newLines,updatedAt:now,
@@ -109,6 +112,7 @@ export async function PATCH(req:NextRequest,ctx:{params:Promise<{id:string}>}) {
         const conflicts=locks.flatMap((s,i)=>s.exists?[{sku:slotList[i].line.sku,date:slotList[i].day}]:[]);
         if(conflicts.length)throw new ApiError(409,'Các sản phẩm thêm vào đã có người giữ lịch.',conflicts.slice(0,10));
         const now=new Date().toISOString();
+        syncDebtIndex(tx,db(),{...order,total:order.total+newLines.reduce((s,l)=>s+l.lineTotal,0),updatedAt:now});
         tx.update(ref,{lines:[...order.lines,...newLines],total:order.total+newLines.reduce((s,l)=>s+l.lineTotal,0),updatedAt:now,
           history:[...order.history,{action:'ADD_ITEMS',by:me.uid,at:now,detail:'Thêm '+newLines.map(l=>l.sku).join(', ')}]});
         slotList.forEach(({line,day,ref:r})=>tx.create(r,{orderId:id,itemId:line.itemId,date:day}));
@@ -154,7 +158,16 @@ export async function PATCH(req:NextRequest,ctx:{params:Promise<{id:string}>}) {
       if(action==='RETURN'&&collectedAtReturn>maxCollection)
         throw new ApiError(400,'Số tiền thu vượt công nợ sau khi tính tất cả phụ thu.');
       const now=new Date().toISOString();
+      const cashCollected=amount+collectedAtReturn;
+      if(cashCollected>0){
+        // Daily cash report: constant-size counter, no scanning historical orders.
+        const date=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Ho_Chi_Minh',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date(now));
+        tx.set(db().collection('cashDaily').doc(date),{amount:FieldValue.increment(cashCollected),payments:FieldValue.increment(1),updatedAt:now},{merge:true});
+      }
       const status=action==='PICKUP'?'PICKED_UP':action==='RETURN'?'RETURNED':action==='CANCEL'?'CANCELLED':order.status;
+      syncDebtIndex(tx,db(),{...order,status,paid:order.paid+amount+collectedAtReturn,updatedAt:now,
+        ...(action==='RETURN'?{compensationTotal,lateFeeTotal:specifiedLate,otherFeeTotal:otherFee}:{}),
+      });
       tx.update(ref,{status,paid:order.paid+amount+collectedAtReturn,updatedAt:now,
         ...(action==='RETURN'?{compensationTotal,returnInspection:inspections,returnedAt:now,lateDays:overdue,lateFeeTotal:specifiedLate,otherFeeTotal:otherFee,surchargeNote}:{}),
         history:[...order.history,{action,by:me.uid,at:now,

@@ -29,5 +29,5 @@ export interface AuditRecord {
 }
 export interface DashboardData {
   items: InventoryItem[]; customers: Customer[]; orders: RentalOrder[]; categories: ProductCategory[];
-  me: { uid: string; role: Role; name: string }; staffNames?: Record<string,string>;
+  me: { uid: string; role: Role; name: string }; staffNames?: Record<string,string>; counts?:{items:number;available:number;laundry:number;rented:number;missing:number;customers:number;activeOrders:number};
 }

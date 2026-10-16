@@ -13,3 +13,6 @@ firebase-adminsdk*.json
 # Credentials downloaded from Firebase Console
 *-firebase-adminsdk-*.json
 service-account*.json
+
+# Private exports, never push client records to GitHub
+private-backups/
