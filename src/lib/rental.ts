@@ -69,3 +69,9 @@ export function requiresLaundry(item: {requiresLaundry?:boolean; bufferDays?:num
 export function assertSlotCapacity(slotCount:number): void {
   if(slotCount > 400) throw new Error('Đơn có quá nhiều ngày chiếm lịch (tối đa 400 ô lịch cho một lần lưu). Hãy chia thành nhiều đơn hoặc rút ngắn thời gian thuê.');
 }
+
+/** One-step post-return stock workflow, with no waiting-for-laundry stage. */
+export function postReturnStockStatus(item: {requiresLaundry?:boolean;bufferDays?:number}, inspection:'OK'|'MISSING'):'MISSING'|'LAUNDRY'|'AVAILABLE' {
+  if(inspection==='MISSING')return 'MISSING';
+  return requiresLaundry(item)?'LAUNDRY':'AVAILABLE';
+}

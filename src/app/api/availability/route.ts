@@ -14,7 +14,7 @@ export async function POST(req:NextRequest) {
     const items=snapshots.map(s=>s.exists?({id:s.id,...s.data()} as InventoryItem):null);
     if (items.some(x=>!x)) return NextResponse.json({available:false,conflicts:[],reason:'Có sản phẩm không tồn tại.'});
     const existing=items as InventoryItem[];
-    const blocked=existing.filter(x=>x.status==='LAUNDRY'||x.status==='MAINTENANCE'||x.status==='MISSING'||!(x.replacementValue>0)||(x.status==='RENTED' && !!x.expectedReturnDate && x.expectedReturnDate<vietnamToday()));
+    const blocked=existing.filter(x=>Boolean(x.archivedAt)||x.status==='LAUNDRY'||x.status==='MAINTENANCE'||x.status==='MISSING'||!(x.replacementValue>0)||(x.status==='RENTED' && !!x.expectedReturnDate && x.expectedReturnDate<vietnamToday()));
     const refs=requiredSlots(existing,parsed.pickupDate,parsed.returnDate);
     const occupied=await db().getAll(...refs.map(x=>x.ref));
     const conflicts=occupied.flatMap((s,i)=>s.exists?[{itemId:refs[i].item.id,sku:refs[i].item.sku,date:refs[i].day}]:[]);

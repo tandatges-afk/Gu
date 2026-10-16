@@ -11,14 +11,13 @@ export async function POST(req: NextRequest) {
     const b=await jsonBody(req);
     const name=assertText(b.name,'Tên khách',100);
     const phone=normalizePhone(b.phone);
-    const sizeNote=assertText(b.sizeNote ?? '', 'Ghi chú size',100,false);
     const note=assertText(b.note ?? '', 'Ghi chú',500,false);
     // Compatibility with historical customer records that predate phoneIndex.
     const legacy=await db().collection('customers').where('phone','==',phone).limit(1).get();
     if(!legacy.empty) return NextResponse.json({id:legacy.docs[0].id,...legacy.docs[0].data(),existing:true});
     const ref=db().collection('customers').doc();
     const phoneRef=db().collection('phoneIndex').doc(encodeURIComponent(phone));
-    const customer={name,phone,sizeNote,note,createdAt:new Date().toISOString()};
+    const customer={name,phone,note,createdAt:new Date().toISOString()};
     let existingId:string|null=null;
     await db().runTransaction(async tx=>{
       const old=await tx.get(phoneRef);

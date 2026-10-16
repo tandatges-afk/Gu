@@ -2,13 +2,13 @@ export type ItemStatus = 'AVAILABLE' | 'RENTED' | 'LAUNDRY' | 'MAINTENANCE' | 'M
 export type OrderStatus = 'RESERVED' | 'PICKED_UP' | 'RETURNED' | 'CANCELLED';
 export type Role = 'admin' | 'staff';
 export interface InventoryItem {
-  id: string; name: string; sku: string; category: string; size: string; color: string;
+  id: string; name: string; sku: string; hangerCode?: string; category: string; size: string; color: string;
   dailyRate: number; bufferDays: number; replacementValue: number;
   archivedAt?: string|null; imagePaths?: string[]; requiresLaundry?: boolean; laundryStartedAt?: string|null; laundryCompletedAt?: string|null; expectedReturnDate?: string|null; currentOrderId?: string|null; status: ItemStatus; createdAt: string; createdBy?: string;
 }
 export interface Customer { id: string; name: string; phone: string; sizeNote?: string; note: string; createdAt: string; }
 export interface RentalLine {
-  itemId: string; name: string; sku: string; size: string;
+  itemId: string; name: string; sku: string; hangerCode?: string; size: string;
   dailyRate: number; bufferDays: number; replacementValue: number; lineTotal: number; startDate?: string;
 }
 export interface ProductCategory { id: string; name: string; createdAt: string; }

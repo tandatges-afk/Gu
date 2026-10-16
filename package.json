@@ -1,6 +1,6 @@
 {
   "name": "gu-thue-do-xinh",
-  "version": "2.2.0",
+  "version": "4.1.2",
   "private": true,
   "type": "module",
   "scripts": {
@@ -9,7 +9,8 @@
     "start": "next start",
     "typecheck": "tsc --noEmit",
     "test": "node --experimental-strip-types --test tests/*.test.ts",
-    "diagnose:firebase": "node --env-file=.env.local scripts/diagnose-firebase.mjs"
+    "diagnose:firebase": "node --env-file=.env.local scripts/diagnose-firebase.mjs",
+    "verify:release": "node scripts/verify-release.mjs"
   },
   "dependencies": {
     "firebase": "^12.0.0",
@@ -26,6 +27,6 @@
     "typescript": "^5.8.0"
   },
   "engines": {
-    "node": ">=20.9.0"
+    "node": "22.x"
   }
 }

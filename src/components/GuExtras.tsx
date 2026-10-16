@@ -3,29 +3,40 @@ import {useEffect,useState, type FormEvent} from 'react';
 import {clientAuth} from '@/lib/firebase-client';
 import {money} from '@/lib/rental';
 import type {StaffProfile,AuditRecord} from '@/lib/types';
-import {Camera,Image as ImageIcon,LoaderCircle,Plus,ShieldCheck,UserX,UserCheck,RefreshCw} from 'lucide-react';
+import {Camera,Image as ImageIcon,Images,LoaderCircle,Plus,ShieldCheck,UserX,UserCheck,RefreshCw,ArrowUp} from 'lucide-react';
+import {useRef} from 'react';
+import {preparePhonePhoto,validateImageSelection,MAX_IMAGES} from '@/lib/mobile-images';
 export type ApiCall = <T=unknown>(path:string,init?:RequestInit)=>Promise<T>;
+/**
+ * Fit the complete garment inside its slot, independent of photo orientation.
+ * Shared by inventory, rental calendar, booking picker, and return details.
+ */
 export function ProductImage({paths,className='product-photo'}:{paths?:string[];className?:string}){
   const url=paths?.[0]||'';
+  const fallbackClassName=['photo-fallback',className==='product-photo'?'':className].filter(Boolean).join(' ');
   return url.startsWith('https://res.cloudinary.com/')?
-    <img src={url} alt="Ảnh sản phẩm" className={className} loading="lazy" referrerPolicy="no-referrer"/>:
-    <span className="photo-fallback"><ImageIcon size={21}/></span>;
+    <img src={url} alt="Ảnh sản phẩm" className={className} loading="lazy" decoding="async" referrerPolicy="no-referrer"/>:
+    <span className={fallbackClassName} role="img" aria-label="Chưa có ảnh sản phẩm"><ImageIcon size={21}/></span>;
 }
+/** GU Mobile v3: explicit Camera and Library actions instead of an ambiguous file picker. */
 export function ImageUploader({paths,onChange,disabled,onUploading}:{paths:string[];onChange:(p:string[])=>void;disabled?:boolean;onUploading?:(value:boolean)=>void}){
   const [uploading,setUploading]=useState(false);
   const [error,setError]=useState('');
+  const cameraInput=useRef<HTMLInputElement>(null);
+  const libraryInput=useRef<HTMLInputElement>(null);
   const send=async(files:FileList|null)=>{
-    if(!files?.length)return;
+    if(!files?.length||disabled||uploading)return;
     setError('');
-    if(paths.length+files.length>5){setError('Tối đa 5 ảnh/sản phẩm.');return;}
+    const selected=Array.from(files);
+    const validation=validateImageSelection(paths.length,selected.length);
+    if(validation){setError(validation);return;}
     setUploading(true);onUploading?.(true);
     const uploaded=[...paths];
     try{
       const user=clientAuth().currentUser;
       if(!user)throw new Error('Hãy đăng nhập trước khi tải ảnh.');
-      for(const file of Array.from(files)){
-        if(!['image/jpeg','image/png','image/webp'].includes(file.type))throw new Error('Chỉ nhận JPG, PNG hoặc WebP.');
-        if(file.size>3*1024*1024)throw new Error('Mỗi ảnh tối đa 3 MB.');
+      for(const original of selected){
+        const file=await preparePhonePhoto(original);
         const form=new FormData();form.append('file',file);
         const send=async(forceRefresh:boolean)=>{
           const token=await user.getIdToken(forceRefresh);
@@ -41,7 +52,25 @@ export function ImageUploader({paths,onChange,disabled,onUploading}:{paths:strin
     }catch(e){setError(e instanceof Error?e.message:'Không thể tải ảnh lên Cloudinary.');}
     finally{setUploading(false);onUploading?.(false);}
   };
-  return <div className="uploader"><div className="upload-gallery">{paths.map(p=><div key={p} className="upload-tile"><ProductImage paths={[p]} className="product-photo"/><button className="remove-image" type="button" disabled={disabled||uploading} onClick={()=>onChange(paths.filter(x=>x!==p))} aria-label="Gỡ ảnh">×</button></div>)}<label className="upload-tile upload-add"><Camera size={23}/><span>{uploading?'Đang tải…':'Thêm ảnh'}</span><input disabled={disabled||uploading||paths.length>=5} type="file" accept="image/jpeg,image/png,image/webp" multiple onChange={e=>{void send(e.target.files);e.target.value='';}}/></label></div><small className="hint">Tối đa 5 ảnh · JPG/PNG/WebP · 3 MB/ảnh · Cloudinary Free</small>{error&&<p className="field-error">{error}</p>}</div>;
+  return <div className="uploader gu-v3-uploader">
+    <div className="upload-gallery">{paths.map((path,index)=><div key={path} className="upload-tile gu-v3-tile">
+      <ProductImage paths={[path]} className="product-photo"/>
+      {index===0&&<span className="gu-cover-badge">Ảnh bìa</span>}
+      <div className="gu-tile-actions">
+        {index>0&&<button type="button" className="gu-tile-tool" disabled={disabled||uploading} onClick={()=>onChange([path,...paths.filter(x=>x!==path)])} aria-label={`Đặt ảnh ${index+1} làm ảnh bìa`} title="Đặt làm ảnh bìa"><ArrowUp size={15}/></button>}
+        <button className="gu-tile-tool gu-tile-remove" type="button" disabled={disabled||uploading} onClick={()=>onChange(paths.filter(x=>x!==path))} aria-label={`Xóa ảnh ${index+1}`} title="Xóa ảnh khỏi sản phẩm">×</button>
+      </div>
+    </div>)}</div>
+    <div className="gu-photo-actions">
+      <button className="btn btn-white gu-photo-action" type="button" disabled={disabled||uploading||paths.length>=MAX_IMAGES} onClick={()=>libraryInput.current?.click()}><Images size={19}/> Chọn từ thư viện</button>
+      <button className="btn btn-dark gu-photo-action" type="button" disabled={disabled||uploading||paths.length>=MAX_IMAGES} onClick={()=>cameraInput.current?.click()}><Camera size={19}/> Chụp ảnh</button>
+      <input ref={libraryInput} className="gu-file-input" type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.heic,.heif" multiple disabled={disabled||uploading||paths.length>=MAX_IMAGES} onChange={e=>{void send(e.target.files);e.target.value='';}} aria-label="Chọn ảnh từ thư viện"/>
+      <input ref={cameraInput} className="gu-file-input" type="file" accept="image/*" capture="environment" disabled={disabled||uploading||paths.length>=MAX_IMAGES} onChange={e=>{void send(e.target.files);e.target.value='';}} aria-label="Chụp ảnh bằng camera"/>
+    </div>
+    {uploading&&<p className="gu-uploading" role="status"><LoaderCircle size={16} className="spin"/> Đang tối ưu và tải ảnh… Đợi hoàn thành trước khi lưu sản phẩm.</p>}
+    <small className="hint">Tối đa {MAX_IMAGES} ảnh · JPG/PNG/WebP, thử chuyển HEIC · tự tối ưu ảnh lớn trước khi tải · lưu Cloudinary. Ảnh đầu tiên là ảnh đại diện trên lịch.</small>
+    {error&&<p className="field-error" role="alert">{error}</p>}
+  </div>;
 }
 export function AdminStaffPanel({api}:{api:ApiCall}){
   const [members,setMembers]=useState<StaffProfile[]>([]);
