@@ -212,3 +212,13 @@ Chỉ push/merge lên Vercel sau khi `typecheck` và `build` đều hoàn thành
 - Bỏ `gu-smart-hint` và các đoạn văn nhắc quy trình không cần thiết. Vẫn giữ các thông báo lỗi, xác nhận thanh toán, và tình trạng cần xử lý.
 - Lưu ý lịch hiện chỉ tải tối đa 300 đơn mới nhất theo endpoint bootstrap hiện có. Dữ liệu công nợ lịch sử được Admin mở riêng.
 - Trước khi triển khai, chạy `npm run verify:release && npm run test && npm run typecheck && npm run build` ở Codespaces.
+
+
+## GU v4.2.0 – Tối ưu 5 năm và Admin Hệ thống
+
+Xem `docs/GU-v4.2.0-TRIEN-KHAI-5-NAM.md` trước khi nâng cấp. Công nợ và dòng tiền cũ cần chuyển đổi riêng, không được coi bản deploy là đã chuyển dữ liệu.
+
+## GU v4.2.1 – Sửa hiển thị Monitoring và định dạng tiền
+
+Xem `docs/CHANGELOG-v4.2.1.md`. Mã tiền được nhập có dấu chấm theo định dạng Việt Nam ở giao diện, nhưng server nhận giá trị nguyên VND.
+Nếu bảng Hệ thống báo Cloud Monitoring 403: bật Monitoring API và cấp `roles/monitoring.viewer` cho service account có email trùng `FIREBASE_CLIENT_EMAIL` (trong Google Cloud IAM của đúng project). Không chia sẻ private key hoặc API Secret.

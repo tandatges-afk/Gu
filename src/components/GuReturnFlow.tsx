@@ -3,6 +3,7 @@
 import {useState} from 'react';
 import {ArrowLeft, CheckCircle2, ClipboardCheck, Plus, Wallet} from 'lucide-react';
 import {money} from '@/lib/rental';
+import {GuMoneyInput} from '@/components/GuMoneyInput';
 import {previewReturnSettlement, type ReturnChoice} from '@/lib/return-settlement';
 import type {InventoryItem, RentalOrder} from '@/lib/types';
 
@@ -79,7 +80,7 @@ export function GuReturnFlow({order,items,today,busy,onSubmit}:{
       </div>
       
       {!showExtra?<button className="gu-return-add-fee" type="button" onClick={()=>setShowExtra(true)}><Plus size={15}/> Thêm phụ phí khác (nếu có)</button>:<div className="gu-return-extras">
-        <label className="form-field"><span>Phụ phí khác (VND)</span><input className="input" type="number" min="0" max="1000000000" inputMode="numeric" placeholder="Để trống nếu không có" value={extraText} onChange={e=>{setExtraText(e.target.value);setCollected(false);}}/></label>
+        <label className="form-field"><span>Phụ phí khác (VND)</span><GuMoneyInput className="input" maxLength={17} placeholder="Để trống nếu không có" value={extraText} onValueChange={raw=>{setExtraText(raw);setCollected(false);}}/></label>
         {extraNumber>0&&<label className="form-field"><span>Lý do phụ phí</span><input className="input" maxLength={300} placeholder="Ví dụ: vệ sinh đặc biệt, hỏng phụ kiện…" value={extraReason} onChange={e=>setExtraReason(e.target.value)}/></label>}
         <button className="gu-return-add-fee" type="button" onClick={()=>{setShowExtra(false);setExtraText('');setExtraReason('');}}>Bỏ phụ phí khác</button>
         {!validExtras&&<p className="gu-return-error">Nhập số tiền hợp lệ và lý do khi có phụ phí khác.</p>}

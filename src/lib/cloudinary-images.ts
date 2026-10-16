@@ -12,3 +12,11 @@ export function imageMagicMatches(bytes: Uint8Array, mime: string): boolean {
     [82,73,70,70].every((n,i)=>bytes[i]===n) && [87,69,66,80].every((n,i)=>bytes[i+8]===n);
   return false;
 }
+
+/** Cloudinary dynamic delivery, without modifying stored original URLs.
+ * Thumbnail variants are cached CDN-side; q_auto/f_auto minimize bandwidth. */
+export function thumbCloudinaryUrl(url:string,width=360):string{
+ if(!/^https:\/\/res\.cloudinary\.com\/[a-zA-Z0-9_-]+\/image\/upload\/v\d+\//.test(url))return url;
+ const w=Math.max(120,Math.min(1200,Math.round(width)));
+ return url.replace('/image/upload/','/image/upload/f_auto,q_auto,c_limit,w_'+w+'/');
+}

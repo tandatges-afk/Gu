@@ -6,6 +6,7 @@ import type {StaffProfile,AuditRecord} from '@/lib/types';
 import {Camera,Image as ImageIcon,Images,LoaderCircle,Plus,ShieldCheck,UserX,UserCheck,RefreshCw,ArrowUp} from 'lucide-react';
 import {useRef} from 'react';
 import {preparePhonePhoto,validateImageSelection,MAX_IMAGES} from '@/lib/mobile-images';
+import {thumbCloudinaryUrl} from '@/lib/cloudinary-images';
 export type ApiCall = <T=unknown>(path:string,init?:RequestInit)=>Promise<T>;
 /**
  * Fit the complete garment inside its slot, independent of photo orientation.
@@ -15,7 +16,7 @@ export function ProductImage({paths,className='product-photo'}:{paths?:string[];
   const url=paths?.[0]||'';
   const fallbackClassName=['photo-fallback',className==='product-photo'?'':className].filter(Boolean).join(' ');
   return url.startsWith('https://res.cloudinary.com/')?
-    <img src={url} alt="Ảnh sản phẩm" className={className} loading="lazy" decoding="async" referrerPolicy="no-referrer"/>:
+    <img src={thumbCloudinaryUrl(url,className.includes("detail")?1024:360)} alt="Ảnh sản phẩm" className={className} loading="lazy" decoding="async" referrerPolicy="no-referrer"/>:
     <span className={fallbackClassName} role="img" aria-label="Chưa có ảnh sản phẩm"><ImageIcon size={21}/></span>;
 }
 /** GU Mobile v3: explicit Camera and Library actions instead of an ambiguous file picker. */
