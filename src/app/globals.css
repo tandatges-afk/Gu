@@ -705,3 +705,25 @@ html,body{background:var(--paper);color:var(--ink)}
 
 .gu-order-created-by{font-size:11px;color:#345b7c;margin-top:3px;font-weight:700;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .gu-product-code-label{font-size:10px;color:#667d72;font-weight:700;margin-right:3px}
+
+/* GU v4.2 — Admin system usage, readable on phones */
+.gu-system-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;margin:18px 0}
+.gu-system-card{padding:20px;min-width:0}.gu-system-heading{display:flex;gap:12px;align-items:center;margin-bottom:19px}
+.gu-system-heading h2{font-size:19px;margin:0}.gu-system-heading small{color:#596679}
+.gu-system-meter{padding:12px 0;border-top:1px solid #e5e9ef}
+.gu-system-meter-title,.gu-system-meter-value{display:flex;justify-content:space-between;gap:8px}
+.gu-system-meter-title{font-size:13px}.gu-system-meter-title span{font-size:12px;font-weight:700;color:#617184}
+.gu-system-meter-value{font-size:20px;font-weight:800;margin:7px 0 10px;flex-wrap:wrap}
+.gu-system-meter-value span{font-size:12px;font-weight:500;color:#66758a}
+.gu-system-progress{height:9px;background:#e5e9ef;border-radius:20px;overflow:hidden}.gu-system-progress span{display:block;height:100%;background:#25875c;border-radius:20px;transition:width .2s}
+.gu-system-warning .gu-system-progress span{background:#ca8d1a}.gu-system-critical .gu-system-progress span{background:#be334a}.gu-system-unknown .gu-system-progress span{background:#aab5c5}
+.gu-system-detail{display:flex;align-items:flex-start;gap:9px;padding:9px 0;font-size:13px;line-height:1.6}
+.gu-system-note{font-size:12px;line-height:1.6;color:#5d6b80;background:#f0f4f8;padding:12px;border-radius:10px}
+.gu-system-source{display:inline-flex;align-items:center;gap:6px;text-decoration:underline;font-size:13px;font-weight:700;padding:8px 0}
+.gu-system-operations{padding:20px}.gu-system-operations h2{display:flex;gap:9px;align-items:center;font-size:18px}
+.gu-system-operations p{font-size:13px;color:#42556c;line-height:1.6}.gu-system-operations small{color:#6e7d8c}
+@media(max-width:850px){.gu-system-grid{grid-template-columns:1fr}.gu-system-card{padding:15px}}
+
+.gu-catalog-pager{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:10px 0;color:#56677a;font-size:13px}.gu-catalog-pager .btn{font-size:12px}
+
+.gu-system-collections{padding:13px 0;border-top:1px solid #e5e9ef;font-size:13px}.gu-system-collections>div{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:12px}.gu-system-collections>div span{padding:8px;background:#f1f4f8;border-radius:7px}

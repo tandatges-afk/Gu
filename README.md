@@ -212,3 +212,8 @@ Chỉ push/merge lên Vercel sau khi `typecheck` và `build` đều hoàn thành
 - Bỏ `gu-smart-hint` và các đoạn văn nhắc quy trình không cần thiết. Vẫn giữ các thông báo lỗi, xác nhận thanh toán, và tình trạng cần xử lý.
 - Lưu ý lịch hiện chỉ tải tối đa 300 đơn mới nhất theo endpoint bootstrap hiện có. Dữ liệu công nợ lịch sử được Admin mở riêng.
 - Trước khi triển khai, chạy `npm run verify:release && npm run test && npm run typecheck && npm run build` ở Codespaces.
+
+
+## GU v4.2.0 – Tối ưu 5 năm và Admin Hệ thống
+
+Xem `docs/GU-v4.2.0-TRIEN-KHAI-5-NAM.md` trước khi nâng cấp. Công nợ và dòng tiền cũ cần chuyển đổi riêng, không được coi bản deploy là đã chuyển dữ liệu.

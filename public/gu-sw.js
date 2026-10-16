@@ -1,5 +1,5 @@
 /* GU v4.0 - privacy-first PWA, cache public assets only. */
-const STATIC_CACHE = 'gu-static-v4-1-4';
+const STATIC_CACHE = 'gu-static-v4-2-0';
 const PUBLIC_ASSETS = ['/offline.html','/icons/gu-192.png','/icons/gu-512.png','/favicon.svg'];
 self.addEventListener('install', event => {
   event.waitUntil(caches.open(STATIC_CACHE).then(cache=>cache.addAll(PUBLIC_ASSETS)).then(()=>self.skipWaiting()));

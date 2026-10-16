@@ -10,7 +10,7 @@ type Availability={available:boolean;conflicts:{itemId:string;sku:string;date:st
 type Booking={customerId:string;itemIds:string[];pickupDate:string;returnDate:string;depositDue:number;note:string};
 const defaultCategory='Tất cả danh mục';
 const isBlocked=(item:InventoryItem,mode:'RESERVE'|'PICKUP')=>
-  ['LAUNDRY','MAINTENANCE','MISSING'].includes(item.status)||!(item.replacementValue>0)||
+  Boolean(item.archivedAt)||['LAUNDRY','MAINTENANCE','MISSING'].includes(item.status)||!(item.replacementValue>0)||
   (mode==='PICKUP'&&item.status!=='AVAILABLE')||
   (item.status==='RENTED'&&Boolean(item.expectedReturnDate&&item.expectedReturnDate<vietnamToday()));
 export function NewRentalForm({items,customers,api,initial,mode,onClose,onSuccess,onCustomerCreated}:{
@@ -20,6 +20,7 @@ export function NewRentalForm({items,customers,api,initial,mode,onClose,onSucces
   const [booking,setBooking]=useState<Booking>(initial);
   const [phoneQuery,setPhoneQuery]=useState('');
   const [productQuery,setProductQuery]=useState('');
+  const [remoteProducts,setRemoteProducts]=useState<InventoryItem[]>([]);
   const [category,setCategory]=useState(defaultCategory);
   const [inlineCustomer,setInlineCustomer]=useState(false);
   const [newCustomer,setNewCustomer]=useState({name:'',phone:'',note:''});
@@ -37,12 +38,20 @@ export function NewRentalForm({items,customers,api,initial,mode,onClose,onSucces
     const t=setTimeout(()=>{api<{customers:Customer[]}>('customers?phone='+encodeURIComponent(digits)).then(r=>{if(!cancelled)setRemoteCustomers(r.customers);}).catch(()=>{});},300);
     return()=>{cancelled=true;clearTimeout(t);};
   },[phoneQuery,api]);
+  useEffect(()=>{
+    if(productQuery.trim().length<2){setRemoteProducts([]);return;}
+    let cancel=false;
+    const timer=setTimeout(()=>{api<{results:InventoryItem[]}>('catalog?kind=items&q='+encodeURIComponent(productQuery.trim())+'&size=50')
+      .then(result=>{if(!cancel)setRemoteProducts(result.results);}).catch(()=>{});},350);
+    return()=>{cancel=true;clearTimeout(timer);};
+  },[productQuery,api]);
+  const productSource=useMemo(()=>Array.from(new Map([...items,...remoteProducts].map(i=>[i.id,i])).values()),[items,remoteProducts]);
   const matchingCustomers=customerList.filter(c=>(c.phone+' '+c.name).toLocaleLowerCase('vi-VN').includes(phoneQuery.trim().toLocaleLowerCase('vi-VN'))).slice(0,30);
   const categories=Array.from(new Set(items.map(x=>x.category))).sort();
-  const matchingItems=items.filter(i=>(category===defaultCategory||i.category===category)&&
+  const matchingItems=productSource.filter(i=>(category===defaultCategory||i.category===category)&&
     (i.name+' '+i.size+' '+i.color+' '+i.category+' '+(i.hangerCode||'')).toLocaleLowerCase('vi-VN').includes(productQuery.trim().toLocaleLowerCase('vi-VN')));
   const rentalDays=(()=>{try{return daysInclusive(booking.pickupDate,booking.returnDate);}catch{return 0;}})();
-  const selected=items.filter(x=>booking.itemIds.includes(x.id));
+  const selected=productSource.filter(x=>booking.itemIds.includes(x.id));
   const total=selected.reduce((sum,x)=>sum+x.dailyRate*rentalDays,0);
   useEffect(()=>{
     if(!booking.itemIds.length||!rentalDays||mode==='PICKUP'&&booking.pickupDate!==vietnamToday()){setChecking(false);setAvailability(null);return;}

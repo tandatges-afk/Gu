@@ -6,6 +6,7 @@ import { rentalRequest, assertItems } from '@/lib/booking-server';
 import { bookingMode, verifyImmediatePickup, mustBeReadyAtPickup } from '@/lib/booking-rules';
 import type { Customer, InventoryItem, RentalLine, RentalOrder } from '@/lib/types';
 import { auditInTransaction } from '@/lib/audit';
+import {syncDebtIndex} from '@/lib/debt-index';
 export const runtime = 'nodejs';
 export const preferredRegion = 'sin1';
 export async function POST(req:NextRequest) {
@@ -46,6 +47,7 @@ export async function POST(req:NextRequest) {
         pickupDate:parsed.pickupDate,returnDate:parsed.returnDate,rentalDays:parsed.rentalDays,lines,total,paid:0,depositDue,note,status,
         createdAt:now,updatedAt:now,createdBy:me.uid,createdByName:me.name,history:[{action:status==='RESERVED'?'RESERVED':'PICKUP',by:me.uid,at:now,detail:mode==='PICKUP'?'Tạo đơn và giao đồ ngay':'Đặt lịch, chờ giao đồ'}]};
       tx.create(ref,order);
+      syncDebtIndex(tx,db(),{id:ref.id,...order});
       auditInTransaction(tx,me,mode==='PICKUP'?'ORDER_CREATE_PICKUP':'ORDER_RESERVE','order',ref.id,`${code} / ${customer.name} / ${items.length} món`,now);
       slots.forEach(({item,day,ref:lockRef})=>tx.create(lockRef,{orderId:ref.id,itemId:item.id,date:day}));
       if(mode==='PICKUP')itemRefs.forEach(r=>tx.update(r,{status:'RENTED',currentOrderId:ref.id,expectedReturnDate:parsed.returnDate}));

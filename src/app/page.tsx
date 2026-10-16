@@ -4,10 +4,10 @@ import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react
 import { onAuthStateChanged, signInWithEmailAndPassword, signOut, type User } from 'firebase/auth';
 import {
   AlertCircle, ArrowDownLeft, ArrowRight, ArrowUpRight, BadgeCheck, Boxes, CalendarDays,
-  Check, CheckCircle2, ChevronLeft, ChevronRight, CircleDollarSign, Clock3, CreditCard,
+  Check, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, CircleDollarSign, Clock3, CreditCard,
   Download, Filter, LayoutDashboard, LoaderCircle, LogOut, Menu, MoreHorizontal,
   Package, Plus, RefreshCcw, Search, ShieldCheck, Shirt, ShoppingBag, Sparkles, Pencil, Trash2,
-  TrendingUp, Users, Wallet, WashingMachine, X, BellRing, ClipboardCheck, ScrollText, UserCog, PhoneCall, CalendarSearch, ListTodo
+  TrendingUp, Users, Wallet, WashingMachine, Settings2, X, BellRing, ClipboardCheck, ScrollText, UserCog, PhoneCall, CalendarSearch, ListTodo
 } from 'lucide-react';
 import { clientAuth } from '@/lib/firebase-client';
 import { addDays, daysInclusive, money, vietnamToday } from '@/lib/rental';
@@ -16,14 +16,14 @@ import {AdminStaffPanel,AuditPanel,ImageUploader,ProductImage} from '@/component
 import {NewRentalForm,OrderAddItems} from '@/components/GuRentalForms';
 import {GuReturnFlow} from '@/components/GuReturnFlow';
 import {GuDebts} from '@/components/GuDebts';
+import {GuSystem} from '@/components/GuSystem';
 import type {DebtSummary} from '@/lib/debts';
 import {GuPwaSetup,GuInstallApp} from '@/components/GuPwa';
 import {calendarItemState,type CalendarFilter} from '@/lib/smart-calendar';
 import {getProductCode} from '@/lib/hanger-code';
 import {orderCreatorName} from '@/lib/order-creator';
-import {ChevronDown,} from "lucide-react";
 
-type Page = 'overview'|'calendar'|'orders'|'debts'|'inventory'|'laundry'|'customers'|'reports'|'staff'|'audit';
+type Page = 'overview'|'calendar'|'orders'|'debts'|'inventory'|'laundry'|'customers'|'reports'|'staff'|'audit'|'system';
 type Modal = 'booking'|'item'|'customer'|'category'|'detail'|null;
 type Availability = { available:boolean;conflicts:{itemId:string;sku:string;date:string}[];reason:string };
 
@@ -38,11 +38,12 @@ const nav: {id:Page;label:string;icon:typeof LayoutDashboard}[] = [
   {id:'reports',label:'Báo cáo',icon:TrendingUp},
   {id:'staff',label:'Nhân viên',icon:UserCog},
   {id:'audit',label:'Nhật ký thao tác',icon:ScrollText},
+  {id:'system',label:'Hệ thống',icon:Settings2},
 ];
 const navSections:{label:string;ids:Page[]}[]=[
   {label:'CÔNG VIỆC',ids:['overview','calendar','orders','customers']},
   {label:'KHO & VẬN HÀNH',ids:['inventory','laundry']},
-  {label:'DÀNH CHO ADMIN',ids:['debts','reports','staff','audit']}
+  {label:'DÀNH CHO ADMIN',ids:['debts','reports','staff','audit','system']}
 ];
 const orderLabels: Record<OrderStatus,string>={RESERVED:'Đã giữ chỗ',PICKED_UP:'Đã lấy hàng',RETURNED:'Đã trả hàng',CANCELLED:'Đã hủy'};
 const statusLabels:Record<InventoryItem['status'],string>={AVAILABLE:'Sẵn sàng',RENTED:'Đang cho thuê',LAUNDRY:'Đang giặt',MAINTENANCE:'Bảo trì',MISSING:'Thất lạc'};
@@ -59,6 +60,7 @@ export default function Home() {
   const [loginPassword,setLoginPassword]=useState('');
   const [loginPending,setLoginPending]=useState(false);
   const [data,setData]=useState<DashboardData|null>(null);
+  const [taskOrders,setTaskOrders]=useState<RentalOrder[]>([]);
   const [loading,setLoading]=useState(false);
   const [err,setErr]=useState('');
   const [toast,setToast]=useState('');
@@ -70,6 +72,8 @@ export default function Home() {
   const [debtSummary,setDebtSummary]=useState<DebtSummary|null>(null);
   const [debtLoading,setDebtLoading]=useState(false);
   const [debtError,setDebtError]=useState('');
+  const [reportDaily,setReportDaily]=useState<{date:string;amount:number;payments:number}[]|null>(null);
+  const [reportNote,setReportNote]=useState('');
   const [query,setQuery]=useState('');
   const [calendarStart,setCalendarStart]=useState(vietnamToday());
   const [orderStatus,setOrderStatus]=useState<'ALL'|OrderStatus>('ALL');
@@ -81,11 +85,18 @@ export default function Home() {
   const [calendarCategory,setCalendarCategory]=useState('ALL');
   const [calendarStatus,setCalendarStatus]=useState<CalendarFilter>('ALL');
   const [calendarCreator,setCalendarCreator]=useState('ALL');
+  const [calendarRemote,setCalendarRemote]=useState<InventoryItem[]>([]);
+  const [calendarLoaded,setCalendarLoaded]=useState(false);
+  const [calendarNext,setCalendarNext]=useState<string|null>(null);
+  const [calendarPageCursor,setCalendarPageCursor]=useState<string|null>(null);
+  const [calendarQuery,setCalendarQuery]=useState('');
+  const [calendarReload,setCalendarReload]=useState(0);
+  const [calendarOrderRows,setCalendarOrderRows]=useState<RentalOrder[]|null>(null);
   const [smartQuery,setSmartQuery]=useState('');
   const [smartStart,setSmartStart]=useState(vietnamToday());
   const [smartEnd,setSmartEnd]=useState(vietnamToday());
   const [smartLoading,setSmartLoading]=useState(false);
-  const [smartResult,setSmartResult]=useState<{availableIds:string[];pickupDate:string;returnDate:string;checkedAt:string}|null>(null);
+  const [smartResult,setSmartResult]=useState<{availableIds:string[];products?:InventoryItem[];pickupDate:string;returnDate:string;checkedAt:string;hasMore?:boolean}|null>(null);
   const [nearestLoading,setNearestLoading]=useState<string|null>(null);
   const [nearestResult,setNearestResult]=useState<{itemId:string;nextPickupDate:string|null;nextReturnDate:string|null;reason:string}|null>(null);
   const [taskView,setTaskView]=useState<'ALL'|'PICKUP_TODAY'|'RETURN_TODAY'|'OVERDUE'>('ALL');
@@ -99,6 +110,15 @@ export default function Home() {
   const [imageUploading,setImageUploading]=useState(false);
   const [clockTick,setClockTick]=useState(0);
   const [notificationsEnabled,setNotificationsEnabled]=useState(false);
+  const [laundryRemote,setLaundryRemote]=useState<InventoryItem[]>([]);
+  const [laundryLoaded,setLaundryLoaded]=useState(false);
+  const [laundryReload,setLaundryReload]=useState(0);
+  const [catalogReload,setCatalogReload]=useState(0);
+  const [catalogData,setCatalogData]=useState<{kind:string;results:Array<InventoryItem|Customer|RentalOrder>;cursor:string|null;hasMore:boolean}|null>(null);
+  const [catalogLoading,setCatalogLoading]=useState(false);
+  const [catalogCursor,setCatalogCursor]=useState<string|null>(null);
+  const [catalogQuery,setCatalogQuery]=useState('');
+
 
   useEffect(()=>{
     try {return onAuthStateChanged(clientAuth(),u=>{setUser(u);setAuthReady(true);if(!u)setData(null);},()=>{setAuthErr('Không thể xác thực với Firebase. Kiểm tra cấu hình.');setAuthReady(true);});}
@@ -133,11 +153,71 @@ export default function Home() {
   },[api]);
   useEffect(()=>{if(user)void refresh();},[user,refresh]);
   useEffect(()=>{if(user&&data?.me.role==='admin'&&['overview','reports','debts'].includes(page))void refreshDebts();},[user,data?.me.role,page,refreshDebts]);
-  useEffect(()=>{if(!user)return;const interval=setInterval(()=>{setClockTick(t=>t+1);void refresh();},60_000);return()=>clearInterval(interval);},[user,refresh]);
+  useEffect(()=>{if(!user)return;const interval=setInterval(()=>{if(document.visibilityState==='visible'){setClockTick(t=>t+1);void refresh();}},900_000);return()=>clearInterval(interval);},[user,refresh]);
+  useEffect(()=>{
+    if(!user||page!=='overview')return;
+    let cancel=false;
+    api<{orders:RentalOrder[]}>('tasks').then(r=>{if(!cancel)setTaskOrders(r.orders);}).catch(e=>{if(!cancel)setErr(e instanceof Error?e.message:'Không tải được việc hôm nay.');});
+    return()=>{cancel=true;};
+  },[user,page,api,clockTick]);
 
+  useEffect(()=>{
+    if(!user||!data||!['inventory','customers','orders'].includes(page))return;
+    const kind=page==='inventory'?'items':page==='customers'?'customers':'orders';
+    let cancelled=false;
+    const timer=setTimeout(()=>{
+      setCatalogLoading(true);
+      api<{kind:string;results:Array<InventoryItem|Customer|RentalOrder>;cursor:string|null;hasMore:boolean}>(
+        'catalog?kind='+kind+'&size=40'+(query.trim()?'&q='+encodeURIComponent(query.trim()):'')+(catalogCursor?'&cursor='+encodeURIComponent(catalogCursor):''))
+        .then(result=>{if(!cancelled)setCatalogData(result);}).catch(e=>{if(!cancelled)setErr(e instanceof Error?e.message:'Không tải được danh sách.');})
+        .finally(()=>{if(!cancelled)setCatalogLoading(false);});
+    },300);
+    return()=>{cancelled=true;clearTimeout(timer);};
+  },[user,data?.me.uid,page,query,catalogCursor,catalogReload,api]);
+  useEffect(()=>{setCatalogCursor(null);setCatalogData(null);},[page,query]);
+  useEffect(()=>{
+    if(!user||page!=='laundry')return;
+    let cancelled=false;setLaundryLoaded(false);
+    (async()=>{try{
+      const all:InventoryItem[]=[];let cursor:string|null=null;
+      for(let i=0;i<10;i++){
+        const r: {items:InventoryItem[];cursor:string|null}=await api<{items:InventoryItem[];cursor:string|null}>(
+          'stock-state?status=LAUNDRY'+(cursor?'&cursor='+encodeURIComponent(cursor):''));
+        all.push(...r.items);cursor=r.cursor;
+        if(!cursor)break;
+        if(i===9)throw new Error('Vượt 1.000 đồ cần giặt. Hãy xử lý theo từng đợt.');
+      }
+      if(!cancelled){setLaundryRemote(all);setLaundryLoaded(true);}
+    }catch(e){if(!cancelled)setErr(e instanceof Error?e.message:'Không tải được danh sách giặt.');}})();
+    return()=>{cancelled=true;};
+  },[user,page,laundryReload,api]);
+  useEffect(()=>{if(user&&data?.me.role==='admin'&&page==='reports'){
+    api<{rows:{date:string;amount:number;payments:number}[];note:string}>('reports')
+      .then(r=>{setReportDaily(r.rows);setReportNote(r.note);}).catch(e=>{setReportDaily(null);setReportNote(e instanceof Error?e.message:'Chưa có báo cáo.');});
+  }},[user,data?.me.role,page,api]);
+  useEffect(()=>{
+    if(!user||page!=='calendar')return;
+    let cancelled=false;
+    const timer=setTimeout(()=>{
+      const url='catalog?kind=items&size=25'+(calendarQuery.trim()?'&q='+encodeURIComponent(calendarQuery.trim()):'')+(calendarPageCursor?'&cursor='+encodeURIComponent(calendarPageCursor):'');
+      api<{results:InventoryItem[];cursor:string|null}>(url).then(r=>{if(!cancelled){setCalendarRemote(r.results.filter(i=>!i.archivedAt));setCalendarLoaded(true);setCalendarNext(r.cursor);}})
+        .catch(e=>{if(!cancelled)setErr(e instanceof Error?e.message:'Không tải được sản phẩm lịch.');});
+    },250);
+    return()=>{cancelled=true;clearTimeout(timer);};
+  },[user,page,calendarQuery,calendarPageCursor,catalogReload,api]);
+  useEffect(()=>{setCalendarPageCursor(null);},[calendarQuery]);
+  useEffect(()=>{
+    if(!user||page!=='calendar'||!calendarRemote.length){setCalendarOrderRows(null);return;}
+    let cancelled=false;
+    const ids=calendarRemote.map(i=>i.id).slice(0,30).join(',');
+    api<{orders:RentalOrder[]}>('calendar?start='+encodeURIComponent(calendarStart)+'&ids='+encodeURIComponent(ids))
+      .then(r=>{if(!cancelled)setCalendarOrderRows(r.orders);})
+      .catch(e=>{if(!cancelled){setCalendarOrderRows(null);setErr(e instanceof Error?e.message:'Không lấy được khóa lịch.');}});
+    return()=>{cancelled=true;};
+  },[user,page,calendarStart,calendarRemote,calendarReload,api]);
   const items=(data?.items||[]).filter(i=>!i.archivedAt);
   const customers=data?.customers||[];
-  const orders=data?.orders||[];
+  const orders=Array.from(new Map([...(data?.orders||[]),...taskOrders].map(o=>[o.id,o] as const)).values());
   const categories=data?.categories||[];
   const today=vietnamToday();
   void clockTick;
@@ -152,7 +232,7 @@ export default function Home() {
   // Only fulfilled orders with unpaid balances are real receivables. Reservations are separate.
   const allOutstanding=debtSummary?.totalOutstanding;
   const search=(str:string)=>str.toLocaleLowerCase('vi-VN').includes(query.trim().toLocaleLowerCase('vi-VN'));
-  const filteredOrders=orders.filter(o=>(data?.me.role==='admin'||!['RETURNED','CANCELLED'].includes(o.status))&&(orderStatus==='ALL'||o.status===orderStatus)&&
+  const filteredOrders=(taskView!=='ALL'?taskOrders:page==='orders'&&catalogData?.kind==='orders'?catalogData.results as RentalOrder[]:orders).filter(o=>(data?.me.role==='admin'||!['RETURNED','CANCELLED'].includes(o.status))&&(orderStatus==='ALL'||o.status===orderStatus)&&
     (taskView==='ALL'||(taskView==='PICKUP_TODAY'&&o.status==='RESERVED'&&o.pickupDate===today)||(taskView==='RETURN_TODAY'&&o.status==='PICKED_UP'&&o.returnDate===today)||(taskView==='OVERDUE'&&o.status==='PICKED_UP'&&o.returnDate<today))&&
     (!query||search(o.code+' '+o.customerName+' '+o.customerPhone+' '+orderCreatorName(o,data?.staffNames)+' '+o.lines.map(l=>l.name).join(' '))));
   const customerPhoneHref=(phone:string)=>'tel:'+phone.replace(/[^+0-9]/g,'');
@@ -170,19 +250,19 @@ export default function Home() {
     finally{setBusy(false);}
   };
   const openTaskOrders=(view:'PICKUP_TODAY'|'RETURN_TODAY'|'OVERDUE')=>{setPage('orders');setOrderStatus('ALL');setQuery('');setTaskView(view);};
-  const filteredItems=items.filter(i=>(itemStatus==='ALL'||i.status===itemStatus)&&(inventoryCategory==='ALL'||inventoryCategory===i.category)&&(!query||search(i.name+' '+i.size+' '+i.color+' '+i.category+' '+(i.hangerCode||''))));
-  const filteredCustomers=customers.filter(c=>!query||search(c.name+' '+c.phone));
+  const filteredItems=(page==='inventory'&&catalogData?.kind==='items'?catalogData.results as InventoryItem[]:items).filter(i=>!i.archivedAt).filter(i=>(itemStatus==='ALL'||i.status===itemStatus)&&(inventoryCategory==='ALL'||inventoryCategory===i.category)&&(!query||search(i.name+' '+i.size+' '+i.color+' '+i.category+' '+(i.hangerCode||''))));
+  const filteredCustomers=(page==='customers'&&catalogData?.kind==='customers'?catalogData.results as Customer[]:customers).filter(c=>!query||search(c.name+' '+c.phone));
   const nameFromId=(id:string)=>items.find(i=>i.id===id)?.name||'Sản phẩm đã xóa';
   const statusClass=(s:string)=>['AVAILABLE','RETURNED'].includes(s)?'success':['PICKED_UP','RENTED'].includes(s)?'blue':s==='LAUNDRY'?'purple':s==='MAINTENANCE'?'slate':['CANCELLED','MISSING'].includes(s)?'danger':'amber';
   const action=async(path:string,body:unknown,success:string,method='POST')=>{
-    setBusy(true);try{await api(path,{method,body:JSON.stringify(body)});setToast(success);setModal(null);await refresh();if(data?.me.role==='admin')void refreshDebts();return true;}
+    setBusy(true);try{await api(path,{method,body:JSON.stringify(body)});setToast(success);setModal(null);await refresh();setCatalogReload(v=>v+1);setLaundryReload(v=>v+1);setCalendarReload(v=>v+1);if(data?.me.role==='admin')void refreshDebts();return true;}
     catch(e){setErr(e instanceof Error?e.message:'Lỗi thao tác.');return false;}
     finally{setBusy(false);}
   };
   const openModal=(m:Modal)=>{if(m==='item'){setEditingItem(null);setNewItem({name:'',category:data?.categories[0]?.name||'Áo dài',size:'M',color:'',dailyRate:0,requiresLaundry:true,replacementValue:0,imagePaths:[]});}if(m==='category'){setEditingCategory(null);setCategoryName('');}setErr('');setModal(m);};
   const editItem=(i:InventoryItem)=>{setEditingItem(i.id);setNewItem({name:i.name,category:i.category,size:i.size,color:i.color,dailyRate:i.dailyRate,requiresLaundry:i.requiresLaundry??i.bufferDays>0,replacementValue:i.replacementValue,imagePaths:i.imagePaths||[]});setErr('');setModal('item');};
   const editCategory=(id:string,name:string)=>{setEditingCategory(id);setCategoryName(name);setErr('');setModal('category');};
-  const removeItem=async(i:InventoryItem)=>{if(!confirm(`Lưu trữ sản phẩm ${i.name}? Các đơn lịch sử vẫn được giữ nguyên.`))return;setBusy(true);try{await api('items/'+i.id,{method:'DELETE'});setToast('Đã lưu trữ sản phẩm.');await refresh();}catch(e){setErr(e instanceof Error?e.message:'Không thể xóa sản phẩm.');}finally{setBusy(false);}};
+  const removeItem=async(i:InventoryItem)=>{if(!confirm(`Lưu trữ sản phẩm ${i.name}? Các đơn lịch sử vẫn được giữ nguyên.`))return;setBusy(true);try{await api('items/'+i.id,{method:'DELETE'});setToast('Đã lưu trữ sản phẩm.');await refresh();setCatalogReload(v=>v+1);}catch(e){setErr(e instanceof Error?e.message:'Không thể xóa sản phẩm.');}finally{setBusy(false);}};
   const removeCategory=async(id:string,name:string)=>{if(!confirm(`Xóa danh mục ${name}? Danh mục đang có sản phẩm sẽ không được xóa.`))return;setBusy(true);try{await api('categories/'+id,{method:'DELETE'});setToast('Đã xóa danh mục.');await refresh();}catch(e){setErr(e instanceof Error?e.message:'Không thể xóa danh mục.');}finally{setBusy(false);}};
   const openBooking=(mode:'RESERVE'|'PICKUP',itemId?:string,date?:string,endDate?:string)=>{const actualMode=date?(date===today?'PICKUP':'RESERVE'):mode;if(date&&date<today){setErr('Không thể tạo lịch thuê trong quá khứ.');return;}setBookingMode(actualMode);setBooking({customerId:'',itemIds:itemId?[itemId]:[],pickupDate:date||today,returnDate:endDate||date||today,depositDue:0,note:''});openModal('booking');};
   const openDebtOrder=async(id:string)=>{
@@ -196,27 +276,29 @@ export default function Home() {
   };
 
   const chartRows=useMemo(()=>{
-    const cash=orders.flatMap(o=>o.history.filter(h=>h.action==='PAY'&&h.amount&&h.amount>0).map(h=>({date:new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Ho_Chi_Minh',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date(h.at)),amount:h.amount||0})));
+    const cash=reportDaily||[];
     const keys=reportMode==='day'?Array.from({length:14},(_,i)=>addDays(today,i-13)):reportMode==='month'?Array.from({length:12},(_,i)=>{const d=new Date(today+'T00:00:00Z');d.setUTCDate(1);d.setUTCMonth(d.getUTCMonth()-11+i);return d.toISOString().slice(0,7);}):Array.from({length:5},(_,i)=>String(Number(today.slice(0,4))-4+i));
     return keys.map(k=>({label:reportMode==='day'?k.slice(5):reportMode==='month'?k.slice(5)+'/'+k.slice(2,4):k,
       key:k,value:cash.filter(x=>x.date.slice(0,k.length)===k).reduce((s,x)=>s+x.amount,0)}));
-  },[orders,reportMode,today]);
+  },[reportDaily,reportMode,today]);
   const chartMax=Math.max(1,...chartRows.map(r=>r.value));
   const calendarDays=Array.from({length:7},(_,i)=>addDays(calendarStart,i));
-  const calendarCreators=Array.from(new Map(orders.filter(o=>Boolean(o.createdBy)).map(o=>[o.createdBy,orderCreatorName(o,data?.staffNames)] as const)).entries()).sort((a,b)=>a[1].localeCompare(b[1],'vi'));
+  const calendarActive=calendarOrderRows??active;
+  const calendarOverdue=calendarActive.filter(o=>o.status==='PICKED_UP'&&o.returnDate<today);
+  const calendarCreators=Array.from(new Map(calendarActive.filter(o=>Boolean(o.createdBy)).map(o=>[o.createdBy,orderCreatorName(o,data?.staffNames)] as const)).entries()).sort((a,b)=>a[1].localeCompare(b[1],'vi'));
   const creatorName=(o:RentalOrder)=>orderCreatorName(o,data?.staffNames);
-  const calendarItems=items.filter(i=>(calendarCategory==='ALL'||i.category===calendarCategory)&&
-    (calendarCreator==='ALL'||active.some(o=>o.createdBy===calendarCreator&&o.lines.some(l=>l.itemId===i.id)&&o.pickupDate<=calendarDays[6]&&o.returnDate>=calendarStart))&&
-    (calendarStatus==='ALL'||calendarItemState(i,active,calendarStart,7,today)===calendarStatus));
+  const calendarItems=(calendarLoaded?calendarRemote:items.slice(0,25)).filter(i=>(calendarCategory==='ALL'||i.category===calendarCategory)&&
+    (calendarCreator==='ALL'||calendarActive.some(o=>o.createdBy===calendarCreator&&o.lines.some(l=>l.itemId===i.id)&&o.pickupDate<=calendarDays[6]&&o.returnDate>=calendarStart))&&
+    (calendarStatus==='ALL'||calendarItemState(i,calendarActive,calendarStart,7,today)===calendarStatus));
   const quickMatches=items.filter(i=>(calendarCategory==='ALL'||i.category===calendarCategory)&&
     (!smartQuery||[i.name,i.category,i.color,i.size].some(v=>v.toLocaleLowerCase('vi-VN').includes(smartQuery.trim().toLocaleLowerCase('vi-VN')))));
   const availableMatches=smartResult&&smartResult.pickupDate===smartStart&&smartResult.returnDate===smartEnd?
-    quickMatches.filter(i=>smartResult.availableIds.includes(i.id)):[];
+    (smartResult.products||quickMatches.filter(i=>smartResult.availableIds.includes(i.id))).filter(i=>(calendarCategory==='ALL'||i.category===calendarCategory)&&(!smartQuery||[i.name,i.category,i.color,i.size].some(v=>v.toLocaleLowerCase('vi-VN').includes(smartQuery.trim().toLocaleLowerCase('vi-VN'))))):[];
   const findAvailable=async()=>{
     setSmartLoading(true);setNearestResult(null);setSmartResult(null);
     try {
-      const result=await api<{availableIds:string[];pickupDate:string;returnDate:string;checkedAt:string}>('smart-calendar',{
-        method:'POST',body:JSON.stringify({mode:'FIND_AVAILABLE',pickupDate:smartStart,returnDate:smartEnd})});
+      const result=await api<{availableIds:string[];products?:InventoryItem[];pickupDate:string;returnDate:string;checkedAt:string;hasMore?:boolean}>('smart-calendar',{
+        method:'POST',body:JSON.stringify({mode:'FIND_AVAILABLE',pickupDate:smartStart,returnDate:smartEnd,query:smartQuery})});
       setSmartResult(result);
     }catch(e){setErr(e instanceof Error?e.message:'Không thể tra cứu lịch trống.');}
     finally{setSmartLoading(false);}
@@ -233,8 +315,8 @@ export default function Home() {
   // Shared occupancy logic for desktop timeline and mobile product cards.
   // Keep both views on the exact same booking rules and click handlers.
   const renderCalendarCell=(item:InventoryItem,day:string,mobile=false)=>{
-    const order=active.find(o=>o.lines.some(l=>l.itemId===item.id)&&day>=o.pickupDate&&day<=o.returnDate&&day>=(o.lines.find(l=>l.itemId===item.id)?.startDate||o.pickupDate));
-    const lateOrder=overdueOrders.find(o=>o.lines.some(l=>l.itemId===item.id));
+    const order=calendarActive.find(o=>o.lines.some(l=>l.itemId===item.id)&&day>=o.pickupDate&&day<=o.returnDate&&day>=(o.lines.find(l=>l.itemId===item.id)?.startDate||o.pickupDate));
+    const lateOrder=calendarOverdue.find(o=>o.lines.some(l=>l.itemId===item.id));
     const shown=order||(lateOrder&&day>=lateOrder.pickupDate?lateOrder:undefined);
     const late=!!lateOrder&&day>lateOrder.returnDate;
     const blocked=!shown&&(['LAUNDRY','MAINTENANCE','MISSING'].includes(item.status)||!(item.replacementValue>0));
@@ -279,7 +361,7 @@ export default function Home() {
       <div className="brand"><span className="brandmark"><Sparkles size={22}/></span><span>GU<span className="brand-accent">.</span><small>THUÊ ĐỒ XINH</small></span></div>
       <div className="workspace"><div className="workspace-logo">GU</div><div className="workspace-copy"><strong>GU - Thuê đồ xinh</strong><span>Workspace <CheckCircle2 size={12}/></span></div><MoreHorizontal size={17} color="#948c83"/></div>
       <div className="nav-heading">QUẢN LÝ</div>
-      <nav className="navigation">{navSections.map(group=><div className="gu-nav-section" key={group.label}><div className="gu-nav-section-title">{group.label}</div>{group.ids.filter(id=>data?.me.role==='admin'||!['debts','reports','staff','audit'].includes(id)).map(id=>{const item=nav.find(n=>n.id===id)!;const Icon=item.icon;return <button type="button" key={id} aria-current={page===id?'page':undefined} className={'nav-link '+(page===id?'nav-active':'')} onClick={()=>{setPage(id);setQuery('');setTaskView('ALL');setMobileNav(false);}}><Icon size={19} strokeWidth={1.9}/><span>{item.label}</span>{page===id&&<span className="active-line"/>}</button>;})}</div>)}</nav>
+      <nav className="navigation">{navSections.map(group=><div className="gu-nav-section" key={group.label}><div className="gu-nav-section-title">{group.label}</div>{group.ids.filter(id=>data?.me.role==='admin'||!['debts','reports','staff','audit','system'].includes(id)).map(id=>{const item=nav.find(n=>n.id===id)!;const Icon=item.icon;return <button type="button" key={id} aria-current={page===id?'page':undefined} className={'nav-link '+(page===id?'nav-active':'')} onClick={()=>{setPage(id);setQuery('');setTaskView('ALL');setMobileNav(false);}}><Icon size={19} strokeWidth={1.9}/><span>{item.label}</span>{page===id&&<span className="active-line"/>}</button>;})}</div>)}</nav>
       <div className="sidebar-spacer"/>
       
       <div className="sidebar-user"><div className="avatar">{initials(data?.me.name||user.email||'AD')}</div><div className="sidebar-user-copy"><strong>{data?.me.name||user.email?.split('@')[0]}</strong><span>{data?.me.role==='admin'?'Quản trị viên':'Nhân viên'}</span></div><button className="icon-btn" aria-label="Đăng xuất" title="Đăng xuất" onClick={()=>void signOut(clientAuth())}><LogOut size={18}/></button></div>
@@ -296,7 +378,7 @@ export default function Home() {
         {page==='overview'&&<><div className="page-intro"><div><div className="eyebrow">STORE OVERVIEW</div><h1>Xin chào, {data.me.name?.split(' ').slice(-1)[0]||'bạn'} <span className="wave">✳</span></h1><p>Đây là những gì đang diễn ra tại cửa hàng hôm nay.</p></div><div className="action-row"><button className="btn btn-white" onClick={()=>openBooking('RESERVE')}><CalendarDays size={17}/> Đặt lịch trước</button><button className="btn btn-dark" onClick={()=>openBooking('PICKUP')}><Plus size={18}/> Tạo đơn · giao ngay</button></div></div>
           <div className="gu-mobile-action-panel"><div className="gu-mobile-greeting"><strong>Hôm nay tại GU</strong><span>{prettyDay(today)}</span></div><div className="gu-mobile-task-grid"><button type="button" onClick={()=>openTaskOrders('PICKUP_TODAY')}><CalendarDays size={18}/><strong>{orders.filter(o=>o.status==='RESERVED'&&o.pickupDate===today).length}</strong><small>Chờ giao hôm nay</small></button><button type="button" onClick={()=>openTaskOrders('RETURN_TODAY')}><Clock3 size={18}/><strong>{dueToday.length}</strong><small>Đến hẹn trả</small></button><button type="button" className={overdueOrders.length?'gu-mobile-danger':''} onClick={()=>openTaskOrders('OVERDUE')}><BellRing size={18}/><strong>{overdueOrders.length}</strong><small>Quá hạn</small></button></div></div>
           <GuInstallApp/>
-          <div className="stats-grid">{data.me.role==='admin'&&<Metric icon={Wallet} title="Đã thu (đơn gần đây)" value={money(collected)} detail="Trong tối đa 300 đơn mới nhất" tone="peach"/>}<Metric icon={ShoppingBag} title="Đơn đang hoạt động" value={String(active.length).padStart(2,'0')} detail={`${picked.length} đơn đã lấy hàng`} tone="purple"/><Metric icon={Shirt} title="Sản phẩm trong kho" value={String(items.length).padStart(2,'0')} detail={`${items.filter(i=>i.status==='AVAILABLE').length} bộ sẵn sàng`} tone="blue"/><Metric icon={ArrowDownLeft} title="Cần trả hôm nay" value={String(dueToday.length).padStart(2,'0')} detail="Đơn đến hạn trả hôm nay" tone="green"/><Metric icon={WashingMachine} title="Đang giặt" value={String(items.filter(i=>i.status==='LAUNDRY').length).padStart(2,'0')} detail="Trả xong sẽ tự chuyển vào đây" tone="blue"/>{data.me.role==='admin'&&<button type="button" className="gu-debt-metric-link" onClick={()=>setPage('debts')}><CreditCard size={20}/><span>Công nợ cần thu</span><strong>{allOutstanding===undefined?'Đang tính…':money(allOutstanding)}</strong><small>{debtSummary?.accounts.length||0} khách · Không tính đơn giữ chỗ</small><ArrowRight size={17}/></button>}</div>
+          <div className="stats-grid">{data.me.role==='admin'&&<Metric icon={Wallet} title="Đã thu (đơn gần đây)" value={money(collected)} detail="Trong tối đa 80 đơn mới nhất" tone="peach"/>}<Metric icon={ShoppingBag} title="Đơn đang hoạt động" value={String(data.counts?.activeOrders??active.length).padStart(2,'0')} detail={`${picked.length} đơn đã lấy hàng`} tone="purple"/><Metric icon={Shirt} title="Sản phẩm trong kho" value={String(data.counts?.items??items.length).padStart(2,'0')} detail={`${data.counts?.available??items.filter(i=>i.status==='AVAILABLE').length} bộ sẵn sàng`} tone="blue"/><Metric icon={ArrowDownLeft} title="Cần trả hôm nay" value={String(dueToday.length).padStart(2,'0')} detail="Đơn đến hạn trả hôm nay" tone="green"/><Metric icon={WashingMachine} title="Đang giặt" value={String(data.counts?.laundry??laundryRemote.length??0).padStart(2,'0')} detail="Trả xong sẽ tự chuyển vào đây" tone="blue"/>{data.me.role==='admin'&&<button type="button" className="gu-debt-metric-link" onClick={()=>setPage('debts')}><CreditCard size={20}/><span>Công nợ cần thu</span><strong>{allOutstanding===undefined?'Đang tính…':money(allOutstanding)}</strong><small>{debtSummary?.accounts.length||0} khách · Không tính đơn giữ chỗ</small><ArrowRight size={17}/></button>}</div>
           <section className="panel gu-today-tasks" aria-label="Việc hôm nay">
             <div className="panel-heading"><div><h3><ListTodo size={19}/> Việc hôm nay</h3><p>Chạm vào đơn để xử lý hoặc gọi trực tiếp cho khách.</p></div></div>
             <div className="gu-task-lists">{[
@@ -309,7 +391,7 @@ export default function Home() {
               {g.list.length>3&&<button className="gu-task-more" onClick={()=>openTaskOrders(g.key)}>Xem thêm {g.list.length-3} đơn <ArrowRight size={13}/></button>}
             </div>)}</div>
           </section>
-          <div className="overview-columns"><section className="panel"><div className="panel-heading"><div><h3>Đơn thuê gần đây</h3></div><button className="text-action" onClick={()=>setPage('orders')}>Xem tất cả <ArrowRight size={15}/></button></div><div className="table-wrap"><table><thead><tr><th>ĐƠN HÀNG</th><th>KHÁCH HÀNG</th><th>NGÀY NHẬN</th><th>TRẠNG THÁI</th></tr></thead><tbody>{orders.slice(0,6).map(o=><tr key={o.id} className="click-row" onClick={()=>openDetail(o)}><td><b>{o.code}</b><div className="table-sub">{money(o.total)}</div></td><td>{o.customerName}</td><td>{prettyDay(o.pickupDate)}</td><td>{isOverdue(o)?<span className="badge badge-danger overdue-blink">TRẢ TRỄ</span>:<StatusBadge status={o.status} label={orderLabels[o.status]}/>} </td></tr>)}{!orders.length&&<tr><td colSpan={4}><Empty small text="Chưa có đơn thuê. Hãy tạo đơn đầu tiên."/></td></tr>}</tbody></table></div></section><section className="panel gu-overview-work-panel"><div className="panel-heading"><div><h3>{data.me.role==='admin'?'Khách còn công nợ':'Tình trạng kho cần xử lý'}</h3><p>{data.me.role==='admin'?'Mở danh sách để biết ai cần thu, đơn nào còn thiếu.':'Các sản phẩm chưa sẵn sàng cho thuê'}</p></div></div>{data.me.role==='admin'?<div className="gu-overview-debt-preview">{debtSummary?.accounts.slice(0,4).map(a=><button key={a.key} type="button" className="gu-debt-preview-row" onClick={()=>setPage('debts')}><span><strong>{a.customerName}</strong><small>{a.customerPhone} · {a.orderCount} đơn</small></span><b>{money(a.outstanding)}</b><ChevronRight size={16}/></button>)}{!debtSummary?.accounts.length&&<p className="gu-debt-empty-inline">{debtLoading?'Đang đối soát công nợ…':'Chưa có khách nào nợ tiền.'}</p>}<button type="button" className="btn btn-white gu-panel-action" onClick={()=>setPage('debts')}>Xem công nợ theo khách <ArrowRight size={16}/></button></div>:<div className="gu-overview-debt-preview"><p className="gu-debt-empty-inline">Đang giặt: <strong>{items.filter(i=>i.status==='LAUNDRY').length}</strong> món</p><p className="gu-debt-empty-inline">Bảo trì: <strong>{items.filter(i=>i.status==='MAINTENANCE').length}</strong> món</p><button type="button" className="btn btn-white gu-panel-action" onClick={()=>setPage('laundry')}>Mở Quản lý giặt <ArrowRight size={16}/></button></div>}</section></div>
+          <div className="overview-columns"><section className="panel"><div className="panel-heading"><div><h3>Đơn thuê gần đây</h3></div><button className="text-action" onClick={()=>setPage('orders')}>Xem tất cả <ArrowRight size={15}/></button></div><div className="table-wrap"><table><thead><tr><th>ĐƠN HÀNG</th><th>KHÁCH HÀNG</th><th>NGÀY NHẬN</th><th>TRẠNG THÁI</th></tr></thead><tbody>{orders.slice(0,6).map(o=><tr key={o.id} className="click-row" onClick={()=>openDetail(o)}><td><b>{o.code}</b><div className="table-sub">{money(o.total)}</div></td><td>{o.customerName}</td><td>{prettyDay(o.pickupDate)}</td><td>{isOverdue(o)?<span className="badge badge-danger overdue-blink">TRẢ TRỄ</span>:<StatusBadge status={o.status} label={orderLabels[o.status]}/>} </td></tr>)}{!orders.length&&<tr><td colSpan={4}><Empty small text="Chưa có đơn thuê. Hãy tạo đơn đầu tiên."/></td></tr>}</tbody></table></div></section><section className="panel gu-overview-work-panel"><div className="panel-heading"><div><h3>{data.me.role==='admin'?'Khách còn công nợ':'Tình trạng kho cần xử lý'}</h3><p>{data.me.role==='admin'?'Mở danh sách để biết ai cần thu, đơn nào còn thiếu.':'Các sản phẩm chưa sẵn sàng cho thuê'}</p></div></div>{data.me.role==='admin'?<div className="gu-overview-debt-preview">{debtSummary?.accounts.slice(0,4).map(a=><button key={a.key} type="button" className="gu-debt-preview-row" onClick={()=>setPage('debts')}><span><strong>{a.customerName}</strong><small>{a.customerPhone} · {a.orderCount} đơn</small></span><b>{money(a.outstanding)}</b><ChevronRight size={16}/></button>)}{!debtSummary?.accounts.length&&<p className="gu-debt-empty-inline">{debtLoading?'Đang đối soát công nợ…':'Chưa có khách nào nợ tiền.'}</p>}<button type="button" className="btn btn-white gu-panel-action" onClick={()=>setPage('debts')}>Xem công nợ theo khách <ArrowRight size={16}/></button></div>:<div className="gu-overview-debt-preview"><p className="gu-debt-empty-inline">Đang giặt: <strong>{(laundryRemote.length||items.filter(i=>i.status==='LAUNDRY').length)}</strong> món</p><p className="gu-debt-empty-inline">Bảo trì: <strong>{items.filter(i=>i.status==='MAINTENANCE').length}</strong> món</p><button type="button" className="btn btn-white gu-panel-action" onClick={()=>setPage('laundry')}>Mở Quản lý giặt <ArrowRight size={16}/></button></div>}</section></div>
           
         </>}
         {page==='calendar'&&<>
@@ -319,15 +401,16 @@ export default function Home() {
             <div className="gu-smart-controls">
               <label>Từ ngày<input className="input" type="date" lang="vi-VN" min={today} value={smartStart} onChange={e=>{const v=e.target.value;setSmartStart(v);if(v>smartEnd)setSmartEnd(v);setSmartResult(null);setNearestResult(null);}}/></label>
               <label>Đến ngày<input className="input" type="date" lang="vi-VN" min={smartStart} value={smartEnd} onChange={e=>{setSmartEnd(e.target.value);setSmartResult(null);setNearestResult(null);}}/></label>
-              <label>Tên / size / màu<input className="input" type="search" value={smartQuery} onChange={e=>setSmartQuery(e.target.value)} placeholder="Tìm áo dài, đầm, túi xách…"/></label>
+              <label>Tên / size / màu<input className="input" type="search" value={smartQuery} onChange={e=>setSmartQuery(e.target.value)} placeholder="Tìm theo đầu tên hoặc mã sản phẩm…"/></label>
               <button type="button" className="btn btn-dark" disabled={smartLoading||!smartStart||!smartEnd||smartEnd<smartStart} onClick={()=>void findAvailable()}>{smartLoading?<LoaderCircle size={16} className="spin"/>:<Search size={16}/>} Tìm đồ trống</button>
             </div>
-            {smartResult&&smartResult.pickupDate===smartStart&&smartResult.returnDate===smartEnd&&<div className="gu-smart-result" aria-live="polite"><div className="gu-smart-result-title"><strong>{availableMatches.length} sản phẩm phù hợp đang trống</strong><small>{prettyDay(smartStart)} – {prettyDay(smartEnd)}</small></div>
+            {smartResult&&smartResult.pickupDate===smartStart&&smartResult.returnDate===smartEnd&&<div className="gu-smart-result" aria-live="polite"><div className="gu-smart-result-title"><strong>{availableMatches.length} món trống trong trang tìm kiếm</strong><small>{prettyDay(smartStart)} – {prettyDay(smartEnd)}</small></div>
               <div className="gu-smart-items">{availableMatches.slice(0,24).map(i=><div className="gu-smart-product" key={i.id}><ProductImage paths={i.imagePaths}/><div><strong>{i.name}</strong><small>{getProductCode(i)||"Chưa có mã sản phẩm"} · Size {i.size} · {money(i.dailyRate)}/ngày</small></div><button className="btn btn-white" onClick={()=>openBooking(smartStart===today?'PICKUP':'RESERVE',i.id,smartStart,smartEnd)}>Chọn đồ <Plus size={15}/></button></div>)}
               {!availableMatches.length&&<div className="gu-smart-no-results">Không tìm thấy đồ trống theo bộ lọc hiện tại. Thử món khác hoặc bấm <strong>Ngày trống gần nhất</strong> trong lịch bên dưới.</div>}
               {availableMatches.length>24&&<small className="gu-smart-overflow">Hiển thị 24/{availableMatches.length} sản phẩm</small>}</div></div>}
             
           </section>
+          <div className="gu-catalog-pager"><div className="gu-search-wrap"><Search size={15}/><input className="input" value={calendarQuery} onChange={e=>setCalendarQuery(e.target.value)} placeholder="Tìm mã sản phẩm hoặc tên trên lịch…"/></div><button type="button" className="btn btn-white" disabled={!calendarNext} onClick={()=>setCalendarPageCursor(calendarNext)}>25 món tiếp theo <ChevronRight size={14}/></button><button type="button" className="btn btn-white" disabled={!calendarPageCursor} onClick={()=>setCalendarPageCursor(null)}>Đầu danh sách</button></div>
           <section className="panel calendar-panel"><div className="calendar-toolbar"><div><h3>Lịch sản phẩm</h3><div className="legend">{data.me.role==='admin'&&<span className="overdue-label"><i className="legend-dot maintenance"/>Chớp đỏ: trả trễ</span>}<span><i className="legend-dot reserved"/>Đã giữ</span><span><i className="legend-dot picked"/>Đã lấy</span><span><i className="legend-dot free"/>Còn trống</span></div></div><div className="calendar-controls">
             <select className="input gu-calendar-cat" value={calendarCategory} onChange={e=>setCalendarCategory(e.target.value)}><option value="ALL">Tất cả danh mục</option>{Array.from(new Set(items.map(i=>i.category))).sort().map(c=><option value={c} key={c}>{c}</option>)}</select>
             <select className="input gu-calendar-status" aria-label="Lọc lịch theo tình trạng" value={calendarStatus} onChange={e=>setCalendarStatus(e.target.value as CalendarFilter)}>
@@ -341,7 +424,7 @@ export default function Home() {
           </div></div>
           <div className="calendar-scroll gu-calendar-desktop"><div className="calendar-grid"><div className="calendar-corner">SẢN PHẨM / NGÀY</div>
             {calendarDays.map(d=><div key={d} className={'calendar-day '+(d===today?'calendar-today':'')}><span>{new Date(d+'T00:00:00Z').toLocaleDateString('vi-VN',{weekday:'short',timeZone:'UTC'})}</span><strong>{prettyDay(d)}</strong></div>)}
-            {calendarItems.map(item=><div className={'calendar-row '+(overdueOrders.some(o=>o.lines.some(l=>l.itemId===item.id))?'overdue-row':'')} key={item.id}>
+            {calendarItems.map(item=><div className={'calendar-row '+(calendarOverdue.some(o=>o.lines.some(l=>l.itemId===item.id))?'overdue-row':'')} key={item.id}>
               <div className="calendar-item"><ProductImage paths={item.imagePaths} className="gu-calendar-photo"/><div><strong>{item.name}</strong><span>{item.category} · Size {item.size} · Mã SP: {getProductCode(item)||"chưa cấp"}</span><button type="button" className="gu-nearest-link" disabled={nearestLoading===item.id} onClick={()=>void findNearest(item.id)}><CalendarSearch size={12}/> {nearestLoading===item.id?'Đang tìm…':'Ngày trống gần nhất'}</button>{nearestResult?.itemId===item.id&&<small className="gu-nearest-inline">{nearestResult.nextPickupDate?`Trống: ${prettyDay(nearestResult.nextPickupDate)}`:nearestResult.reason}</small>}</div></div>
               {calendarDays.map(day=>renderCalendarCell(item,day))}
             </div>)}
@@ -357,20 +440,22 @@ export default function Home() {
           {nearestResult&&<div className="gu-nearest-result" aria-live="polite"><CalendarSearch size={19}/><div><strong>{items.find(i=>i.id===nearestResult.itemId)?.name||'Sản phẩm'}:</strong> {nearestResult.nextPickupDate?`trống từ ${prettyDay(nearestResult.nextPickupDate)} đến ${prettyDay(nearestResult.nextReturnDate!)}`:nearestResult.reason}</div>{nearestResult.nextPickupDate&&<button className="btn btn-dark" onClick={()=>openBooking(nearestResult.nextPickupDate===today?'PICKUP':'RESERVE',nearestResult.itemId,nearestResult.nextPickupDate!,nearestResult.nextReturnDate!)}>Đặt ngày này</button>}<button className="icon-btn" title="Đóng" aria-label="Đóng kết quả" onClick={()=>setNearestResult(null)}><X size={16}/></button></div>}
           </section>
         </>}
-        {page==='orders'&&<><div className="page-intro"><div><div className="eyebrow">RENTAL ORDERS</div><h1>Quản lý đơn thuê</h1></div><div className="action-row"><button className="btn btn-white" onClick={exportCsv}><Download size={17}/> Xuất CSV</button><button className="btn btn-white" onClick={()=>openBooking('RESERVE')}><CalendarDays size={17}/> Đặt lịch trước</button><button className="btn btn-dark" onClick={()=>openBooking('PICKUP')}><Plus size={17}/> Tạo đơn · giao ngay</button></div></div>{items.some(i=>i.status==='LAUNDRY')&&<button className="gu-orders-laundry-link" type="button" onClick={()=>setPage('laundry')}><WashingMachine size={17}/> {items.filter(i=>i.status==='LAUNDRY').length} món đang giặt — xem tại Quản lý giặt <ArrowRight size={16}/></button>}
+        {['inventory','customers','orders'].includes(page)&&<div className="gu-catalog-pager" aria-live="polite"><span>{catalogLoading?'Đang tải trang dữ liệu…':catalogData?.results.length+' kết quả trong trang hiện tại'}</span><button className="btn btn-white" type="button" disabled={catalogLoading||!catalogData?.hasMore} onClick={()=>setCatalogCursor(catalogData?.cursor||null)}>Trang kế tiếp <ChevronRight size={14}/></button><button className="btn btn-white" type="button" disabled={catalogLoading||!catalogCursor} onClick={()=>setCatalogCursor(null)}>Về trang đầu</button></div>}
+        {page==='orders'&&<><div className="page-intro"><div><div className="eyebrow">RENTAL ORDERS</div><h1>Quản lý đơn thuê</h1></div><div className="action-row"><button className="btn btn-white" onClick={exportCsv}><Download size={17}/> Xuất CSV</button><button className="btn btn-white" onClick={()=>openBooking('RESERVE')}><CalendarDays size={17}/> Đặt lịch trước</button><button className="btn btn-dark" onClick={()=>openBooking('PICKUP')}><Plus size={17}/> Tạo đơn · giao ngay</button></div></div>{items.some(i=>i.status==='LAUNDRY')&&<button className="gu-orders-laundry-link" type="button" onClick={()=>setPage('laundry')}><WashingMachine size={17}/> {(laundryRemote.length||items.filter(i=>i.status==='LAUNDRY').length)} món đang giặt — xem tại Quản lý giặt <ArrowRight size={16}/></button>}
         {taskView!=='ALL'&&<div className="gu-task-active"><ListTodo size={16}/> Đang xem: {taskView==='PICKUP_TODAY'?'Chờ giao hôm nay':taskView==='RETURN_TODAY'?'Đến hạn trả hôm nay':'Đơn trả quá hạn'} <button className="btn btn-white" onClick={()=>setTaskView('ALL')}>Xóa lọc</button></div>}<div className="summary-pills"><span><ShoppingBag size={16}/> Tổng đơn <b>{orders.length}</b></span><span><Clock3 size={16}/> Đang giữ <b>{orders.filter(o=>o.status==='RESERVED').length}</b></span><span><Shirt size={16}/> Đã lấy <b>{picked.length}</b></span>{data.me.role==='admin'&&<button type="button" className="gu-pill-link" onClick={()=>setPage('debts')}><CreditCard size={16}/> Công nợ <b>{allOutstanding===undefined?'Đang tính…':money(allOutstanding)}</b> <ArrowRight size={14}/></button>}</div><section className="panel"><div className="filter-toolbar"><div className="search-box"><Search size={18}/><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Tìm mã đơn, khách, SĐT, nhân viên…"/></div><div className="select-holder"><Filter size={17}/><select value={orderStatus} onChange={e=>setOrderStatus(e.target.value as typeof orderStatus)}><option value="ALL">Tất cả trạng thái</option>{(Object.keys(orderLabels) as OrderStatus[]).map(k=><option key={k} value={k}>{orderLabels[k]}</option>)}</select></div></div><div className="table-wrap"><table><thead><tr><th>MÃ ĐƠN</th><th>KHÁCH HÀNG</th><th>SẢN PHẨM</th><th>LỊCH THUÊ</th><th>THANH TOÁN</th><th>TRẠNG THÁI</th><th></th></tr></thead><tbody>{filteredOrders.map(o=><tr key={o.id} className="click-row" onClick={()=>openDetail(o)}><td><b>{o.code}</b><div className="table-sub">{prettyDay(o.createdAt.slice(0,10))}</div><div className="gu-order-created-by">NV: {creatorName(o)}</div></td><td><b>{o.customerName}</b><div className="table-sub">{o.customerPhone}</div><a href={customerPhoneHref(o.customerPhone)} className="gu-order-call" onClick={e=>e.stopPropagation()}><PhoneCall size={13}/> Gọi khách</a></td><td>{o.lines.map(l=>l.name).join(', ')}<div className="table-sub">{o.lines.length} sản phẩm</div></td><td>{prettyDay(o.pickupDate)}<div className="table-sub">→ {prettyDay(o.returnDate)}</div></td><td><b>{money(dueAmount(o))}</b><div className="table-sub">Đã thu: {money(o.paid)}</div></td><td>{isOverdue(o)?<span className="badge badge-danger overdue-blink">TRẢ TRỄ</span>:<StatusBadge status={o.status} label={orderLabels[o.status]}/>} </td><td><ChevronRight size={16}/></td></tr>)}{!filteredOrders.length&&<tr><td colSpan={7}><Empty small text="Không tìm thấy đơn thuê phù hợp."/></td></tr>}</tbody></table></div></section></>}
         {page==='laundry'&&<><div className="page-intro"><div><div className="eyebrow">LAUNDRY MANAGEMENT</div><h1>Quản lý giặt</h1></div><button className="btn btn-white" onClick={()=>void refresh()}><RefreshCcw size={17}/> Làm mới</button></div>
-          <section className="panel gu-laundry-queue"><div className="panel-heading"><div><h3><WashingMachine size={20}/> Đang giặt ({items.filter(i=>i.status==='LAUNDRY').length})</h3></div></div><div className="gu-laundry-list">{items.filter(i=>i.status==='LAUNDRY').map(i=><div key={i.id} className="gu-laundry-line"><ProductImage paths={i.imagePaths}/><span><strong>{i.name}</strong><small>{i.category} · Size {i.size} · {getProductCode(i)||'Chưa cấp mã sản phẩm'}</small></span><button className="btn btn-dark" disabled={busy} onClick={()=>void action('items/'+i.id,{action:'CLEAN'},'Đã giặt · kho đã cập nhật.','PATCH')}><CheckCircle2 size={15}/> Đã giặt</button></div>)}{!items.some(i=>i.status==='LAUNDRY')&&<Empty text="Không có sản phẩm đang giặt."/>}</div></section>
+          <section className="panel gu-laundry-queue"><div className="panel-heading"><div><h3><WashingMachine size={20}/> Đang giặt ({(laundryRemote.length||items.filter(i=>i.status==='LAUNDRY').length)})</h3></div></div><div className="gu-laundry-list">{(laundryLoaded?laundryRemote:items.filter(i=>i.status==='LAUNDRY')).map(i=><div key={i.id} className="gu-laundry-line"><ProductImage paths={i.imagePaths}/><span><strong>{i.name}</strong><small>{i.category} · Size {i.size} · {getProductCode(i)||'Chưa cấp mã sản phẩm'}</small></span><button className="btn btn-dark" disabled={busy} onClick={()=>void action('items/'+i.id,{action:'CLEAN'},'Đã giặt · kho đã cập nhật.','PATCH')}><CheckCircle2 size={15}/> Đã giặt</button></div>)}{!(laundryLoaded?laundryRemote.length:items.some(i=>i.status==='LAUNDRY'))&&<Empty text="Không có sản phẩm đang giặt."/>}</div></section>
         </>}
         {page==='inventory'&&<><div className="page-intro"><div><div className="eyebrow">INVENTORY CONTROL</div><h1>Kho sản phẩm</h1></div><div className="action-row"><button className="btn btn-white" onClick={()=>openModal('category')}><Plus size={16}/> Quản lý danh mục</button>{data.me.role==='admin'&&items.some(i=>!getProductCode(i))&&<button className="btn btn-white" disabled={busy} onClick={()=>void assignOldProductCodes()}><RefreshCcw size={16}/> Cấp mã sản phẩm</button>}<button className="btn btn-dark" onClick={()=>openModal('item')}><Plus size={18}/> Thêm sản phẩm</button></div></div>
-          <div className="inventory-stats"><span><i className="legend-dot free"/> Sẵn sàng <b>{items.filter(i=>i.status==='AVAILABLE').length}</b></span><span><i className="legend-dot picked"/> Đang thuê <b>{items.filter(i=>i.status==='RENTED').length}</b></span><button className="gu-status-link" onClick={()=>setPage('laundry')}><i className="legend-dot reserved"/> Đang giặt <b>{items.filter(i=>i.status==='LAUNDRY').length}</b></button><span><i className="legend-dot maintenance"/> Thất lạc <b>{items.filter(i=>i.status==='MISSING').length}</b></span></div>
-          <section className="panel"><div className="filter-toolbar"><div className="search-box"><Search size={18}/><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Tìm tên, mã sản phẩm, màu, size hoặc danh mục…"/></div><div className="select-holder"><Filter size={17}/><select value={itemStatus} onChange={e=>setItemStatus(e.target.value as typeof itemStatus)}><option value="ALL">Tất cả tình trạng</option>{(Object.keys(statusLabels) as InventoryItem['status'][]).map(k=><option key={k} value={k}>{statusLabels[k]}</option>)}</select></div><select className="input gu-filter-category" value={inventoryCategory} onChange={e=>setInventoryCategory(e.target.value)}><option value="ALL">Tất cả danh mục</option>{Array.from(new Set([...items.map(i=>i.category),...(data?.categories||[]).map(c=>c.name)])).map(c=><option key={c} value={c}>{c}</option>)}</select></div>
+          <div className="inventory-stats"><span><i className="legend-dot free"/> Sẵn sàng <b>{data.counts?.available??items.filter(i=>i.status==='AVAILABLE').length}</b></span><span><i className="legend-dot picked"/> Đang thuê <b>{data.counts?.rented??items.filter(i=>i.status==='RENTED').length}</b></span><button className="gu-status-link" onClick={()=>setPage('laundry')}><i className="legend-dot reserved"/> Đang giặt <b>{data.counts?.laundry??laundryRemote.length}</b></button><span><i className="legend-dot maintenance"/> Thất lạc <b>{data.counts?.missing??items.filter(i=>i.status==='MISSING').length}</b></span></div>
+          <section className="panel"><div className="filter-toolbar"><div className="search-box"><Search size={18}/><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Tìm đầu tên hoặc mã sản phẩm…"/></div><div className="select-holder"><Filter size={17}/><select value={itemStatus} onChange={e=>setItemStatus(e.target.value as typeof itemStatus)}><option value="ALL">Tất cả tình trạng</option>{(Object.keys(statusLabels) as InventoryItem['status'][]).map(k=><option key={k} value={k}>{statusLabels[k]}</option>)}</select></div><select className="input gu-filter-category" value={inventoryCategory} onChange={e=>setInventoryCategory(e.target.value)}><option value="ALL">Tất cả danh mục</option>{Array.from(new Set([...items.map(i=>i.category),...(data?.categories||[]).map(c=>c.name)])).map(c=><option key={c} value={c}>{c}</option>)}</select></div>
           <div className="table-wrap"><table><thead><tr><th>SẢN PHẨM</th><th>PHÂN LOẠI</th><th>GIÁ / NGÀY</th><th>TÌNH TRẠNG</th><th>THAO TÁC</th></tr></thead><tbody>{filteredItems.map(i=><tr key={i.id}><td><div className="item-name-cell"><ProductImage paths={i.imagePaths}/><div><b>{i.name}</b><div className="table-sub">{i.color||'Không ghi màu'}</div><div className="gu-product-code-row"><span className="gu-product-code-label">Mã sản phẩm</span>{getProductCode(i)?<button className="gu-product-code-tag" type="button" title="Nhấn để sao chép mã sản phẩm" onClick={()=>void copyProductCode(i.hangerCode!)}>{i.hangerCode}</button>:<span className="gu-product-code-unassigned">Chưa cấp mã sản phẩm</span>}</div></div></div></td><td>{i.category}<div className="table-sub">Size {i.size} · {(i.requiresLaundry ?? (i.bufferDays>0))?'Có giặt sau thuê':'Không cần giặt'}</div></td><td><b>{money(i.dailyRate)}</b><div className="table-sub">Đền bù: {i.replacementValue>0?money(i.replacementValue):'Chờ Admin duyệt'}</div></td><td><StatusBadge status={i.status} label={statusLabels[i.status]}/></td><td><div className="gu-table-actions"><button className="btn btn-white" type="button" onClick={()=>editItem(i)}><Pencil size={15}/> Sửa</button>{i.status==='LAUNDRY'&&<button className="btn btn-dark" disabled={busy} onClick={()=>void action('items/'+i.id,{action:'CLEAN'},'Đã giặt, kho đã cập nhật.','PATCH')}><WashingMachine size={15}/> Đã giặt</button>}{data.me.role==='admin'&&<details className="gu-row-more"><summary className="btn btn-white">Khác <ChevronDown size={15}/></summary><div className="gu-row-more-menu"><button type="button" className="btn btn-danger" disabled={busy} onClick={()=>void removeItem(i)}><Trash2 size={15}/> Lưu trữ sản phẩm</button>{i.status!=='RENTED'&&i.status!=='MISSING'&&i.status!=='LAUNDRY'&&<label className="gu-row-state-edit">Tình trạng<select className="small-select" aria-label={'Đổi tình trạng '+i.name} disabled={busy} value={i.status} onChange={e=>void action('items/'+i.id,{status:e.target.value},'Đã cập nhật kho.','PATCH')}><option value="AVAILABLE">Sẵn sàng</option><option value="MAINTENANCE">Bảo trì</option></select></label>}</div></details>}</div></td></tr>)}{!filteredItems.length&&<tr><td colSpan={5}><Empty small text="Không có sản phẩm phù hợp."/></td></tr>}</tbody></table></div></section></>}
         {page==='debts'&&data.me.role==='admin'&&<GuDebts summary={debtSummary} loading={debtLoading} error={debtError} onRefresh={()=>void refreshDebts()} onOpen={id=>void openDebtOrder(id)}/>}
         {page==='customers'&&<><div className="page-intro"><div><div className="eyebrow">CUSTOMER RELATIONSHIPS</div><h1>Khách hàng</h1></div><button className="btn btn-dark" onClick={()=>openModal('customer')}><Plus size={18}/> Thêm khách hàng</button></div><section className="panel"><div className="filter-toolbar"><div className="search-box"><Search size={18}/><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Tìm tên hoặc số điện thoại…"/></div><div className="customer-count">{filteredCustomers.length} khách hàng</div></div><div className="table-wrap"><table><thead><tr><th>KHÁCH HÀNG</th><th>SỐ ĐIỆN THOẠI</th><th>GHI CHÚ</th><th>SỐ LẦN THUÊ</th><th>TỔNG GIÁ TRỊ ĐƠN</th>{data.me.role==='admin'&&<th>CÔNG NỢ</th>}</tr></thead><tbody>{filteredCustomers.map(c=>{const os=orders.filter(o=>o.customerId===c.id&&o.status!=='CANCELLED');return <tr key={c.id}><td><div className="item-name-cell"><span className="avatar customer-avatar">{initials(c.name)}</span><div><b>{c.name}</b><div className="table-sub">{prettyDay(c.createdAt.slice(0,10))}</div></div></div></td><td>{c.phone}</td><td>{c.note||'—'}</td><td><b>{os.length}</b></td><td>{money(os.reduce((s,o)=>s+o.total,0))}</td>{data.me.role==='admin'&&<td>{debtSummary?.accounts.some(a=>a.customerId===c.id)?<button className="gu-debt-mini-link" type="button" onClick={()=>setPage('debts')}>{money(debtSummary.accounts.find(a=>a.customerId===c.id)!.outstanding)} <ArrowRight size={13}/></button>:<span className="gu-settled-label">{debtSummary?'Không nợ':'Chưa đối soát'}</span>}</td>}</tr>;})}{!filteredCustomers.length&&<tr><td colSpan={data.me.role==='admin'?6:5}><Empty small text="Chưa có khách hàng."/></td></tr>}</tbody></table></div></section></>}
         {page==='staff'&&data.me.role==='admin'&&<AdminStaffPanel api={api}/>}
         {page==='audit'&&data.me.role==='admin'&&<AuditPanel api={api}/>}
-        {page==='reports'&&data.me.role==='admin'&&<><div className="page-intro"><div><div className="eyebrow">BUSINESS INSIGHTS</div><h1>Báo cáo doanh thu</h1></div><div className="select-holder report-select"><select value={reportMode} onChange={e=>setReportMode(e.target.value as typeof reportMode)}><option value="day">14 ngày</option><option value="month">12 tháng</option><option value="year">5 năm</option></select></div></div><div className="stats-grid report-stats"><Metric icon={Wallet} title="Đã thu (đơn gần đây)" value={money(collected)} detail="Trong tối đa 300 đơn tải gần nhất" tone="peach"/><Metric icon={CircleDollarSign} title="Tổng giá trị đơn" value={money(liveOrders.reduce((s,o)=>s+o.total,0))} detail="Không tính đơn hủy" tone="purple"/><Metric icon={CreditCard} title="Công nợ cần thu" value={allOutstanding===undefined?'Đang tải…':money(allOutstanding)} detail="Đơn đã giao/trả, không tính đặt trước" tone="blue"/><Metric icon={BadgeCheck} title="Đơn đã hoàn tất" value={String(orders.filter(o=>o.status==='RETURNED').length)} detail="Khách đã trả đồ" tone="green"/></div><div className="report-layout"><section className="panel chart-panel"><div className="panel-heading"><div><h3>Dòng tiền thực thu</h3><p>Ghi nhận từ thao tác thu tiền của nhân viên, không tính doanh thu dự kiến.</p></div></div><div className="bar-chart">{chartRows.map((r,i)=><div key={r.key} className="bar-col"><div className="bar-value">{r.value?shortMoney(r.value):''}</div><div className={'bar '+(i===chartRows.length-1?'bar-highlight':'')} style={{height:Math.max(3,(r.value/chartMax)*195)+'px'}} title={r.key+' · '+money(r.value)}/><span>{r.label}</span></div>)}</div></section><section className="panel top-products"><div className="panel-heading"><div><h3>Sản phẩm được thuê nhiều</h3><p>Tính theo số lượt đặt không bị hủy</p></div></div>{items.map(i=>({item:i,count:liveOrders.filter(o=>o.lines.some(l=>l.itemId===i.id)).length})).sort((a,b)=>b.count-a.count).slice(0,5).map((x,idx)=><div className="rank-row" key={x.item.id}><span className="rank-num">{String(idx+1).padStart(2,'0')}</span><span className="mini-item-icon"><Shirt size={17}/></span><div><strong>{x.item.name}</strong><small>{x.item.category}</small></div><b>{x.count} lượt</b></div>)}{!items.length&&<Empty small text="Chưa có sản phẩm để thống kê."/>}</section></div></>}
+        {page==='system'&&data.me.role==='admin'&&<GuSystem api={api}/>} 
+        {page==='reports'&&data.me.role==='admin'&&<>{reportNote&&<div className="inline-alert" role="status">{reportNote}</div>}<div className="page-intro"><div><div className="eyebrow">BUSINESS INSIGHTS</div><h1>Báo cáo doanh thu</h1></div><div className="select-holder report-select"><select value={reportMode} onChange={e=>setReportMode(e.target.value as typeof reportMode)}><option value="day">14 ngày</option><option value="month">12 tháng</option><option value="year">5 năm</option></select></div></div><div className="stats-grid report-stats"><Metric icon={Wallet} title="Đã thu (đơn gần đây)" value={money(collected)} detail="Trong tối đa 80 đơn tải gần nhất" tone="peach"/><Metric icon={CircleDollarSign} title="Giá trị đơn gần đây" value={money(liveOrders.reduce((s,o)=>s+o.total,0))} detail="Chỉ các đơn trong dữ liệu tải gần đây" tone="purple"/><Metric icon={CreditCard} title="Công nợ cần thu" value={allOutstanding===undefined?'Đang tải…':money(allOutstanding)} detail="Đơn đã giao/trả, không tính đặt trước" tone="blue"/><Metric icon={BadgeCheck} title="Đã hoàn tất gần đây" value={String(orders.filter(o=>o.status==='RETURNED').length)} detail="Trong dữ liệu tải gần đây" tone="green"/></div><div className="report-layout"><section className="panel chart-panel"><div className="panel-heading"><div><h3>Dòng tiền thực thu</h3><p>Ghi nhận từ thao tác thu tiền của nhân viên, không tính doanh thu dự kiến.</p></div></div><div className="bar-chart">{chartRows.map((r,i)=><div key={r.key} className="bar-col"><div className="bar-value">{r.value?shortMoney(r.value):''}</div><div className={'bar '+(i===chartRows.length-1?'bar-highlight':'')} style={{height:Math.max(3,(r.value/chartMax)*195)+'px'}} title={r.key+' · '+money(r.value)}/><span>{r.label}</span></div>)}</div></section><section className="panel top-products"><div className="panel-heading"><div><h3>Sản phẩm được thuê nhiều</h3><p>Tính theo số lượt đặt không bị hủy</p></div></div>{items.map(i=>({item:i,count:liveOrders.filter(o=>o.lines.some(l=>l.itemId===i.id)).length})).sort((a,b)=>b.count-a.count).slice(0,5).map((x,idx)=><div className="rank-row" key={x.item.id}><span className="rank-num">{String(idx+1).padStart(2,'0')}</span><span className="mini-item-icon"><Shirt size={17}/></span><div><strong>{x.item.name}</strong><small>{x.item.category}</small></div><b>{x.count} lượt</b></div>)}{!items.length&&<Empty small text="Chưa có sản phẩm để thống kê."/>}</section></div></>}
         </>}
       </div>
     </main>
