@@ -50,6 +50,7 @@ const required = [
   'src/lib/camera-rental.ts',
   'src/lib/evidence-retention.ts',
   'src/lib/evidence-retention-rules.ts',
+  'src/lib/product-policies.ts',
   'src/lib/v5-review-pricing.ts',
   'src/app/api/v5/evidence-cleanup/route.ts',
   'src/app/api/v5/evidence-history/[id]/route.ts'
@@ -85,10 +86,14 @@ checks.push(['phí trễ máy ảnh chưa chốt được tách khỏi kiểm nh
 checks.push(['admin mới được hủy các đơn', /'CANCEL','APPROVE_RETURN'/, 'src/app/api/v5/orders/[id]/route.ts']);
 checks.push(['giới hạn 7 cặp ảnh', /KEEP_INSPECTION_ROUNDS=7/, 'src/lib/evidence-retention-rules.ts']);
 checks.push(['Cloudinary xóa ảnh bản cũ có invalidate', /invalidate:'true'/, 'src/lib/evidence-retention.ts']);
+checks.push(['quy tắc ẩn giặt theo danh mục', /launderingForCategory/, 'src/app/api/items/route.ts']);
+checks.push(['góc ảnh do Admin tự thêm', /Thêm góc chụp/, 'src/app/page.tsx']);
+checks.push(['không tự điền góc ảnh', /DEFAULT_ANGLES:string\[\]=\[\]/, 'src/lib/inspection-proof.ts']);
+checks.push(['đơn cần góc ảnh được thiết lập', /Admin cần thêm góc ảnh/, 'src/app/api/v5/orders/route.ts']);
 checks.push(['theo dõi Cloud Monitoring 403', /Monitoring Viewer/, 'src/components/GuSystem.tsx']);
 const absent = checks.filter(([name,pattern,file]) => missing.includes(file) || !pattern.test(read(file))).map(([name])=>name);
 const pkg = JSON.parse(read('package.json'));
-if (pkg.version !== '5.0.0-beta.4') absent.push('phiên bản 5.0.0-beta.4 trong package.json');
+if (pkg.version !== '5.0.0-beta.5') absent.push('phiên bản 5.0.0-beta.5 trong package.json');
 if (missing.length || absent.length) {
   console.error('KHÔNG ĐỒNG BỘ. Thiếu tệp:', missing.join(', ') || 'không');
   console.error('Thiếu thành phần:', absent.join(', ') || 'không');

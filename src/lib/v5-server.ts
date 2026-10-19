@@ -38,5 +38,5 @@ export async function removeOrderIntervals(tx:Transaction,order:RentalOrder){
   if(prior[i].exists){if(entries.length)tx.set(s.ref,{itemId:s.itemId,day:s.day,entries,updatedAt:new Date().toISOString()});else tx.delete(s.ref);}
  });
 }
-export function requiredTemplates(order:RentalOrder):Record<string,string[]>{return order.photoTemplates||Object.fromEntries(order.lines.map(l=>[l.itemId,['Toàn thân trước','Toàn thân sau','Cổ áo','Tay áo']]));}
+export function requiredTemplates(order:RentalOrder):Record<string,string[]>{return order.photoTemplates||Object.fromEntries(order.lines.map(l=>[l.itemId,[]]));}
 export function currentItemStatus(item:InventoryItem,orderId:string){return item.currentOrderId===orderId||item.status==='AVAILABLE';}

@@ -261,3 +261,8 @@ Xem `docs/GU-v5-BETA4-CAMERA-OVERTIME.md`.
 
 **Chưa kiểm tra build Next.js/Firebase live:** Cần chạy `npm run typecheck`, `npm run build`
 và thử tạo/giao/nhận/duyệt trên staging trước khi triển khai Production.
+
+
+## GU v5.0.0-beta.5 — Tối ưu form nhập kho và cấu hình góc chụp
+
+Xem `docs/GU-v5-BETA5-INVENTORY-REFINEMENT.md`.

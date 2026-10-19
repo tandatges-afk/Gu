@@ -4,7 +4,8 @@ import { staffUser,handleError,jsonBody,ApiError } from '@/lib/http';
 import { assertText,positiveVnd } from '@/lib/rental';
 import {rentalKind} from '@/lib/hourly-pricing';
 import {isCameraCategory,isCameraModel,normalizedSerial} from '@/lib/camera-rental';
-import {normalizedAngles,DEFAULT_ANGLES} from '@/lib/inspection-proof';
+import {normalizedAngles} from '@/lib/inspection-proof';
+import {DEFAULT_PRODUCT_SIZE,launderingForCategory,isNonLaundryCategory} from '@/lib/product-policies';
 import {auditInTransaction } from '@/lib/audit';
 import { validProductImageUrl } from '@/lib/cloudinary-images';
 import { HANGER_COUNTER_DOC, nextHangerSequence, formatHangerCode } from '@/lib/hanger-code';
@@ -18,7 +19,7 @@ export async function POST(req:NextRequest) {
     // SKU is an internal immutable identifier. Employees never enter it.
     const ref=db().collection('items').doc();
     const sku='GU-'+ref.id.slice(0,12).toUpperCase();
-    const size=assertText(b.size,'Size',30);
+    const size=DEFAULT_PRODUCT_SIZE;
     const color=assertText(b.color,'Màu sắc',40,false);
     const category=assertText(b.category,'Loại sản phẩm',50);
     const camera=isCameraCategory(category);
@@ -30,16 +31,16 @@ export async function POST(req:NextRequest) {
     const dailyRate=camera?0:rentalKind(category)==='ACCESSORY'?20000:50000;
     // No selectable buffer: availability is determined by actual reservations and laundry status.
     if(!Array.isArray(b.imagePaths)||b.imagePaths.length>5||b.imagePaths.some(p=>!validProductImageUrl(p,me.uid,process.env.CLOUDINARY_CLOUD_NAME||'')))throw new ApiError(400,'Ảnh phải được tải lên từ tài khoản của bạn (tối đa 5 ảnh).');
-    if(typeof b.requiresLaundry!=='boolean')throw new ApiError(400,'Vui lòng chọn sản phẩm có cần giặt sau thuê hay không.');
-    if(camera&&b.requiresLaundry)throw new ApiError(400,'Máy ảnh không có quy trình giặt; chỉ kiểm tra, vệ sinh thiết bị.');
+    if(!isNonLaundryCategory(category)&&typeof b.requiresLaundry!=='boolean')throw new ApiError(400,'Vui lòng xác nhận việc giặt với trang phục.');
+    const requiresLaundry=launderingForCategory(category,b.requiresLaundry===true);
     const replacementValue=me.role==='admin'?positiveVnd(b.replacementValue,'Giá trị đền bù'):0;
     const skuRef=db().collection('skuIndex').doc(encodeURIComponent(sku));
     const counterRef=db().collection('inventoryCounters').doc(HANGER_COUNTER_DOC);
     const now=new Date().toISOString();
-    const inspectionAngles=me.role==='admin'&&b.inspectionAngles?normalizedAngles(b.inspectionAngles):DEFAULT_ANGLES;
+    const inspectionAngles=me.role==='admin'&&Array.isArray(b.inspectionAngles)&&b.inspectionAngles.length?normalizedAngles(b.inspectionAngles):[];
     const referenceShots=me.role==='admin'&&b.referenceShots&&typeof b.referenceShots==='object'&&!Array.isArray(b.referenceShots)?b.referenceShots as Record<string,unknown>:{};
     if(Object.entries(referenceShots).some(([angle,url])=>!inspectionAngles.includes(angle)||!validProductImageUrl(url,me.uid,process.env.CLOUDINARY_CLOUD_NAME||'')))throw new ApiError(400,'Ảnh chi tiết phải nằm trong góc chụp và được tải lên từ tài khoản Admin.');
-    const item={name,sku,size,color,category,...(camera?{cameraModel,cameraSerial}:{}),inspectionAngles,referenceShots,dailyRate,bufferDays:0,requiresLaundry:b.requiresLaundry as boolean,replacementValue,imagePaths:b.imagePaths as string[],status:'AVAILABLE',createdAt:now,createdBy:me.uid};
+    const item={name,sku,size,color,category,...(camera?{cameraModel,cameraSerial}:{}),inspectionAngles,referenceShots,dailyRate,bufferDays:0,requiresLaundry,replacementValue,imagePaths:b.imagePaths as string[],status:'AVAILABLE',createdAt:now,createdBy:me.uid};
     const hangerCode=await db().runTransaction(async tx=>{
       // All reads precede all writes; increment is atomic even when two employees create simultaneously.
       const [exists,counter,serial]=await Promise.all([tx.get(skuRef),tx.get(counterRef),serialRef?tx.get(serialRef):Promise.resolve(null)]);

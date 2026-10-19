@@ -1,4 +1,5 @@
-export const DEFAULT_ANGLES=['Toàn thân trước','Toàn thân sau','Cổ áo','Tay áo'];
+/** No preset angles; Admin configures each product individually. */
+export const DEFAULT_ANGLES:string[]=[];
 export type Capture={url:string;at:string;by:string;byName:string};
 export type PhotoProof={itemId:string;shots:Record<string,Capture>;condition?:'OK'|'ISSUE'|'MISSING';note?:string};
 export type ProofSet={status:'PENDING'|'SUBMITTED'|'APPROVED';by?:string;byName?:string;at?:string;reviewedBy?:string;reviewedAt?:string;items:PhotoProof[]};

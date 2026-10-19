@@ -198,6 +198,7 @@ export async function PATCH(req:NextRequest,ctx:{params:Promise<{id:string}>}){
     const refs=(ids as string[]).map(x=>db().collection('items').doc(x));
     const snaps=await Promise.all(refs.map(r=>tx.get(r)));
     if(snaps.some(s=>!s.exists||s.data()?.archivedAt||s.data()?.status!=='AVAILABLE'))throw new ApiError(409,'Có sản phẩm bổ sung chưa sẵn sàng.');
+    if(snaps.some(s=>!Array.isArray(s.data()?.inspectionAngles)||!s.data()?.inspectionAngles.length))throw new ApiError(409,'Admin phải cấu hình góc chụp cho sản phẩm bổ sung trước khi giao.');
     const start=order.status==='RESERVED'?order.pickupAt:now;
     if(Date.parse(start)>=Date.parse(order.returnAt))throw new ApiError(409,'Đã qua giờ trả dự kiến. Cần gia hạn trước.');
     const slots=intervalRefs(ids,start,order.returnAt);
@@ -206,7 +207,7 @@ export async function PATCH(req:NextRequest,ctx:{params:Promise<{id:string}>}){
     const nextLines=[...order.lines,...extra];const total=nextLines.reduce((sum,l)=>sum+l.lineTotal,0);
     createIntervalWrites(tx,slots,prior,id);
     const pending=order.status==='PICKED_UP'?[...ids]:[];
-    tx.update(ref,{lines:nextLines,total,pendingExtraItemIds:pending,referencePhotos:{...order.referencePhotos,...Object.fromEntries(snaps.map(s=>[s.id,s.data()?.referenceShots||{}]))},photoTemplates:{...requiredTemplates(order),...Object.fromEntries(snaps.map(s=>[s.id,(s.data()?.inspectionAngles as string[]|undefined)||['Toàn thân trước','Toàn thân sau','Cổ áo','Tay áo']]))},updatedAt:now,history:[...order.history,{action:'ADD_ITEMS',at:now,by:me.uid,detail:`Thêm ${ids.length} món; ${pending.length?'chờ chụp ảnh giao':'chờ chụp ảnh khi giao đơn'}`} ]});
+    tx.update(ref,{lines:nextLines,total,pendingExtraItemIds:pending,referencePhotos:{...order.referencePhotos,...Object.fromEntries(snaps.map(s=>[s.id,s.data()?.referenceShots||{}]))},photoTemplates:{...requiredTemplates(order),...Object.fromEntries(snaps.map(s=>[s.id,(s.data()?.inspectionAngles as string[]|undefined)||[]]))},updatedAt:now,history:[...order.history,{action:'ADD_ITEMS',at:now,by:me.uid,detail:`Thêm ${ids.length} món; ${pending.length?'chờ chụp ảnh giao':'chờ chụp ảnh khi giao đơn'}`} ]});
     if(pending.length)tx.set(job,{stage:'HANDOVER',updatedAt:now},{merge:true});
     syncDebtIndex(tx,db(),{...order,lines:nextLines,total,updatedAt:now});
    }else if(action==='EXTEND'){
