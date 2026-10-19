@@ -31,14 +31,14 @@ export async function staffUser(req: NextRequest) {
 }
 export function requirePcStaff(me:{role:Role}){if(me.role==='staff_mobile')throw new ApiError(403,'Tài khoản nhân viên mobile chỉ được tìm ảnh và chụp ảnh giao/nhận.');}
 export function requireAdmin(me:{role:Role}){if(me.role!=='admin')throw new ApiError(403,'Chỉ Admin được duyệt và xóa đơn.');}
-export function handleError(err: unknown) {
+export function handleError(err: unknown, endpoint?: string) {
   if (err instanceof ApiError) return NextResponse.json({ error: err.message, details: err.details }, {status: err.status});
   if (err instanceof Error && /không hợp lệ|phải |tối đa|định dạng|Ngày |Thời gian thuê|Ngày đệm|VND hợp lệ|chưa cấu hình phí trễ|chưa xác định mẫu|Mẫu máy|serial|góc chụp|Góc chụp|Không được trùng góc|Chọn từ 1 đến 10 góc/.test(err.message))
     return NextResponse.json({ error: err.message }, {status:400});
   const incidentId=randomUUID().slice(0,8);
   const known=classifyServerFailure(err);
-  console.error('[GU_SERVER_ERROR]',incidentId,err instanceof Error?{name:err.name,code:(err as Error&{code?:unknown}).code,message:err.message,stack:err.stack}:{type:typeof err});
-  if(known)return NextResponse.json({error:known.message+' Mã đối chiếu: '+incidentId,code:known.code,incidentId}, {status:known.status});
+  console.error('[GU_SERVER_ERROR]',incidentId, endpoint ? {endpoint}: {}, err instanceof Error?{name:err.name,code:(err as Error&{code?:unknown}).code,message:err.message,stack:err.stack}:{type:typeof err});
+  if(known)return NextResponse.json({error:known.message+' Mã đối chiếu: '+incidentId,code:known.code,incidentId,...(endpoint?{endpoint}:{})}, {status:known.status});
   return NextResponse.json({error:'Máy chủ không xử lý được yêu cầu. Mã lỗi: '+incidentId,code:'GU_SERVER_ERROR',incidentId}, {status:500});
 }
 export async function jsonBody(req: NextRequest): Promise<Record<string, unknown>> {

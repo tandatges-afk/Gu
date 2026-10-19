@@ -1,5 +1,5 @@
 import {NextRequest,NextResponse} from 'next/server';
-import {FieldPath,type Query} from 'firebase-admin/firestore';
+import {type Query} from 'firebase-admin/firestore';
 import {db} from '@/lib/firebase-admin';
 import {staffUser,handleError,ApiError} from '@/lib/http';
 export const runtime='nodejs';
@@ -22,18 +22,28 @@ export async function GET(req:NextRequest){
   }
   if(kind==='orders'&&me.role!=='admin'&&mode==='history')throw new ApiError(403,'Chỉ Admin được truy xuất lịch sử hoàn tất.');
   const descending=kind==='orders'&&!term;
-  collection=collection.orderBy(field,descending?'desc':'asc').orderBy(FieldPath.documentId());
+  // One indexed field plus Firestore's implicit document-ID tie-breaker.
+  // The previous explicit second orderBy(__name__) could demand a composite index
+  // on some existing Firestore projects even for a simple catalog lookup.
+  collection=collection.orderBy(field,descending?'desc':'asc');
   if(term){
    // Legacy GU names are case sensitive in Firestore. Code and phone searches remain exact-prefix.
    const value=field==='hangerCode'?term.toUpperCase():term;
    collection=collection.startAt(value).endAt(value+'\uf8ff');
   }
   if(token){
-   try{
-    const [lastValue,lastId]=JSON.parse(Buffer.from(token,'base64url').toString('utf8')) as [string,string];
-    if(typeof lastValue!=='string'||typeof lastId!=='string'||lastValue.length>256||!/^[a-zA-Z0-9]{10,64}$/.test(lastId))throw Error();
-    collection=collection.startAfter(lastValue,lastId);
-   }catch{throw new ApiError(400,'Trang dữ liệu không hợp lệ.');}
+    let lastValue:string,lastId:string;
+    try{
+      const parsed=JSON.parse(Buffer.from(token,'base64url').toString('utf8')) as unknown;
+      if(!Array.isArray(parsed)||parsed.length!==2||typeof parsed[0]!=='string'||typeof parsed[1]!=='string')throw Error();
+      [lastValue,lastId]=parsed;
+      if(lastValue.length>256||!/^[a-zA-Z0-9]{10,64}$/.test(lastId))throw Error();
+    }catch{throw new ApiError(400,'Trang dữ liệu không hợp lệ.');}
+    // Cursor references the last rendered document, preserving order among identical names.
+    const lastDoc=await db().collection(kind).doc(lastId).get();
+    if(!lastDoc.exists||String(lastDoc.get(field)||'')!==lastValue)
+      throw new ApiError(409,'Danh sách đã thay đổi. Vui lòng tải lại.');
+    collection=collection.startAfter(lastDoc);
   }
   const snapshot=await collection.limit(take+1).get();
   let docs=snapshot.docs.slice(0,take);
@@ -42,5 +52,5 @@ export async function GET(req:NextRequest){
   const cursor=snapshot.size>take&&last?Buffer.from(JSON.stringify([String(last.get(field)||''),last.id])).toString('base64url'):null;
   return NextResponse.json({kind,results:docs.map(d=>({id:d.id,...d.data()})),cursor,hasMore:Boolean(cursor),pageSize:take,
    searchNote:term?'Tìm theo tiền tố, không phải tìm toàn văn.':''},{headers:{'Cache-Control':'private, no-store'}});
- }catch(e){return handleError(e);}
+ }catch(e){return handleError(e,'GET /api/catalog');}
 }

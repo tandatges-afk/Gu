@@ -32,5 +32,5 @@ export async function GET(req: NextRequest) {
       customers: customers.docs.map(d => ({id:d.id,...d.data()})) as Customer[],
       orders: orders.docs.map(d => ({id:d.id,...d.data()} as RentalOrder)).filter(o => me.role==='admin' || !['RETURNED','CANCELLED'].includes(o.status)),
     }, {headers:{'Cache-Control':'no-store'}});
-  } catch (e) {return handleError(e);}
+  } catch (e) {return handleError(e,'GET /api/bootstrap');}
 }

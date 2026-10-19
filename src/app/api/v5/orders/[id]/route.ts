@@ -59,7 +59,7 @@ export async function GET(req:NextRequest,ctx:{params:Promise<{id:string}>}){
   return NextResponse.json({order:mobileOrder,items:itemSnaps.map((d,i)=>({id:ids[i],name:d.data()?.name||'',imagePaths:d.data()?.imagePaths||[]}))},{headers:{'Cache-Control':'private,no-store'}});
  }
  return NextResponse.json({order,items:itemSnaps.map((d,i)=>({id:ids[i],...d.data()}))},{headers:{'Cache-Control':'private,no-store'}});
- }catch(e){return handleError(e);}
+ }catch(e){return handleError(e,'/api/v5/orders/[id]');}
 }
 export async function PATCH(req:NextRequest,ctx:{params:Promise<{id:string}>}){
  try{
@@ -231,5 +231,5 @@ export async function PATCH(req:NextRequest,ctx:{params:Promise<{id:string}>}){
     after(async()=>{try{await runEvidenceCleanup(8);}catch(error){console.error('Deferred evidence cleanup',error);}});
   }
   return NextResponse.json({ok:true});
- }catch(e){return handleError(e);}
+ }catch(e){return handleError(e,'/api/v5/orders/[id]');}
 }

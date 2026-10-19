@@ -11,7 +11,7 @@ export function classifyServerFailure(error:unknown):ServerFailure|null{
   case 9:case 'FAILED_PRECONDITION':{
    const detail=String(e.message||'')+' '+String(e.details||'');
    if(/requires an index|create (?:it|the index)|missing (?:a )?(?:composite )?index|no matching index/i.test(detail))
-    return {code:'GU_DB_INDEX_REQUIRED',status:503,message:'Truy vấn Firestore đang thiếu chỉ mục. Cần tạo index được chỉ rõ trong Vercel Logs.'};
+    return {code:'GU_DB_INDEX_REQUIRED',status:503,message:'Truy vấn dữ liệu cần chỉ mục Firestore. Mở Vercel Logs theo mã sự cố để lấy đường dẫn tạo index đúng truy vấn.'};
    if(/transaction|reads? before writes?|read operations after write|too much contention|document.*no longer exists/i.test(detail))
     return {code:'GU_DB_TRANSACTION',status:409,message:'Dữ liệu thay đổi đồng thời hoặc giao dịch Firestore không hợp lệ. Vui lòng thử lại.'};
    return {code:'GU_DB_PRECONDITION',status:503,message:'Firestore không chấp nhận yêu cầu. Cần kiểm tra nguyên nhân chi tiết trong Vercel Logs.'};

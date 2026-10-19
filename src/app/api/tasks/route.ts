@@ -19,5 +19,5 @@ export async function GET(req:NextRequest){
   for(const snap of snaps)for(const doc of snap.docs){const o={id:doc.id,...doc.data()} as RentalOrder;
     if(o.status==='PICKED_UP'||(o.status==='RESERVED'&&o.pickupDate===today))map.set(o.id,o);}
   return NextResponse.json({orders:[...map.values()]},{headers:{'Cache-Control':'private, no-store'}});
- }catch(e){return handleError(e);}
+ }catch(e){return handleError(e,'GET /api/tasks');}
 }

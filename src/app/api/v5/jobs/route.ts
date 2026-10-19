@@ -10,5 +10,5 @@ export async function GET(req:NextRequest){
  if(!['HANDOVER','OUT','REVIEW'].includes(stage))throw new ApiError(400,'Trạng thái không hợp lệ.');
  const snap=await db().collection('mobileJobs').where('stage','==',stage).limit(40).get();
  return NextResponse.json({jobs:snap.docs.map(d=>({id:d.id,...d.data()})),checkedAt:new Date().toISOString()},{headers:{'Cache-Control':'no-store'}});
- }catch(e){return handleError(e);}
+ }catch(e){return handleError(e,'GET /api/v5/jobs');}
 }
