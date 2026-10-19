@@ -920,3 +920,54 @@ html,body{background:var(--paper);color:var(--ink)}
 .gu-cash-ledger summary {cursor:pointer;font-weight:600}
 .gu-cash-ledger p {margin:10px 0 0;font-size:.88rem;overflow-wrap:anywhere}
 @media (max-width:600px) {.gu-refund-section {padding:10px}.gu-refund-section .input {width:100%}}
+
+/* GU v5.2: anchored search suggestions do not resize or jump the booking form. */
+.gu-customer-search-anchor{position:relative;min-width:0}
+.gu-v11-customer-results{position:absolute;left:0;right:0;top:100%;z-index:1200;margin:4px 0 0;max-height:208px;overflow-y:auto;display:block;background:#fff;border:1px solid #dae2ed;border-radius:12px;box-shadow:0 10px 30px #12263d25;padding:4px}
+.gu-v11-customer-result{width:100%;min-height:42px;padding:8px 10px;margin:0;display:flex;gap:12px;justify-content:space-between;box-shadow:none;border:0;border-radius:8px}
+.gu-v11-customer-result:hover,.gu-v11-customer-result:focus-visible{background:#eaf4ff}
+.gu-calendar-cell-time{display:block;font-weight:700;font-size:11px;line-height:1.25;margin:2px 0;color:#193c63;font-variant-numeric:tabular-nums;white-space:nowrap}
+.gu-v52-prepay{margin:12px 0;padding:15px;border:1px solid #b7d7d0;border-radius:12px;background:#f1faf8;display:grid;gap:9px}
+.gu-v52-prepay p{margin:0;color:#3f6570;font-size:13px}
+.gu-secure-upload{display:grid;justify-items:start;gap:5px}.gu-secure-upload small{font-size:12px;color:#49637a}
+.gu-v52-deposit-panel{border:1px solid #d5e4e9;border-radius:12px;background:#f8fcfd;padding:15px;margin:12px 20px}
+.gu-v52-deposit-panel select{max-width:300px}
+.gu-v52-settlement{padding:18px 20px;display:grid;gap:12px;background:white}
+.gu-v52-settlement-actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.gu-v52-settlement-actions input{max-width:210px}
+@media(max-width:650px){.gu-v52-settlement-actions input{max-width:100%;width:100%}.gu-calendar-cell-time{font-size:10px;white-space:normal}.gu-v52-deposit-panel{margin:10px}}
+
+/* GU v5.3: weekly shift booking, responsive 7-day planner. */
+.gu-shifts-panel{display:flex;flex-direction:column;gap:18px;max-width:1500px;width:100%;margin:0 auto;padding:12px 0 30px}
+.gu-shifts-header{display:flex;justify-content:space-between;align-items:flex-start;gap:16px}
+.gu-shifts-header h2{display:flex;gap:10px;align-items:center;margin:6px 0;font-size:clamp(1.25rem,2vw,1.65rem)}
+.gu-shifts-header p{color:var(--muted,#777);margin:8px 0;line-height:1.6}
+.gu-shifts-info,.gu-shifts-rules,.gu-shifts-notice{display:flex;align-items:center;gap:12px;padding:14px;border-radius:12px;background:var(--surface,#f5f4f0)}
+.gu-shifts-info>div{display:flex;flex-direction:column;gap:5px}
+.gu-shifts-info span{font-size:.88rem;color:#696969}
+.gu-shifts-rules{font-size:.9rem;line-height:1.5;margin:0}
+.gu-shifts-grid{display:grid;grid-template-columns:repeat(7,minmax(140px,1fr));gap:10px;overflow-x:auto}
+.gu-shifts-day{display:flex;flex-direction:column;gap:9px;min-width:0}
+.gu-shifts-day>strong{padding:10px 4px;text-align:center;font-size:.9rem}
+.gu-shifts-slot{display:flex;flex-direction:column;align-items:stretch;text-align:left;gap:10px;background:var(--card,#fff);color:inherit;border:1px solid #dadada;border-radius:12px;min-height:124px;padding:13px;cursor:pointer;transition:border-color .15s,background .15s}
+.gu-shifts-slot:not(:disabled):hover{border-color:#8c8c8c}
+.gu-shifts-slot:disabled{cursor:default;opacity:.84}
+.gu-shifts-slot.is-selected{background:#e9f6ee;border-color:#55a576;color:#125032}
+.gu-shifts-slot.is-full:not(.is-selected){background:#f5f0ef;border-color:#e4cfcb;color:#6e4c44}
+.gu-shifts-slot-title{display:flex;flex-direction:column;gap:4px}
+.gu-shifts-slot-title>span{font-size:.84rem;white-space:nowrap}
+.gu-shifts-slot-meta{display:flex;align-items:center;gap:4px;font-size:.8rem;font-weight:600}
+.gu-shifts-members{font-size:.78rem;line-height:1.35;overflow-wrap:anywhere;opacity:.78}
+.gu-shifts-footer{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:16px;border:1px solid #ddd;border-radius:12px}
+.gu-shifts-footer p{font-size:.87rem;color:#6b6b6b;margin:5px 0 0}
+.gu-shifts-stats{border:1px solid #e0e0e0;border-radius:13px;padding:16px}
+.gu-shifts-stats h3{display:flex;align-items:center;gap:9px}
+.gu-shifts-stats p{font-size:.85rem;color:#666}
+.gu-shifts-notice{font-size:.9rem;line-height:1.6}
+.gu-signup-gate{min-height:100vh;padding:clamp(16px,4vw,48px);background:#f6f5f1}
+.gu-signup-top{display:flex;gap:12px;justify-content:space-between;align-items:center;max-width:1500px;margin:0 auto 18px}
+.gu-signup-top>strong{font-size:1.1rem}
+@media(max-width:1140px){.gu-shifts-grid{grid-template-columns:repeat(4,minmax(150px,1fr));overflow:visible}}
+@media(max-width:700px){.gu-shifts-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.gu-shifts-slot{min-height:114px;padding:10px}.gu-shifts-header{flex-wrap:wrap}.gu-shifts-info{align-items:flex-start}.gu-shifts-footer{align-items:flex-start;flex-direction:column}.gu-shifts-footer button{width:100%}}
+@media(max-width:360px){.gu-shifts-grid{grid-template-columns:1fr}}
+.gu-shifts-header-buttons{display:flex;flex-wrap:wrap;align-items:center;gap:6px}

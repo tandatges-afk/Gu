@@ -63,5 +63,5 @@ test('Server stores camera package at create and add-items, and quotes it upon A
  assert.match(edit,/cameraOvertimeFeeTotal/);
  assert.match(edit,/lateFeeTotal:0/); // avoid double counting fees in the debt ledger
  assert.match(edit,/AUTO_RESOLVE_CAMERA_LATE/);
- assert.match(review,/Trễ \{q\.lateHours\} giờ/);
+ assert.match(review,/cameraOvertimeFeeTotal|Máy ảnh chưa đối soát phí trễ/);
 });

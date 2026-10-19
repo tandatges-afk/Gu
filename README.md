@@ -1,3 +1,21 @@
+> **GU v5.3.0 Beta 1 — Đăng ký ca nhân viên:** Đăng ký Chủ nhật 12:00–20:00 cho tuần kế tiếp; 3 ca/ngày, 2 người/ca, ít nhất 5 ngày/tuần; nhân viên ngoài ca chỉ có quyền vào màn đăng ký, hết ca +15 phút tự đăng xuất. Trước khi deploy lên Vercel xem **[hướng dẫn chuyển đổi không khóa nhầm toàn bộ nhân viên](docs/GU-v5.3.0-CA-LAM-VIEC.md)**.
+
+# GU v5.2.0-beta.1 · Full source cho GitHub Codespaces
+
+Bản này kế thừa **toàn bộ mã nguồn GU v5.0.1 Patch 1** (không phải file sửa lẻ).
+
+- Hint khách hàng hiện dưới textbox, không làm nhảy modal.
+- Lịch hiển thị giờ giao → giờ nhận trước tên nhân viên.
+- Đặt trước bắt buộc chụp chứng từ và xác nhận **đã nhận đủ 100% tiền thuê** khi tạo lịch; chưa cần chụp sản phẩm.
+- Giao hàng mới chụp ảnh sản phẩm và (tùy chọn) ảnh CCCD/tiền/vật cọc, lưu riêng tư trên Storage.
+- Trả hàng chụp đủ góc, giải phóng lịch/đưa kho về giặt ngay; Admin hậu kiểm ảnh mà không chặn cho thuê lại sau giặt.
+- Popup vẫn mở sau nhận trả, tự tính số còn thu, có **Thu tiền**, **Thu đủ** và phụ thu khi cần; không yêu cầu chụp ảnh hoàn vật cọc.
+- Có xác nhận trả lại vật cọc, hậu kiểm ảnh và hoàn tiền trước khi hủy đơn đã đặt cọc.
+
+**LƯU Ý CẤU HÌNH MỚI:** Cần bucket Firebase Storage / Google Cloud Storage riêng tư và service account có quyền đọc/ghi, đặt `FIREBASE_STORAGE_BUCKET` trên Vercel. **Không** lưu ảnh CCCD trong Cloudinary công khai. Nếu chưa cấu hình Storage, không triển khai flow ảnh cọc này lên Production. Trước khi push Production phải kiểm tra build và chạy thử trên Firebase staging. Xem `docs/GU-v5.2.0-BETA1-CODESPACES.md`.
+
+---
+
 > **GU v5.0.1-patch.1:** Chi tiết bản vá, điểm chưa nghiệm thu và hướng dẫn triển khai an toàn tại [docs/GU-v5.0.1-PATCH1-SUA-LOI-VA-TRIEN-KHAI.md](docs/GU-v5.0.1-PATCH1-SUA-LOI-VA-TRIEN-KHAI.md).
 
 ## GU v5.0.0 Beta 11 — 1 nhân viên / 2 kích thước màn hình

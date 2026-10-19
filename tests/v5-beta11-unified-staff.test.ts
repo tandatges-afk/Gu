@@ -22,7 +22,7 @@ test('clicked calendar day passes to v5 booking datetime and return is next day'
 });
 test('phone matches existing customer results and offers explicit selection',()=>{
  const booking=read('src/components/GuV5Booking.tsx');
- assert.match(booking,/customers\?phone=/);assert.match(booking,/setCustomerId\(exact\.id\)/);
+ assert.match(booking,/customers\?phone=/);assert.match(booking,/onClick=\{\(\)=>\{setCustomerId\(c\.id\)/);
  assert.match(booking,/gu-v11-customer-result/);
 });
 test('risk only after 17h VN when product held and another rental starts tomorrow',()=>{

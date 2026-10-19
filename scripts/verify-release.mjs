@@ -65,7 +65,15 @@ const required = [
   'src/lib/product-policies.ts',
   'src/lib/v5-review-pricing.ts',
   'src/app/api/v5/evidence-cleanup/route.ts',
-  'src/app/api/v5/evidence-history/[id]/route.ts'
+  'src/app/api/v5/evidence-history/[id]/route.ts',
+  'src/components/GuSecurePhoto.tsx',
+  'src/components/GuSecureUpload.tsx',
+  'src/app/api/v5/secure-photo/route.ts',
+  'src/lib/gu-v52-workflow.ts',
+  'src/lib/secure-evidence.ts',
+  'src/lib/shift-schedule.ts',
+  'src/app/api/shifts/route.ts',
+  'src/components/GuStaffShifts.tsx'
 ];
 const missing = required.filter(p => !existsSync(join(root,p)));
 const read = p => readFileSync(join(root,p),'utf8');
@@ -114,9 +122,22 @@ checks.push(['đơn cần góc ảnh được thiết lập', /Admin cần thêm
 checks.push(['chẩn đoán Cloud Monitoring 403', /BILLING_REQUIRED/, 'src/lib/monitoring-error.ts']);
 checks.push(['menu PC không dùng bottom nav mobile', /gu-main-bottom-nav/, 'src/app/page.tsx']);
 checks.push(['một giao diện cho PC và điện thoại', /GuOrderCapture/, 'src/app/page.tsx']);
+checks.push(['chặn API ngoài ca ở backend', /!options\?\.allowSchedule&&!shift\.canWork/, 'src/lib/http.ts']);
+checks.push(['giao dịch giữ chỗ atomic', /db\(\)\.runTransaction/, 'src/app/api/shifts/route.ts']);
+checks.push(['màn đăng ký ca', /GuStaffShifts/, 'src/app/page.tsx']);
+checks.push(['đăng xuất theo ca 20 giây', /20_000/, 'src/app/page.tsx']);
+checks.push(['đặt trước thu đủ tiền thuê có bằng chứng', /readVerifiedEvidence\(tx,paymentProofId/, 'src/app/api/v5/orders/route.ts']);
+checks.push(['sổ quỹ đặt trước', /kind:'PAYMENT',amount:total/, 'src/app/api/v5/orders/route.ts']);
+checks.push(['ảnh cọc lưu private', /evidenceBucket\(\)\.file\(path\)\.save/, 'src/app/api/v5/secure-photo/route.ts']);
+checks.push(['nhận trả không cần Admin giải phóng kho', /status:'RETURNED' as const/, 'src/app/api/v5/orders/[id]/route.ts']);
+checks.push(['admin chỉ kiểm tra ảnh', /action==='REVIEW_PHOTOS'/, 'src/app/api/v5/orders/[id]/route.ts']);
+checks.push(['nhân viên xác nhận hoàn vật cọc', /action==='RETURN_COLLATERAL'/, 'src/app/api/v5/orders/[id]/route.ts']);
+checks.push(['thu đủ tự động sau nhận trả', /Thu đủ \{money\(due\)\}/, 'src/components/GuOrderCapture.tsx']);
+checks.push(['gợi ý SĐT nổi dưới ô nhập', /\.gu-v11-customer-results\{position:absolute/, 'src/app/globals.css']);
+checks.push(['hiển thị giờ giao và giờ nhận', /gu-calendar-cell-time/, 'src/app/page.tsx']);
 const absent = checks.filter(([name,pattern,file]) => missing.includes(file) || !pattern.test(read(file))).map(([name])=>name);
 const pkg = JSON.parse(read('package.json'));
-if (pkg.version !== '5.0.1-patch.1') absent.push('phiên bản 5.0.1-patch.1 trong package.json');
+if (pkg.version !== '5.3.0-beta.1') absent.push('phiên bản 5.3.0-beta.1 trong package.json');
 if (missing.length || absent.length) {
   console.error('KHÔNG ĐỒNG BỘ. Thiếu tệp:', missing.join(', ') || 'không');
   console.error('Thiếu thành phần:', absent.join(', ') || 'không');

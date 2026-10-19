@@ -32,7 +32,7 @@ test('A later same-day reservation does not overlap interval ending at boundary'
  assert.equal(overlap('2026-10-18T02:00:00Z','2026-10-18T05:00:00Z','2026-10-18T05:00:00Z','2026-10-18T08:00:00Z'),false);
 });
 test('Admin only may cancel/void/review and settle legacy camera overtime automatically',()=>{
- assert.match(route,/\['VOID','CANCEL','APPROVE_RETURN','AUTO_RESOLVE_CAMERA_LATE'\]\.includes\(action\)\)requireAdmin\(me\)/);
+ assert.match(route,/\['VOID','CANCEL','APPROVE_RETURN','AUTO_RESOLVE_CAMERA_LATE','REVIEW_PHOTOS','REFUND_RETURN','REFUND_RESERVATION'\]\.includes\(action\)\)requireAdmin\(me\)/);
  assert.match(ui, /isAdmin&&order\.status==='RESERVED'&&<button/);
  assert.match(route,/cameraLateFeePending\)throw new ApiError\(409/);
  assert.match(route,/action==='AUTO_RESOLVE_CAMERA_LATE'/);
@@ -48,7 +48,7 @@ test('Early handover atomically locks its extra interval and persists the actual
  assert.match(route,/const earlySlots=earlyHandover\?intervalRefs/);
  assert.match(route,/await checkIntervalAvailability\(tx,earlySlots,id\)/);
  assert.match(route,/createIntervalWrites\(tx,earlySlots,earlyPrior,id\)/);
- assert.match(route,/scheduledPickupAt:order\.pickupAt,pickupAt:now/);
+ assert.match(route,/scheduledPickupAt:order\.scheduledPickupAt\|\|order\.pickupAt/);assert.match(route,/earlyHandover\?\{pickupAt:now/);
 });
 test('Physical asset retention stays seven fully-approved rounds',()=>{
  let rounds: {orderId:string;completedAt:string}[]=[];

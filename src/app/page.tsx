@@ -2,7 +2,7 @@
 import {categorySelectOptions,isNonLaundryCategory,LEGACY_DEFAULT_CATEGORIES} from '@/lib/product-policies';
 import {normalizeProductName} from '@/lib/product-name';
 
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { onAuthStateChanged, signInWithEmailAndPassword, signOut, type User } from 'firebase/auth';
 import {
   AlertCircle, ArrowDownLeft, ArrowRight, ArrowUpRight, BadgeCheck, Boxes, CalendarDays,
@@ -19,7 +19,8 @@ import {NewRentalForm,OrderAddItems} from '@/components/GuRentalForms';
 import {GuV5Booking} from '@/components/GuV5Booking';
 import {GuOrderCapture} from '@/components/GuOrderCapture';
 import {matchesProductSearch} from '@/lib/product-search';
-import {tomorrowReturnRisk,vnClock} from '@/lib/return-risk';
+import {tomorrowReturnRisk,vnClock as vnCurrentTime} from '@/lib/return-risk';
+import {vnClock as vnDisplayHour} from '@/lib/gu-v52-workflow';
 import {GuVisualFinder} from '@/components/GuVisualFinder';
 import {GuV5Review,GuV5OrderDetail} from '@/components/GuV5Review';
 import {GuEvidenceHistory} from '@/components/GuEvidenceHistory';
@@ -29,11 +30,12 @@ import {GuSystem} from '@/components/GuSystem';
 import {GuMoneyInput} from '@/components/GuMoneyInput';
 import type {DebtSummary} from '@/lib/debts';
 import {GuPwaSetup,GuInstallApp} from '@/components/GuPwa';
+import {GuStaffShifts} from '@/components/GuStaffShifts';
 import {calendarItemState,type CalendarFilter} from '@/lib/smart-calendar';
 import {getProductCode} from '@/lib/hanger-code';
 import {orderCreatorName} from '@/lib/order-creator';
 
-type Page = 'visual'|'reviews'|'overview'|'calendar'|'orders'|'debts'|'inventory'|'laundry'|'customers'|'reports'|'staff'|'audit'|'system';
+type Page = 'visual'|'reviews'|'overview'|'calendar'|'orders'|'debts'|'inventory'|'laundry'|'customers'|'reports'|'staff'|'shifts'|'audit'|'system';
 type Modal = 'booking'|'item'|'customer'|'category'|'detail'|null;
 type Availability = { available:boolean;conflicts:{itemId:string;sku:string;date:string}[];reason:string };
 
@@ -49,12 +51,14 @@ const nav: {id:Page;label:string;icon:typeof LayoutDashboard}[] = [
   {id:'customers',label:'Khách hàng',icon:Users},
   {id:'reports',label:'Báo cáo',icon:TrendingUp},
   {id:'staff',label:'Nhân viên',icon:UserCog},
+  {id:'shifts',label:'Đăng ký ca',icon:Clock3},
   {id:'audit',label:'Nhật ký thao tác',icon:ScrollText},
   {id:'system',label:'Hệ thống',icon:Settings2},
 ];
 const navSections:{label:string;ids:Page[]}[]=[
   {label:'ĐƠN HÀNG',ids:['overview','calendar','orders','customers']},
   {label:'KHO SẢN PHẨM',ids:['inventory','visual','laundry']},
+  {label:'LỊCH NHÂN SỰ',ids:['shifts']},
   {label:'QUẢN TRỊ',ids:['reviews','debts','reports','staff','audit','system']}
 ];
 const orderLabels: Record<OrderStatus,string>={RESERVED:'Chờ bàn giao',PICKED_UP:'Đã giao',RETURNED:'Đã trả',CANCELLED:'Đã hủy',VOIDED:'Admin đã xóa'};
@@ -67,6 +71,9 @@ const shortMoney=(n:number)=>n>=1_000_000?(n/1_000_000).toLocaleString('vi-VN',{
 export default function Home() {
   const [user,setUser]=useState<User|null>(null);
   const [authReady,setAuthReady]=useState(false);
+  const wasWorkingRef=useRef(false);
+  const dashboardLoadedRef=useRef(false);
+  const [shiftSession,setShiftSession]=useState<{role:'admin'|'staff';name:string;access:'WORK'|'REGISTER'|'DENIED';message:string|null;shift?:{allowedUntil:string|null;grace:boolean;activeSlot:string|null;shiftEndedAt:string|null}|null}|null>(null);
   const [authErr,setAuthErr]=useState('');
   const [loginEmail,setLoginEmail]=useState('');
   const [loginPassword,setLoginPassword]=useState('');
@@ -142,7 +149,7 @@ export default function Home() {
 
 
   useEffect(()=>{
-    try {return onAuthStateChanged(clientAuth(),u=>{setUser(u);setAuthReady(true);if(!u)setData(null);},()=>{setAuthErr('Không thể xác thực với Firebase. Kiểm tra cấu hình.');setAuthReady(true);});}
+    try {return onAuthStateChanged(clientAuth(),u=>{setUser(u);setAuthReady(true);if(!u){setData(null);setShiftSession(null);wasWorkingRef.current=false;dashboardLoadedRef.current=false;}},()=>{setAuthErr('Không thể xác thực với Firebase. Kiểm tra cấu hình.');setAuthReady(true);});}
     catch(e){setAuthErr(e instanceof Error?e.message:'Lỗi cấu hình Firebase.');setAuthReady(true);}
   },[]);
   useEffect(()=>{if(!toast)return;const id=setTimeout(()=>setToast(''),4800);return()=>clearTimeout(id);},[toast]);
@@ -161,11 +168,35 @@ export default function Home() {
     if(!res.ok){const detail=Array.isArray(json.details)?' — '+json.details.map((x:{sku:string;date:string})=>'Sản phẩm trùng lịch ngày '+prettyDay(x.date)).join(', '):'';throw new Error((json.error||'Yêu cầu thất bại.')+detail);}
     return json as T;
   },[]);
-  const refresh=useCallback(async()=>{
-    setLoading(true);try{const access=await api<{role:string}>('v5/session');setData(await api<DashboardData>('bootstrap'));setErr('');}
-    catch(e){setErr(e instanceof Error?e.message:'Không thể tải dữ liệu.');}
-    finally{setLoading(false);}
+  const sessionCheck=useCallback(async(loadDashboard=false)=>{
+    try{
+      const access=await api<{role:'admin'|'staff';name:string;access:'WORK'|'REGISTER'|'DENIED';message:string|null;shift?:{allowedUntil:string|null;grace:boolean;activeSlot:string|null;shiftEndedAt:string|null}|null}>('v5/session');
+      setShiftSession(access);
+      if(access.access==='DENIED'){
+        setData(null);setAuthErr(access.message||'Bạn không có ca làm việc lúc này.');
+        await signOut(clientAuth());return false;
+      }
+      if(access.access==='REGISTER'){
+        // Someone leaving a working shift must be signed out 15 minutes later.
+        // A fresh Sunday login may use only the registration screen.
+        if(wasWorkingRef.current){
+          setAuthErr('Ca làm đã kết thúc hơn 15 phút. Bạn đã được đăng xuất tự động.');
+          await signOut(clientAuth());return false;
+        }
+        dashboardLoadedRef.current=false;
+        setData(null);setPage('shifts');setErr('');return false;
+      }
+      if(access.role==='staff')wasWorkingRef.current=true;
+      if(loadDashboard||!dashboardLoadedRef.current){
+        setData(await api<DashboardData>('bootstrap'));dashboardLoadedRef.current=true;setErr('');
+      }
+      return true;
+    }catch(e){setErr(e instanceof Error?e.message:'Không thể kiểm tra ca làm việc.');return false;}
   },[api]);
+  const refresh=useCallback(async()=>{
+    setLoading(true);
+    try{await sessionCheck(true);}finally{setLoading(false);}
+  },[sessionCheck]);
   const refreshDebts=useCallback(async()=>{
     setDebtLoading(true);
     try {setDebtSummary(await api<DebtSummary>('debts'));setDebtError('');}
@@ -176,6 +207,9 @@ export default function Home() {
   useEffect(()=>{if(user&&data?.me.role==='admin'&&['overview','reports','debts'].includes(page))void refreshDebts();},[user,data?.me.role,page,refreshDebts]);
   useEffect(()=>{if(!user)return;const interval=setInterval(()=>{if(document.visibilityState==='visible'){setClockTick(t=>t+1);void refresh();}},900_000);return()=>clearInterval(interval);},[user,refresh]);
   useEffect(()=>{const timer=setInterval(()=>setMinuteTick(n=>n+1),60_000);return()=>clearInterval(timer);},[]);
+  // Check every 20s, not only on refresh. This also signs staff out within 20s
+  // of the 15-minute post-shift grace expiring. Server APIs always enforce it.
+  useEffect(()=>{if(!user)return;const timer=setInterval(()=>{void sessionCheck();},20_000);return()=>clearInterval(timer);},[user,sessionCheck]);
   useEffect(()=>{
     if(!user||page!=='overview')return;
     let cancel=false;
@@ -245,7 +279,7 @@ export default function Home() {
   const categories=data?.categories||[];
   const today=vietnamToday();
   // After 17:00 VN, refresh true cross-order stock risks independently of the 80-row dashboard.
-  const {hour:vnHour}=vnClock(new Date());
+  const {hour:vnHour}=vnCurrentTime(new Date());
   const riskRows=vnHour>=17?[...tomorrowReturnRisk(orders,new Date()),...remoteRisks]:[];
   const riskIds=new Set(riskRows.map(r=>r.itemId));
 
@@ -358,6 +392,7 @@ export default function Home() {
     return <button key={day} type="button" title={title} aria-label={`${prettyDay(day)}: ${title}`} className={'calendar-cell '+(mobile?'gu-calendar-mobile-cell ':'')+(day===today?'gu-calendar-cell-today ':'')+(nextDayRisk?'gu-next-day-risk ':late?'late-flash ':shown?(shown.status==='PICKED_UP'?'occupied-picked':'occupied-reserved'):blocked?'cell-blocked':'cell-free')} disabled={!shown&&(blocked||isPast)} onClick={()=>matching.length>1?setCalendarMatches(matching):shown?openDetail(shown):openBooking(day===today?'PICKUP':'RESERVE',item.id,day)}>
       {mobile&&<span className="gu-calendar-cell-date"><strong>{week}</strong><small>{day.slice(8,10)}/{day.slice(5,7)}</small></span>}
       <span className="gu-calendar-cell-result">{shown?<>{nextDayRisk?'⏰ ':late?'⚠ ':''}{matching.length>1?matching.length+' lượt':shown.customerName.split(' ').slice(-1)[0]}</>:blocked?'—':isPast?'·':'+'}</span>
+      {shown&&<span className="gu-calendar-cell-time" title={'Giờ giao: '+vnDisplayHour(shown.pickupAt)+' · Giờ nhận: '+vnDisplayHour(shown.returnAt)}>{vnDisplayHour(shown.pickupAt)} → {vnDisplayHour(shown.returnAt)}</span>}
       {shown&&<span className="gu-calendar-cell-creator" title={'Tạo bởi: '+creatorName(shown)}>NV: {creatorName(shown).split(/\s+/).slice(-1)[0]}</span>}
     </button>;
   };
@@ -387,6 +422,11 @@ export default function Home() {
   if(!authReady)return <div className="center-screen"><LoaderCircle className="spin" size={30}/><p>Đang kết nối hệ thống…</p></div>;
   if(!user)return <div className="login-page"><div className="login-art"><div className="brand brand-large"><span className="brandmark"><Sparkles size={24}/></span><span>GU<span className="brand-accent">.</span></span></div><div className="login-art-copy"><span className="eyebrow light">GU - THUÊ ĐỒ XINH</span><h1>Vận hành cửa hàng<br/>đẹp như cách bạn<br/><em>chăm chút từng bộ đồ.</em></h1><p>Quản lý lịch thuê, kho đồ, khách hàng và doanh thu trên một nền tảng gọn gàng.</p><div className="login-feature"><ShieldCheck size={20}/> Tự động chống đặt trùng lịch theo từng món đồ</div></div><div className="login-art-bottom">GU - THUÊ ĐỒ XINH</div></div><div className="login-pane"><div className="login-box"><div className="login-small-logo"><span className="brandmark"><Sparkles size={21}/></span> GU<span className="brand-accent">.</span></div><div className="eyebrow">WELCOME BACK</div><h2>Chào mừng trở lại</h2><p className="muted">Đăng nhập bằng tài khoản nhân viên đã được cửa hàng cấp quyền.</p><form onSubmit={async(e)=>{e.preventDefault();setLoginPending(true);setAuthErr('');try{await signInWithEmailAndPassword(clientAuth(),loginEmail,loginPassword);}catch{setAuthErr('Email hoặc mật khẩu chưa đúng.');}finally{setLoginPending(false);}}}><label className="field-label">Email công việc</label><input className="input" type="email" autoComplete="email" placeholder="nhanvien@cuahang.vn" value={loginEmail} onChange={e=>setLoginEmail(e.target.value)} required/><label className="field-label">Mật khẩu</label><input className="input" type="password" autoComplete="current-password" placeholder="Nhập mật khẩu" value={loginPassword} onChange={e=>setLoginPassword(e.target.value)} required/>{authErr&&<div className="inline-alert danger-alert"><AlertCircle size={17}/>{authErr}</div>}<button type="submit" className="btn btn-dark login-btn" disabled={loginPending}>{loginPending?<LoaderCircle size={17} className="spin"/>:null} Đăng nhập <ArrowRight size={17}/></button></form><div className="login-secure"><ShieldCheck size={16}/> Bảo vệ bởi Firebase Authentication</div></div></div></div>;
 
+  if(shiftSession?.access==='REGISTER')return <div className="gu-signup-gate">
+    <div className="gu-signup-top"><strong>GU · Chỉ đăng ký ca</strong><button type="button" className="btn btn-white" onClick={()=>void signOut(clientAuth())}><LogOut size={16}/> Đăng xuất</button></div>
+    <GuStaffShifts api={api} registrationOnly/>
+  </div>;
+  if(!shiftSession||shiftSession.access==='DENIED')return <div className="center-screen"><LoaderCircle className="spin" size={26}/> Đang xác thực ca làm việc…</div>;
   return <div className="shell">
     <aside className={'sidebar '+(mobileNav?'sidebar-open':'')}>
       <div className="brand"><span className="brandmark"><Sparkles size={22}/></span><span>GU<span className="brand-accent">.</span><small>THUÊ ĐỒ XINH</small></span></div>
@@ -487,6 +527,7 @@ export default function Home() {
         {page==='debts'&&data.me.role==='admin'&&<GuDebts summary={debtSummary} loading={debtLoading} error={debtError} onRefresh={()=>void refreshDebts()} onOpen={id=>void openDebtOrder(id)}/>}
         {page==='customers'&&<><div className="page-intro"><div><div className="eyebrow">CUSTOMER RELATIONSHIPS</div><h1>Khách hàng</h1></div><button className="btn btn-dark" onClick={()=>openModal('customer')}><Plus size={18}/> Thêm khách hàng</button></div><section className="panel"><div className="filter-toolbar"><div className="search-box"><Search size={18}/><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Tìm tên hoặc số điện thoại…"/></div><div className="customer-count">{filteredCustomers.length} khách hàng</div></div><div className="table-wrap"><table><thead><tr><th>KHÁCH HÀNG</th><th>SỐ ĐIỆN THOẠI</th><th>GHI CHÚ</th><th>SỐ LẦN THUÊ</th><th>TỔNG GIÁ TRỊ ĐƠN</th>{data.me.role==='admin'&&<th>CÔNG NỢ</th>}</tr></thead><tbody>{filteredCustomers.map(c=>{const os=orders.filter(o=>o.customerId===c.id&&o.status!=='CANCELLED');return <tr key={c.id}><td><div className="item-name-cell"><span className="avatar customer-avatar">{initials(c.name)}</span><div><b>{c.name}</b><div className="table-sub">{prettyDay(c.createdAt.slice(0,10))}</div></div></div></td><td>{c.phone}</td><td>{c.note||'—'}</td><td><b>{os.length}</b></td><td>{money(os.reduce((s,o)=>s+o.total,0))}</td>{data.me.role==='admin'&&<td>{debtSummary?.accounts.some(a=>a.customerId===c.id)?<button className="gu-debt-mini-link" type="button" onClick={()=>setPage('debts')}>{money(debtSummary.accounts.find(a=>a.customerId===c.id)!.outstanding)} <ArrowRight size={13}/></button>:<span className="gu-settled-label">{debtSummary?'Không nợ':'Chưa đối soát'}</span>}</td>}</tr>;})}{!filteredCustomers.length&&<tr><td colSpan={data.me.role==='admin'?6:5}><Empty small text="Chưa có khách hàng."/></td></tr>}</tbody></table></div></section></>}
         {page==='staff'&&data.me.role==='admin'&&<AdminStaffPanel api={api}/>}
+        {page==='shifts'&&<GuStaffShifts api={api} isAdmin={data.me.role==='admin'}/>}
         {page==='reviews'&&data.me.role==='admin'&&<GuV5Review api={api} onChanged={refresh}/>}
         {page==='visual'&&<GuVisualFinder api={api}/>} 
         {page==='audit'&&data.me.role==='admin'&&<AuditPanel api={api}/>}
@@ -521,9 +562,9 @@ export default function Home() {
         </div>{data?.me.role==='admin'&&<div className="photos-form"><strong>Ảnh mẫu theo góc chụp (tùy chọn)</strong><div className="gu-v5-reference-grid">{newItem.inspectionAngles.map(angle=><section key={angle} className="gu-v5-angle"><b>{angle}</b><ImageUploader paths={newItem.referenceShots[angle]?[newItem.referenceShots[angle]]:[]} onUploading={setImageUploading} onChange={paths=>setNewItem(v=>({...v,referenceShots:{...v.referenceShots,[angle]:paths[0]||''}}))}/></section>)}</div></div>}<div className="photos-form"><strong>Ảnh sản phẩm</strong><ImageUploader paths={newItem.imagePaths} onUploading={setImageUploading} onChange={paths=>setNewItem(v=>({...v,imagePaths:paths}))}/></div><div className="modal-actions"><button type="button" className="btn btn-white" onClick={()=>setModal(null)}>Hủy</button><button disabled={busy||imageUploading} className="btn btn-dark"><Check size={16}/> {editingItem?'Lưu thay đổi':'Lưu sản phẩm'}</button></div></form>}
       {modal==='customer'&&<form onSubmit={e=>{e.preventDefault();void action('customers',newCustomer,'Đã thêm khách hàng.');}} className="modal-body"><div className="form-grid"><Field label="Họ tên khách hàng" full><input className="input" required placeholder="Nguyễn Thị Mai" value={newCustomer.name} onChange={e=>setNewCustomer({...newCustomer,name:e.target.value})}/></Field><Field label="Số điện thoại"><input className="input" type="tel" required placeholder="09xxxxxxxx" value={newCustomer.phone} onChange={e=>setNewCustomer({...newCustomer,phone:e.target.value})}/></Field><Field label="Ghi chú" full><textarea className="input textarea" rows={3} placeholder="Sở thích, yêu cầu riêng…" value={newCustomer.note} onChange={e=>setNewCustomer({...newCustomer,note:e.target.value})}/></Field></div><div className="modal-actions"><button type="button" className="btn btn-white" onClick={()=>setModal(null)}>Hủy</button><button disabled={busy} className="btn btn-dark"><Plus size={17}/> Lưu khách hàng</button></div></form>}
       {modal==='booking'&&<GuV5Booking key={String(modal)+bookingMode+booking.pickupDate+booking.itemIds.join(':')}
-        items={items} customers={customers} api={api} initial={booking} onClose={()=>setModal(null)}
+        items={items} customers={customers} api={api} initial={booking} mode={bookingMode} onClose={()=>setModal(null)}
         onCustomerCreated={async()=>{await refresh();}}
-        onCreated={id=>setCaptureId(id)}
+        onCreated={id=>{if(bookingMode==='PICKUP')setCaptureId(id);}}
         onSuccess={async(message)=>{setToast(message);setModal(null);await refresh();}}/>}
       {modal==='category'&&<form className="modal-body" onSubmit={e=>{e.preventDefault();void action(editingCategory?'categories/'+editingCategory:'categories',{name:categoryName},editingCategory?'Đã sửa danh mục.':'Đã thêm danh mục.',editingCategory?'PATCH':'POST');}}><label className="form-field"><span>Tên danh mục</span><input className="input" required maxLength={50} value={categoryName} onChange={e=>setCategoryName(e.target.value)} placeholder="Ví dụ: Đầm dự tiệc, Túi xách, Phụ kiện tóc…"/></label>{categories.length>0&&<div className="gu-category-manager"><strong>Danh mục hiện có</strong>{categories.filter(c=>!LEGACY_DEFAULT_CATEGORIES.some(name=>name===c.name)).map(c=><div className="gu-category-row" key={c.id}><span>{c.name}</span>{data?.me.role==='admin'&&<button type="button" className="icon-btn" title="Sửa" onClick={()=>editCategory(c.id,c.name)}><Pencil size={16}/></button>}{data?.me.role==='admin'&&<button type="button" className="icon-btn gu-danger-icon" title="Xóa" onClick={()=>void removeCategory(c.id,c.name)}><Trash2 size={16}/></button>}</div>)}</div>}<div className="modal-actions"><button type="button" className="btn btn-white" onClick={()=>{setEditingCategory(null);setCategoryName('');}}>Tạo danh mục mới</button><button className="btn btn-dark" disabled={busy}>{editingCategory?'Lưu thay đổi':'Lưu danh mục'}</button></div></form>}
       {modal==='detail'&&selectedOrder&&(()=>{const o=orders.find(x=>x.id===selectedOrder.id)||selectedOrder;if(o.pricingVersion)return <GuV5OrderDetail order={o} items={items} api={api} isAdmin={data?.me.role==='admin'} onCapture={()=>{setModal(null);setCaptureId(o.id);}} onChanged={async()=>{setModal(null);await refresh();}}/>;return <div className="modal-body detail-body"><div className="detail-top"><div><span className="eyebrow">MÃ ĐƠN HÀNG</span><h3>{o.code}</h3></div><StatusBadge label={orderLabels[o.status]} status={o.status}/></div><div className="detail-info"><div><span>Khách hàng</span><strong>{o.customerName}</strong><a className="gu-detail-call" href={customerPhoneHref(o.customerPhone)}><PhoneCall size={14}/> {o.customerPhone} · Nhấn để gọi</a></div><div><span>Ngày thuê</span><strong>{prettyDay(o.pickupDate)} → {prettyDay(o.returnDate)}</strong><small>{o.rentalDays} ngày</small></div></div><div className="detail-creator"><span>Nhân viên tạo đơn</span><strong>{creatorName(o)}</strong></div><div className="detail-lines"><strong>Sản phẩm thuê</strong>{o.lines.map(l=><div className="detail-line" key={l.itemId}><ProductImage paths={items.find(i=>i.id===l.itemId)?.imagePaths}/><div><b>{l.name}</b><small>Mã sản phẩm: {items.find(i=>i.id===l.itemId)?.hangerCode||l.hangerCode||'Chưa cấp mã'}</small></div>{o.status!=='PICKED_UP'&&<strong>{money(l.lineTotal)}</strong>}</div>)}</div>{o.status==='PICKED_UP'&&<GuReturnFlow key={`${o.id}:${o.lines.length}:${o.total}`} order={o} items={items} today={today} busy={busy} onSubmit={async payload=>{

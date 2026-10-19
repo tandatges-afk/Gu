@@ -30,10 +30,10 @@ test('legacy and hourly locks checked together',()=>{
  assert.match(hourly,/collection\('rentalSlots'\)/);
  assert.match(old,/v5DayIntervals/);
 });
-test('single capture workflow supports handover and return; Admin keeps review approval',()=>{
+test('single capture workflow supports handover/return; Admin reviews after staff release',()=>{
  const capture=read('src/components/GuOrderCapture.tsx');const review=read('src/components/GuV5Review.tsx');
  assert.match(capture,/HANDOVER_EXTRA/);assert.match(capture,/RECEIVE/);assert.match(capture,/preparePhonePhoto/);
- assert.match(review,/order\.handoverProof/);assert.match(review,/order\.returnProof/);assert.match(review,/APPROVE_RETURN/);
+ assert.match(review,/order\.handoverProof/);assert.match(review,/order\.returnProof/);assert.match(review,/REVIEW_PHOTOS/);
 });
 test('actual mobile handover is the clock origin for final 24h settlement',()=>{
  const route=read('src/app/api/v5/orders/[id]/route.ts');

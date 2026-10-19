@@ -40,7 +40,13 @@ export async function GET(req: NextRequest) {
     await staffUser(req);
     const q=(new URL(req.url).searchParams.get('phone')||'').replace(/[\s.()-]/g,'');
     if(!/^\d{3,13}$/.test(q)) throw new ApiError(400,'Nhập ít nhất 3 chữ số điện thoại để tìm kiếm.');
-    const snap=await db().collection('customers').orderBy('phone').startAt(q).endAt(q+'\uf8ff').limit(20).get();
-    return NextResponse.json({customers:snap.docs.map(d=>({id:d.id,...d.data()}))});
+    // Legacy customer records sometimes use +84 while new records use 0xxxxxxxxx.
+    // Query both prefixes, deduplicate and keep a bounded suggestion list.
+    const prefixes=[q];
+    if(q.startsWith('0'))prefixes.push('+84'+q.slice(1));
+    if(q.startsWith('84'))prefixes.push('0'+q.slice(2));
+    const results=await Promise.all([...new Set(prefixes)].map(prefix=>db().collection('customers').orderBy('phone').startAt(prefix).endAt(prefix+'\uf8ff').limit(20).get()));
+    const customers=[...new Map(results.flatMap(s=>s.docs.map(d=>[d.id,{id:d.id,...d.data()}] as const))).values()].slice(0,20);
+    return NextResponse.json({customers});
   }catch(e){return handleError(e);}
 }
