@@ -270,3 +270,9 @@ và thử tạo/giao/nhận/duyệt trên staging trước khi triển khai Prod
 ## GU v5.0.0-beta.5 — Tối ưu form nhập kho và cấu hình góc chụp
 
 Xem `docs/GU-v5-BETA5-INVENTORY-REFINEMENT.md`.
+
+
+### GU v5 Beta 8
+- Admin Hệ thống: Cloudinary usage only (Firestore data remains intact).
+- Removes excess UI hints and catalog undefined counter.
+- Categorizes known Firestore server failures with an incident ID; see `docs/GU-v5-BETA8-CLOUDINARY-ONLY-SYSTEM.md`.

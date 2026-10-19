@@ -3,6 +3,7 @@ import { db, serverAuth } from './firebase-admin';
 import { Role } from './types';
 import { classifyTokenFailure } from './auth-errors';
 import { randomUUID } from 'node:crypto';
+import {classifyServerFailure} from './server-error-classifier';
 export class ApiError extends Error {
   constructor(public status: number, message: string, public details?: unknown) { super(message); }
 }
@@ -35,8 +36,10 @@ export function handleError(err: unknown) {
   if (err instanceof Error && /không hợp lệ|phải |tối đa|định dạng|Ngày |Thời gian thuê|Ngày đệm|VND hợp lệ|chưa cấu hình phí trễ|chưa xác định mẫu|Mẫu máy|serial|góc chụp|Góc chụp|Không được trùng góc|Chọn từ 1 đến 10 góc/.test(err.message))
     return NextResponse.json({ error: err.message }, {status:400});
   const incidentId=randomUUID().slice(0,8);
-  console.error('[GU_SERVER_ERROR]',incidentId,err instanceof Error?{name:err.name,message:err.message,stack:err.stack}:{type:typeof err});
-  return NextResponse.json({error:'Máy chủ không xử lý được yêu cầu. Mã lỗi: '+incidentId,code:'GU_SERVER_ERROR'}, {status:500});
+  const known=classifyServerFailure(err);
+  console.error('[GU_SERVER_ERROR]',incidentId,err instanceof Error?{name:err.name,code:(err as Error&{code?:unknown}).code,message:err.message,stack:err.stack}:{type:typeof err});
+  if(known)return NextResponse.json({error:known.message+' Mã đối chiếu: '+incidentId,code:known.code,incidentId}, {status:known.status});
+  return NextResponse.json({error:'Máy chủ không xử lý được yêu cầu. Mã lỗi: '+incidentId,code:'GU_SERVER_ERROR',incidentId}, {status:500});
 }
 export async function jsonBody(req: NextRequest): Promise<Record<string, unknown>> {
   const size = Number(req.headers.get('content-length') || '0');
