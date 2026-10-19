@@ -27,6 +27,7 @@ const required = [
   'src/lib/vnd-input.ts',
   'src/app/api/system/route.ts',
   'src/lib/monitoring-error.ts',
+  'src/lib/server-error-classifier.ts',
   'src/app/api/catalog/route.ts',
   'src/app/api/calendar/route.ts',
   'src/app/api/tasks/route.ts',
@@ -36,6 +37,8 @@ const required = [
   'scripts/migrate-revenue-history.mjs',
   'scripts/backup-firestore.mjs',
   'scripts/reset-demo-data.mjs',
+  'scripts/diagnose-monitoring.mjs',
+  'docs/GU-v5-BETA7-DESKTOP-UI-MONITORING.md',
   'docs/GU-V5-BETA6-MOBILE-RESET.md',
   'public/gu-sw.js',
   '.env.example',
@@ -75,7 +78,7 @@ const checks = [
 ];
 checks.push(['tiền phân cách hàng nghìn', /formatVndInput/, 'src/components/GuMoneyInput.tsx']);
 checks.push(['giá thuê dùng tiền định dạng', /GuMoneyInput required/, 'src/app/page.tsx']);
-checks.push(['Cloud Monitoring trả đủ điểm dữ liệu', /'view':'FULL'/, 'src/app/api/system/route.ts']);
+checks.push(['chỉ giữ Cloudinary trong giám sát Admin', /cloudinaryReport/, 'src/app/api/system/route.ts']);
 checks.push(['nút cập nhật bỏ cache', /system\?refresh=1/, 'src/components/GuSystem.tsx']);
 checks.push(['giá thuê theo 24h', /billableBlocks/, 'src/lib/hourly-pricing.ts']);
 checks.push(['mobile chụp nhận trả', /sendPhoto/, 'src/app/mobile/page.tsx']);
@@ -92,10 +95,12 @@ checks.push(['quy tắc ẩn giặt theo danh mục', /launderingForCategory/, '
 checks.push(['góc ảnh do Admin tự thêm', /Thêm góc chụp/, 'src/app/page.tsx']);
 checks.push(['không tự điền góc ảnh', /DEFAULT_ANGLES:string\[\]=\[\]/, 'src/lib/inspection-proof.ts']);
 checks.push(['đơn cần góc ảnh được thiết lập', /Admin cần thêm góc ảnh/, 'src/app/api/v5/orders/route.ts']);
-checks.push(['theo dõi Cloud Monitoring 403', /Monitoring Viewer/, 'src/components/GuSystem.tsx']);
+checks.push(['chẩn đoán Cloud Monitoring 403', /BILLING_REQUIRED/, 'src/lib/monitoring-error.ts']);
+checks.push(['menu PC không dùng bottom nav mobile', /gu-main-bottom-nav/, 'src/app/page.tsx']);
+checks.push(['menu mobile riêng', /gu-staff-bottom-nav/, 'src/app/mobile/page.tsx']);
 const absent = checks.filter(([name,pattern,file]) => missing.includes(file) || !pattern.test(read(file))).map(([name])=>name);
 const pkg = JSON.parse(read('package.json'));
-if (pkg.version !== '5.0.0-beta.6') absent.push('phiên bản 5.0.0-beta.6 trong package.json');
+if (pkg.version !== '5.0.0-beta.8') absent.push('phiên bản 5.0.0-beta.8 trong package.json');
 if (missing.length || absent.length) {
   console.error('KHÔNG ĐỒNG BỘ. Thiếu tệp:', missing.join(', ') || 'không');
   console.error('Thiếu thành phần:', absent.join(', ') || 'không');

@@ -22,11 +22,11 @@ test('IAM, token and invalid request errors are distinguished',()=>{
  assert.match(explainMonitoringError(400,{}),/không hợp lệ/);
  assert.equal(monitoringErrorReason({error:{details:[{reason:'<script>'}]}}),null);
 });
-test('System request uses full time series view and refresh skips server cache',()=>{
+test('System request retrieves Cloudinary only and refresh skips server cache',()=>{
  const api=read('src/app/api/system/route.ts'),ui=read('src/components/GuSystem.tsx');
- assert.match(api,/'view':'FULL'/);
  assert.match(api,/req.nextUrl.searchParams.get\('refresh'\)==='1'/);
  assert.match(ui,/system\?refresh=1/);
- assert.match(api,/explainMonitoringError/);
  assert.match(api,/me.role!=='admin'/);
+ assert.match(api,/api.cloudinary.com/);
+ assert.doesNotMatch(api,/monitoring.googleapis.com|firestoreReport|collection\(.+\)\.count/);
 });

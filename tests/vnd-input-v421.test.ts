@@ -30,8 +30,8 @@ test('all GU monetary entry points use reusable formatter',()=>{
   assert.match(component,/onValueChange\(raw\)/);
   assert.match(component,/inputMode="numeric"/);
 });
-test('admin monitoring explains 403 and Cloudinary fractional credits remain visible',()=>{
-  const admin=readFileSync('src/components/GuSystem.tsx','utf8');
-  assert.match(admin,/monitoring\.viewer/);
-  assert.match(admin,/n\.toLocaleString\('vi-VN',\{maximumFractionDigits:2\}\)/);
+test('Cloudinary fractional credits remain visible without Firestore monitoring hint',()=>{
+ const admin=readFileSync('src/components/GuSystem.tsx','utf8');
+ assert.match(admin,/maximumFractionDigits:2/);
+ assert.doesNotMatch(admin,/monitoring\.viewer|Firebase Firestore|Vercel · Web\/API/);
 });

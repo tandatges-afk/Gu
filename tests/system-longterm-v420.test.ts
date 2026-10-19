@@ -40,8 +40,8 @@ test('Debt ledger stores only uncollected orders and excludes canceled/paid',()=
 });
 test('System API enforces Admin permission and provider data only',()=>{
  const code=read('src/app/api/system/route.ts');
- assert.match(code,/me.role!=='admin'/);assert.match(code,/monitoring.googleapis.com/);assert.match(code,/api.cloudinary.com/);
- assert.match(code,/CLOUDINARY_API_SECRET/);assert.match(code,/metricUsage\(null,FIRESTORE_FREE.reads\)/);
+ assert.match(code,/me.role!=='admin'/);assert.doesNotMatch(code,/monitoring.googleapis.com/);assert.match(code,/api.cloudinary.com/);
+ assert.match(code,/CLOUDINARY_API_SECRET/);assert.doesNotMatch(code,/firestoreReport|collectionCounts/);
  assert.doesNotMatch(read('src/components/GuSystem.tsx'),/CLOUDINARY_API_SECRET/);
 });
 test('Six long-term changes have corresponding server support',()=>{

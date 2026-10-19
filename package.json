@@ -1,6 +1,6 @@
 {
   "name": "gu-thue-do-xinh",
-  "version": "5.0.0-beta.6",
+  "version": "5.0.0-beta.8",
   "private": true,
   "type": "module",
   "scripts": {
@@ -12,7 +12,8 @@
     "diagnose:firebase": "node --env-file=.env.local scripts/diagnose-firebase.mjs",
     "verify:release": "node scripts/verify-release.mjs",
     "data:plan": "node --env-file=.env.local scripts/reset-demo-data.mjs --plan",
-    "data:backup": "node --env-file=.env.local scripts/reset-demo-data.mjs --backup"
+    "data:backup": "node --env-file=.env.local scripts/reset-demo-data.mjs --backup",
+    "diagnose:monitoring": "node --experimental-strip-types --env-file=.env.local scripts/diagnose-monitoring.mjs"
   },
   "dependencies": {
     "firebase": "^12.0.0",
