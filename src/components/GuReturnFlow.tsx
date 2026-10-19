@@ -58,7 +58,7 @@ export function GuReturnFlow({order,items,today,busy,onSubmit}:{
       {order.lines.map(line=><div className="gu-return-item" key={line.itemId}>
         <div className="gu-return-item-title">
           <strong>{line.name}</strong>
-          <small>Size {line.size} · Mã sản phẩm: {items.find(i=>i.id===line.itemId)?.hangerCode||line.hangerCode||'Chưa cấp mã'}</small>
+          <small>Mã sản phẩm: {items.find(i=>i.id===line.itemId)?.hangerCode||line.hangerCode||'Chưa cấp mã'}</small>
         </div>
         <div className="gu-return-choices" role="group" aria-label={'Kiểm nhận '+line.name}>
           <button type="button" className={'gu-return-choice '+(checks[line.itemId]==='OK'?'is-ok':'')} aria-pressed={checks[line.itemId]==='OK'} onClick={()=>setChecks(v=>({...v,[line.itemId]:'OK'}))}>Đã nhận đủ</button>

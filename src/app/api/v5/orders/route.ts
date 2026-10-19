@@ -4,7 +4,7 @@ import {staffUser,handleError,jsonBody,ApiError,requirePcStaff} from '@/lib/http
 import {localDateTimeToISO,billableBlocks,vnDayKey} from '@/lib/hourly-pricing';
 import {rentalCharge,cameraPackageSnapshot,isCameraCategory,isCameraModel} from '@/lib/camera-rental';
 import {intervalRefs,checkIntervalAvailability,createIntervalWrites,simpleId} from '@/lib/v5-server';
-import {DEFAULT_ANGLES} from '@/lib/inspection-proof';
+import {normalizedAngles} from '@/lib/inspection-proof';
 import {auditInTransaction} from '@/lib/audit';
 import {syncDebtIndex} from '@/lib/debt-index';
 import type {RentalOrder,InventoryItem,Customer,RentalLine} from '@/lib/types';
@@ -32,11 +32,18 @@ export async function POST(req:NextRequest){
    const customer={id:customerSnap.id,...customerSnap.data()} as Customer;
    const items=itemSnaps.map(s=>({id:s.id,...s.data()} as InventoryItem));
    if(items.some(i=>i.archivedAt||['MAINTENANCE','MISSING'].includes(i.status)))throw new ApiError(409,'Có sản phẩm đã ngưng sử dụng hoặc thất lạc.');
+   if(items.some(i=>!Array.isArray(i.inspectionAngles)||!i.inspectionAngles.length))throw new ApiError(409,'Admin cần thêm góc ảnh giao/nhận cho từng sản phẩm trước khi tạo đơn.');
    const snapshots=await checkIntervalAvailability(tx,slots);
    const lines:RentalLine[]=items.map(i=>({itemId:i.id,name:i.name,sku:i.sku,hangerCode:i.hangerCode,size:i.size,category:i.category,cameraModel:i.cameraModel,cameraSerial:i.cameraSerial,...(isCameraCategory(i.category)&&isCameraModel(i.cameraModel)?cameraPackageSnapshot(i.cameraModel,pickupAt,returnAt):{}),dailyRate:i.dailyRate,bufferDays:0,replacementValue:i.replacementValue,lineTotal:rentalCharge(i,pickupAt,returnAt),startDate:vnDayKey(pickupAt),startAt:pickupAt}));
    const total=lines.reduce((s,l)=>s+l.lineTotal,0);
    const code='TH-'+now.slice(2,10).replace(/-/g,'')+'-'+orderRef.id.slice(0,5).toUpperCase();
-   const photoTemplates=Object.fromEntries(items.map(i=>[i.id,i.inspectionAngles?.length?i.inspectionAngles:DEFAULT_ANGLES]));
+   // Snapshot only validated/normalized angle labels. InventoryItem.inspectionAngles is optional
+   // for legacy records, but a new v5 order must persist a complete string[] per item.
+   const photoTemplates:Record<string,string[]>={};
+   for(const item of items){
+    try{photoTemplates[item.id]=normalizedAngles(item.inspectionAngles);}
+    catch{throw new ApiError(409,`Góc chụp của sản phẩm “${item.name}” không hợp lệ. Admin cần kiểm tra lại.`);}
+   }
    const referencePhotos=Object.fromEntries(items.map(i=>[i.id,i.referenceShots||{}]));
    const record:Omit<RentalOrder,'id'>={code,customerId:customer.id,customerName:customer.name,customerPhone:customer.phone,pickupDate:vnDayKey(pickupAt),returnDate:vnDayKey(returnAt),pickupAt,returnAt,pricingVersion:'GU_HOURLY_V1',photoTemplates,referencePhotos,rentalDays:blocks,lines,total,paid:0,depositDue:0,note,status:'RESERVED',createdAt:now,updatedAt:now,createdBy:me.uid,createdByName:me.name,history:[{action:'CREATE_HOURLY',at:now,by:me.uid,detail:'Đơn tạo trên PC, chờ mobile chụp ảnh giao đồ'}]};
    tx.create(orderRef,record);createIntervalWrites(tx,slots,snapshots,orderRef.id);

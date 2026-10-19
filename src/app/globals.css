@@ -738,3 +738,11 @@ html,body{background:var(--paper);color:var(--ink)}
 @media(max-width:760px){.gu-v5-review-layout{grid-template-columns:1fr}.gu-v5-review-list{max-height:240px}.gu-v5-compare{gap:6px}.gu-v5-angle{padding:8px}.gu-v5-photo-actions .btn{flex:1;min-width:95px;justify-content:center}.gu-v5-stages>*{flex:1}.gu-v5-review-detail{padding:10px}}
 
 .gu-v5-reference-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px}.gu-v5-reference-grid .uploader{margin-top:8px}.gu-v5-reference-grid .upload-gallery{display:flex;gap:8px}
+
+/* GU v5 Beta 5: compact, admin-configured photo angles */
+.gu-angle-editor{display:grid;gap:8px;width:100%}
+.gu-angle-input-row{display:flex;gap:8px;align-items:stretch;flex-wrap:wrap}
+.gu-angle-input-row .input{flex:1;min-width:155px}
+.gu-angle-input-row button{white-space:normal;min-height:42px}
+.gu-angle-added{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 10px;border:1px solid #d7e0d9;background:#f4f8f5;border-radius:9px;font-size:13px}
+.gu-angle-required{color:#9b5017;font-size:12px}

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db, serverAuth } from './firebase-admin';
 import { Role } from './types';
 import { classifyTokenFailure } from './auth-errors';
+import { randomUUID } from 'node:crypto';
 export class ApiError extends Error {
   constructor(public status: number, message: string, public details?: unknown) { super(message); }
 }
@@ -31,10 +32,11 @@ export function requirePcStaff(me:{role:Role}){if(me.role==='staff_mobile')throw
 export function requireAdmin(me:{role:Role}){if(me.role!=='admin')throw new ApiError(403,'Chỉ Admin được duyệt và xóa đơn.');}
 export function handleError(err: unknown) {
   if (err instanceof ApiError) return NextResponse.json({ error: err.message, details: err.details }, {status: err.status});
-  if (err instanceof Error && /không hợp lệ|phải |tối đa|định dạng|Ngày |Thời gian thuê|Ngày đệm|VND hợp lệ|chưa cấu hình phí trễ|chưa xác định mẫu|Mẫu máy|serial/.test(err.message))
+  if (err instanceof Error && /không hợp lệ|phải |tối đa|định dạng|Ngày |Thời gian thuê|Ngày đệm|VND hợp lệ|chưa cấu hình phí trễ|chưa xác định mẫu|Mẫu máy|serial|góc chụp|Góc chụp|Không được trùng góc|Chọn từ 1 đến 10 góc/.test(err.message))
     return NextResponse.json({ error: err.message }, {status:400});
-  console.error('API failure', err);
-  return NextResponse.json({error:'Có lỗi hệ thống. Vui lòng thử lại hoặc kiểm tra cấu hình Firebase.'}, {status:500});
+  const incidentId=randomUUID().slice(0,8);
+  console.error('[GU_SERVER_ERROR]',incidentId,err instanceof Error?{name:err.name,message:err.message,stack:err.stack}:{type:typeof err});
+  return NextResponse.json({error:'Máy chủ không xử lý được yêu cầu. Mã lỗi: '+incidentId,code:'GU_SERVER_ERROR'}, {status:500});
 }
 export async function jsonBody(req: NextRequest): Promise<Record<string, unknown>> {
   const size = Number(req.headers.get('content-length') || '0');
