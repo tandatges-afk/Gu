@@ -1,5 +1,6 @@
 'use client';
 import {categorySelectOptions,isNonLaundryCategory,LEGACY_DEFAULT_CATEGORIES} from '@/lib/product-policies';
+import {normalizeProductName} from '@/lib/product-name';
 
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
 import { onAuthStateChanged, signInWithEmailAndPassword, signOut, type User } from 'firebase/auth';
@@ -49,9 +50,9 @@ const nav: {id:Page;label:string;icon:typeof LayoutDashboard}[] = [
   {id:'system',label:'Hệ thống',icon:Settings2},
 ];
 const navSections:{label:string;ids:Page[]}[]=[
-  {label:'CÔNG VIỆC',ids:['overview','calendar','orders','visual','customers']},
-  {label:'KHO & VẬN HÀNH',ids:['inventory','laundry']},
-  {label:'DÀNH CHO ADMIN',ids:['reviews','debts','reports','staff','audit','system']}
+  {label:'ĐƠN HÀNG',ids:['overview','calendar','orders','customers']},
+  {label:'KHO SẢN PHẨM',ids:['inventory','visual','laundry']},
+  {label:'QUẢN TRỊ',ids:['reviews','debts','reports','staff','audit','system']}
 ];
 const orderLabels: Record<OrderStatus,string>={RESERVED:'Chờ bàn giao',PICKED_UP:'Đã giao',RETURNED:'Đã trả',CANCELLED:'Đã hủy',VOIDED:'Admin đã xóa'};
 const statusLabels:Record<InventoryItem['status'],string>={AVAILABLE:'Sẵn sàng',RENTED:'Đang cho thuê',LAUNDRY:'Đang giặt',MAINTENANCE:'Bảo trì',MISSING:'Thất lạc'};
@@ -71,6 +72,7 @@ export default function Home() {
   const [taskOrders,setTaskOrders]=useState<RentalOrder[]>([]);
   const [loading,setLoading]=useState(false);
   const [err,setErr]=useState('');
+  const [itemError,setItemError]=useState('');
   const [toast,setToast]=useState('');
   const [page,setPage]=useState<Page>('overview');
   const [mobileNav,setMobileNav]=useState(false);
@@ -267,11 +269,11 @@ export default function Home() {
   const statusClass=(s:string)=>['AVAILABLE','RETURNED'].includes(s)?'success':['PICKED_UP','RENTED'].includes(s)?'blue':s==='LAUNDRY'?'purple':s==='MAINTENANCE'?'slate':['CANCELLED','MISSING'].includes(s)?'danger':'amber';
   const action=async(path:string,body:unknown,success:string,method='POST')=>{
     setBusy(true);try{await api(path,{method,body:JSON.stringify(body)});setToast(success);setModal(null);await refresh();setCatalogReload(v=>v+1);setLaundryReload(v=>v+1);setCalendarReload(v=>v+1);if(data?.me.role==='admin')void refreshDebts();return true;}
-    catch(e){setErr(e instanceof Error?e.message:'Lỗi thao tác.');return false;}
+    catch(e){const message=e instanceof Error?e.message:'Lỗi thao tác.';setErr(message);if(modal==='item')setItemError(message);return false;}
     finally{setBusy(false);}
   };
-  const openModal=(m:Modal)=>{if(m==='item'){setAngleDraft('');setEditingItem(null);setNewItem({name:'',category:'Phụ kiện',size:'Một size',color:'',dailyRate:20000,requiresLaundry:false,cameraModel:'',cameraSerial:'',replacementValue:0,inspectionAngles:[],referenceShots:{},imagePaths:[]});}if(m==='category'){setEditingCategory(null);setCategoryName('');}setErr('');setModal(m);};
-  const editItem=(i:InventoryItem)=>{setAngleDraft('');setEditingItem(i.id);setNewItem({name:i.name,category:i.category,size:i.size,color:i.color,dailyRate:i.dailyRate,cameraModel:i.cameraModel||'',cameraSerial:i.cameraSerial||'',requiresLaundry:i.requiresLaundry??i.bufferDays>0,replacementValue:i.replacementValue,inspectionAngles:i.inspectionAngles||[],referenceShots:i.referenceShots||{},imagePaths:i.imagePaths||[]});setErr('');setModal('item');};
+  const openModal=(m:Modal)=>{setItemError('');if(m==='item'){setAngleDraft('');setEditingItem(null);setNewItem({name:'',category:'Phụ kiện',size:'Một size',color:'',dailyRate:20000,requiresLaundry:false,cameraModel:'',cameraSerial:'',replacementValue:0,inspectionAngles:[],referenceShots:{},imagePaths:[]});}if(m==='category'){setEditingCategory(null);setCategoryName('');}setErr('');setModal(m);};
+  const editItem=(i:InventoryItem)=>{setItemError('');setAngleDraft('');setEditingItem(i.id);setNewItem({name:i.name,category:i.category,size:i.size,color:i.color,dailyRate:i.dailyRate,cameraModel:i.cameraModel||'',cameraSerial:i.cameraSerial||'',requiresLaundry:i.requiresLaundry??i.bufferDays>0,replacementValue:i.replacementValue,inspectionAngles:i.inspectionAngles||[],referenceShots:i.referenceShots||{},imagePaths:i.imagePaths||[]});setErr('');setModal('item');};
   const addAngle=()=>{const angle=angleDraft.trim();if(!angle)return;if(newItem.inspectionAngles.includes(angle)){setErr('Góc chụp đã tồn tại.');return;}if(newItem.inspectionAngles.length>=10){setErr('Mỗi sản phẩm tối đa 10 góc chụp.');return;}setNewItem(v=>({...v,inspectionAngles:[...v.inspectionAngles,angle]}));setAngleDraft('');setErr('');};
    const editCategory=(id:string,name:string)=>{setEditingCategory(id);setCategoryName(name);setErr('');setModal('category');};
   const removeItem=async(i:InventoryItem)=>{if(!confirm(`Lưu trữ sản phẩm ${i.name}? Các đơn lịch sử vẫn được giữ nguyên.`))return;setBusy(true);try{await api('items/'+i.id,{method:'DELETE'});setToast('Đã lưu trữ sản phẩm.');await refresh();setCatalogReload(v=>v+1);}catch(e){setErr(e instanceof Error?e.message:'Không thể xóa sản phẩm.');}finally{setBusy(false);}};
@@ -485,7 +487,7 @@ export default function Home() {
     {evidenceItem&&data?.me.role==='admin'&&<GuEvidenceHistory item={evidenceItem} api={api} onClose={()=>setEvidenceItem(null)}/>}
     {calendarMatches&&<div className="modal-overlay"><div className="modal modal-wide" role="dialog" aria-modal="true" aria-label="Các lượt thuê cùng ngày"><div className="modal-heading"><h2>{calendarMatches.length} lượt thuê trong ngày</h2><button className="icon-btn" onClick={()=>setCalendarMatches(null)}><X size={19}/></button></div><div className="modal-body">{calendarMatches.map(o=><button type="button" key={o.id} className="gu-v5-job" onClick={()=>{setCalendarMatches(null);openDetail(o);}}><b>{o.code} · {o.customerName}</b><span>{o.pickupAt?new Date(o.pickupAt).toLocaleString('vi-VN',{timeZone:'Asia/Ho_Chi_Minh'}):prettyDay(o.pickupDate)} → {o.returnAt?new Date(o.returnAt).toLocaleString('vi-VN',{timeZone:'Asia/Ho_Chi_Minh'}):prettyDay(o.returnDate)}</span><strong>Xem →</strong></button>)}</div></div></div>}
     {modal&&<div className="modal-overlay" onMouseDown={e=>{if(e.target===e.currentTarget&&!busy)setModal(null)}}><div className={'modal '+(modal==='booking'||modal==='detail'?'modal-wide':'')} role="dialog" aria-modal="true" aria-label="Biểu mẫu"><div className="modal-heading"><div><div className="eyebrow">GU - THUÊ ĐỒ XINH</div><h2>{modal==='booking'?(bookingMode==='RESERVE'?'Đặt lịch thuê trước':'Tạo đơn · chờ chụp ảnh giao'):modal==='item'?(editingItem?'Sửa sản phẩm':'Thêm sản phẩm'):modal==='customer'?'Thêm khách hàng':modal==='category'?(editingCategory?'Sửa danh mục':'Thêm danh mục'):'Chi tiết đơn thuê'}</h2></div><button className="icon-btn close-btn" onClick={()=>setModal(null)} aria-label="Đóng"><X size={20}/></button></div>
-      {modal==='item'&&<form onSubmit={e=>{e.preventDefault();void action(editingItem?'items/'+editingItem:'items',editingItem?{action:'EDIT',...newItem,referenceShots:Object.fromEntries(Object.entries(newItem.referenceShots).filter(([,url])=>Boolean(url)))}:{...newItem,referenceShots:Object.fromEntries(Object.entries(newItem.referenceShots).filter(([,url])=>Boolean(url)))},editingItem?'Đã sửa sản phẩm.':'Đã nhập kho sản phẩm.',editingItem?'PATCH':'POST');}} className="modal-body"><div className="form-grid">
+      {modal==='item'&&<form onSubmit={e=>{e.preventDefault();if(items.some(i=>i.id!==editingItem&&normalizeProductName(i.name)===normalizeProductName(newItem.name))){setItemError('Tên sản phẩm đã tồn tại.');return;}setItemError('');void action(editingItem?'items/'+editingItem:'items',editingItem?{action:'EDIT',...newItem,referenceShots:Object.fromEntries(Object.entries(newItem.referenceShots).filter(([,url])=>Boolean(url)))}:{...newItem,referenceShots:Object.fromEntries(Object.entries(newItem.referenceShots).filter(([,url])=>Boolean(url)))},editingItem?'Đã sửa sản phẩm.':'Đã nhập kho sản phẩm.',editingItem?'PATCH':'POST');}} className="modal-body">{itemError&&<div className="inline-alert danger-alert" role="alert">{itemError}</div>}<div className="form-grid">
         <Field label="Tên sản phẩm" full><input required className="input" placeholder="Tên sản phẩm" value={newItem.name} onChange={e=>setNewItem({...newItem,name:e.target.value})}/></Field>
         <Field label="Danh mục"><select className="input" value={newItem.category} onChange={e=>{const category=e.target.value;setNewItem(v=>({...v,category,requiresLaundry:!isNonLaundryCategory(category),cameraModel:category==='Máy ảnh'?(v.cameraModel||'Canon EOS R50'):'',name:category==='Máy ảnh'?(v.cameraModel||'Canon EOS R50'):v.name}));}}>{categorySelectOptions((data?.categories||[]).map(c=>c.name),newItem.category).map(x=><option key={x}>{x}</option>)}</select></Field>
         {newItem.category==='Máy ảnh'&&<><Field label="Mẫu máy"><select className="input" disabled={Boolean(editingItem)} value={newItem.cameraModel} onChange={e=>setNewItem({...newItem,cameraModel:e.target.value,name:e.target.value})}><option value="Canon EOS R50">Canon EOS R50</option><option value="Canon M50">Canon M50</option></select></Field><Field label="Serial thân máy"><input required className="input" disabled={Boolean(editingItem)} value={newItem.cameraSerial} onChange={e=>setNewItem({...newItem,cameraSerial:e.target.value.toUpperCase()})} placeholder="Số serial trên thân máy"/></Field></>}
