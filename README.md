@@ -1,3 +1,7 @@
+## GU v5 Beta 6 — Mobile & Demo Reset
+
+Xem `docs/GU-V5-BETA6-MOBILE-RESET.md` để triển khai an toàn.
+
 # GU - Thuê đồ xinh — Bản mã nguồn đầy đủ v4.1.4
 
 **Hướng dẫn nâng cấp từ bất kỳ phiên bản cũ nào:** [`docs/HUONG-DAN-CAI-DAT-BAN-TOAN-BO.md`](docs/HUONG-DAN-CAI-DAT-BAN-TOAN-BO.md). Không cần tải/ghép các bản vá 2.x, 3.x, 4.0 hay 4.1.1.

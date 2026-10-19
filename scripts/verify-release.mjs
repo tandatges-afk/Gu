@@ -35,6 +35,8 @@ const required = [
   'scripts/migrate-debt-index.mjs',
   'scripts/migrate-revenue-history.mjs',
   'scripts/backup-firestore.mjs',
+  'scripts/reset-demo-data.mjs',
+  'docs/GU-V5-BETA6-MOBILE-RESET.md',
   'public/gu-sw.js',
   '.env.example',
   'src/app/mobile/page.tsx',
@@ -93,7 +95,7 @@ checks.push(['đơn cần góc ảnh được thiết lập', /Admin cần thêm
 checks.push(['theo dõi Cloud Monitoring 403', /Monitoring Viewer/, 'src/components/GuSystem.tsx']);
 const absent = checks.filter(([name,pattern,file]) => missing.includes(file) || !pattern.test(read(file))).map(([name])=>name);
 const pkg = JSON.parse(read('package.json'));
-if (pkg.version !== '5.0.0-beta.5') absent.push('phiên bản 5.0.0-beta.5 trong package.json');
+if (pkg.version !== '5.0.0-beta.6') absent.push('phiên bản 5.0.0-beta.6 trong package.json');
 if (missing.length || absent.length) {
   console.error('KHÔNG ĐỒNG BỘ. Thiếu tệp:', missing.join(', ') || 'không');
   console.error('Thiếu thành phần:', absent.join(', ') || 'không');
