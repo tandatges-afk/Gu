@@ -30,6 +30,10 @@ const required = [
   'src/lib/server-error-classifier.ts',
   'docs/GU-v5-BETA10-INDEX-AND-UI.md',
   'src/lib/product-name.ts',
+  'src/lib/product-search.ts',
+  'src/lib/return-risk.ts',
+  'scripts/migrate-staff-unified.mjs',
+  'src/app/api/v5/return-risk/route.ts',
   'scripts/migrate-product-names.mjs',
   'src/app/api/catalog/route.ts',
   'src/app/api/calendar/route.ts',
@@ -45,7 +49,7 @@ const required = [
   'docs/GU-V5-BETA6-MOBILE-RESET.md',
   'public/gu-sw.js',
   '.env.example',
-  'src/app/mobile/page.tsx',
+  'src/components/GuOrderCapture.tsx',
   'src/app/api/v5/orders/route.ts',
   'src/app/api/v5/orders/[id]/route.ts',
   'src/app/api/v5/jobs/route.ts',
@@ -87,10 +91,13 @@ checks.push(['sửa tên sản phẩm đồng bộ index', /nextNameRef/, 'src/a
 checks.push(['migrating tên sản phẩm cũ', /DUPLICATE GROUPS/, 'scripts/migrate-product-names.mjs']);
 checks.push(['tiền phân cách hàng nghìn', /formatVndInput/, 'src/components/GuMoneyInput.tsx']);
 checks.push(['giá thuê dùng tiền định dạng', /GuMoneyInput required/, 'src/app/page.tsx']);
+checks.push(['không có trang /mobile', /GuOrderCapture/, 'src/app/page.tsx']);
+checks.push(['tìm tên ở giữa từ không dấu', /nameSearchBigrams/, 'src/app/api/catalog/route.ts']);
+checks.push(['cảnh báo sau 17 giờ', /vnClock/, 'src/lib/return-risk.ts']);
 checks.push(['chỉ giữ Cloudinary trong giám sát Admin', /cloudinaryReport/, 'src/app/api/system/route.ts']);
 checks.push(['nút cập nhật bỏ cache', /system\?refresh=1/, 'src/components/GuSystem.tsx']);
 checks.push(['giá thuê theo 24h', /billableBlocks/, 'src/lib/hourly-pricing.ts']);
-checks.push(['mobile chụp nhận trả', /sendPhoto/, 'src/app/mobile/page.tsx']);
+checks.push(['chụp kiểm nhận ngay trên đơn', /const upload=async/, 'src/components/GuOrderCapture.tsx']);
 checks.push(['admin duyệt ảnh', /GuV5Review/, 'src/app/page.tsx']);
 checks.push(['chống trùng giờ', /checkIntervalAvailability/, 'src/app/api/v5/orders/route.ts']);
 checks.push(['chỉ admin xóa và duyệt', /requireAdmin/, 'src/app/api/v5/orders/[id]/route.ts']);
@@ -106,10 +113,10 @@ checks.push(['không tự điền góc ảnh', /DEFAULT_ANGLES:string\[\]=\[\]/,
 checks.push(['đơn cần góc ảnh được thiết lập', /Admin cần thêm góc ảnh/, 'src/app/api/v5/orders/route.ts']);
 checks.push(['chẩn đoán Cloud Monitoring 403', /BILLING_REQUIRED/, 'src/lib/monitoring-error.ts']);
 checks.push(['menu PC không dùng bottom nav mobile', /gu-main-bottom-nav/, 'src/app/page.tsx']);
-checks.push(['menu mobile riêng', /gu-staff-bottom-nav/, 'src/app/mobile/page.tsx']);
+checks.push(['một giao diện cho PC và điện thoại', /GuOrderCapture/, 'src/app/page.tsx']);
 const absent = checks.filter(([name,pattern,file]) => missing.includes(file) || !pattern.test(read(file))).map(([name])=>name);
 const pkg = JSON.parse(read('package.json'));
-if (pkg.version !== '5.0.0-beta.10') absent.push('phiên bản 5.0.0-beta.10 trong package.json');
+if (pkg.version !== '5.0.0-beta.11') absent.push('phiên bản 5.0.0-beta.11 trong package.json');
 if (missing.length || absent.length) {
   console.error('KHÔNG ĐỒNG BỘ. Thiếu tệp:', missing.join(', ') || 'không');
   console.error('Thiếu thành phần:', absent.join(', ') || 'không');

@@ -31,9 +31,7 @@ export async function POST(req: NextRequest) {
     const purpose=String(form.get('purpose')||'product');
     const orderId=String(form.get('orderId')||'');
     if(!['product','handover','return'].includes(purpose))throw new ApiError(400,'Loại ảnh không hợp lệ.');
-    if(me.role==='staff_mobile'&&purpose==='product')throw new ApiError(403,'Nhân viên Mobile không được thêm ảnh sản phẩm.');
     if(purpose!=='product'){
-      if(me.role!=='staff_mobile'&&me.role!=='admin')throw new ApiError(403,'Ảnh giao nhận chỉ chụp trên Mobile.');
       if(!simpleId(orderId))throw new ApiError(400,'Mã đơn không hợp lệ.');
       const order=await db().collection('orders').doc(orderId).get();
       if(!order.exists||!order.data()?.pricingVersion||['RETURNED','CANCELLED','VOIDED'].includes(order.data()?.status))throw new ApiError(409,'Đơn đã đóng hoặc không dùng quy trình ảnh.');

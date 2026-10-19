@@ -21,7 +21,7 @@ export async function POST(req:NextRequest) {
     const name=assertText(b.name,'Họ tên',100);
     const email=assertText(b.email,'Email',200).toLowerCase();
     if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))throw new ApiError(400,'Email không hợp lệ.');
-    const role=b.role==='staff_mobile'?'staff_mobile':'staff';
+    const role='staff';
     const password=b.password;
     if(typeof password!=='string'||password.length<12||password.length>128)throw new ApiError(400,'Mật khẩu ban đầu phải từ 12–128 ký tự.');
     // Only create STAFF here. Admin privileges must be provisioned securely by the owner.

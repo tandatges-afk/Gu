@@ -4,6 +4,7 @@
 import {cert,initializeApp,getApps} from 'firebase-admin/app';
 import {getFirestore,FieldPath} from 'firebase-admin/firestore';
 import {normalizeProductName,productNameIndexId,PRODUCT_NAME_INDEX_MIGRATION} from '../src/lib/product-name.ts';
+import {productSearchBigrams} from '../src/lib/product-search.ts';
 const projectId=process.env.FIREBASE_PROJECT_ID;
 const clientEmail=process.env.FIREBASE_CLIENT_EMAIL;
 const privateKey=process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g,'\n');
@@ -25,7 +26,7 @@ if(!execute){console.log('PLAN ONLY. Để chuyển đổi: --execute --confirm=
 const state=db.collection('systemMigrations').doc(PRODUCT_NAME_INDEX_MIGRATION);
 // Live create/edit operations reject writes until migration has completed.
 await state.set({completed:false,startedAt:new Date().toISOString(),updatedAt:new Date().toISOString(),processed:0,duplicateGroups:duplicates.length});
-const entries=[...items.map(doc=>({ref:doc.ref,data:{nameKey:normalizeProductName(String(doc.data().name))},merge:true})),
+const entries=[...items.map(doc=>({ref:doc.ref,data:{nameKey:normalizeProductName(String(doc.data().name)),nameSearchBigrams:productSearchBigrams(String(doc.data().name))},merge:true})),
  ...[...names.entries()].map(([key,owners])=>({ref:db.collection('productNameIndex').doc(productNameIndexId(key)),data:{key,name:owners[0].name,owners:owners.map(o=>o.id),updatedAt:new Date().toISOString()},merge:false}))];
 let done=0;for(let i=0;i<entries.length;i+=350){const batch=db.batch();for(const entry of entries.slice(i,i+350))batch.set(entry.ref,entry.data,{merge:entry.merge});await batch.commit();done+=Math.min(350,entries.length-i);console.log('Đã đồng bộ',done,'/',entries.length,'tệp chỉ mục');}
 await state.set({completed:true,completedAt:new Date().toISOString(),updatedAt:new Date().toISOString(),processed:items.length,duplicateGroups:duplicates.length});

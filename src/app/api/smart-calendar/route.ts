@@ -4,6 +4,7 @@ import {staffUser,handleError,jsonBody,ApiError} from '@/lib/http';
 import {addDays,slotId,vietnamToday} from '@/lib/rental';
 import {validateSmartRange,nearestFreeStart} from '@/lib/smart-calendar';
 import type {InventoryItem} from '@/lib/types';
+import {productSearchText,matchesProductSearch} from '@/lib/product-search';
 export const runtime='nodejs';
 export const preferredRegion='sin1';
 const blockedReason=(i:InventoryItem,today:string)=>i.archivedAt?'Sản phẩm đã lưu trữ':i.status==='LAUNDRY'?'Sản phẩm đang giặt':i.status==='MAINTENANCE'?'Sản phẩm đang bảo trì':i.status==='MISSING'?'Sản phẩm thất lạc':!(i.replacementValue>0)?'Chưa được duyệt giá đền bù':i.status==='RENTED'&&(!i.expectedReturnDate||i.expectedReturnDate<today)?'Đồ chưa trả, cần xử lý đơn quá hạn':'';
@@ -18,10 +19,10 @@ export async function POST(req:NextRequest){
       const limit=40;
       // Cheap discovery: only a page of products, then exact per-item locks. Never scan all rentalSlots.
       let itemQuery=db().collection('items').orderBy('name').limit(limit);
-      if(q)itemQuery=db().collection('items').orderBy('name').startAt(q).endAt(q+'\uf8ff').limit(limit);
+      if(q){const key=productSearchText(q);if(key.length<2)throw new ApiError(400,'Nhập ít nhất 2 ký tự để tìm.');itemQuery=db().collection('items').where('nameSearchBigrams','array-contains',key.slice(0,2)).limit(180);}
       const stock=await itemQuery.get();
       const candidates=stock.docs.map(d=>({id:d.id,...d.data()} as InventoryItem))
-        .filter(item=>!blockedReason(item,today));
+        .filter(item=>!blockedReason(item,today)&&(!q||matchesProductSearch([item.name,item.color,item.category].join(' '),q))).slice(0,limit);
       const dates=Array.from({length:rentalDays},(_,index)=>addDays(start,index));
       if(dates.length>31)throw new ApiError(400,'Chỉ tra cứu nhanh trong khoảng tối đa 31 ngày.');
       const pairs=candidates.flatMap(item=>dates.map(date=>({item,date,ref:db().collection('rentalSlots').doc(slotId(item.id,date))})));

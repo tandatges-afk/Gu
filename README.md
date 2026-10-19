@@ -1,3 +1,11 @@
+## GU v5.0.0 Beta 11 — 1 nhân viên / 2 kích thước màn hình
+
+- Đăng nhập tại `/` trên PC lẫn điện thoại; không còn `/mobile` và không tạo vai trò nhân viên riêng theo thiết bị.
+- Tạo đơn → chụp ảnh ngay tại chi tiết đơn → nhận trả → chụp ảnh và gửi Admin duyệt; giao trước lịch chỉ khi đã giao hàng thực tế.
+- Tìm tên không dấu ở mọi vị trí của tên sản phẩm: phải chạy `npm run data:index-names` (xem trước) và `npm run data:apply-names` (cập nhật index tên + search bigrams) sau khi backup.
+- Cảnh báo màu cam sau 17:00 (giờ Việt Nam) khi có hàng chưa trả và đặt thuê ngày mai.
+- Kiểm tra trên Codespaces với `npm run test`, `npm run typecheck`, `npm run build`; chưa push Production nếu còn lỗi.
+
 # GU v5 Beta 10 — Firestore index diagnostics + responsive actions
 
 Bản phát hành kế thừa Beta 9, loại bỏ hai cách sắp xếp danh sách dùng document ID tường minh có nguy cơ yêu cầu composite index, bổ sung tên endpoint vào lỗi Firebase, chuẩn hóa bố cục nút Admin PC / Nhân viên PC / Nhân viên Mobile. Đính kèm hướng dẫn Word 12 hình minh họa tại `docs/GU-v5-Beta10-Huong-Dan-Co-Hinh-Anh-Admin-Nhan-Vien.docx`. Xem `docs/GU-v5-BETA10-INDEX-AND-UI.md` trước khi đẩy Production.

@@ -30,9 +30,9 @@ test('FAILED_PRECONDITION không tự suy luận là thiếu index',()=>{
  assert.equal(classifyServerFailure({code:9,message:'precondition unknown'})?.code,'GU_DB_PRECONDITION');
 });
 test('Admin và staff PC menu có nhóm vai trò, mobile có CSS độc lập',()=>{
- const page=read('src/app/page.tsx'),mobile=read('src/app/mobile/page.tsx'),css=read('src/app/globals.css');
+ const page=read('src/app/page.tsx'),mobile=read('src/components/GuOrderCapture.tsx'),css=read('src/app/globals.css');
  assert.match(page,/ĐƠN HÀNG/);assert.match(page,/QUẢN TRỊ/);
  assert.match(page,/normalizeProductName\(i\.name\)/);
- assert.match(mobile,/gu-staff-bottom-nav/);
+ assert.match(mobile,/gu-capture-dialog/);
  assert.match(css,/@media\(min-width:851px\)/);assert.match(css,/gu-main-bottom-nav,\.gu-staff-bottom-nav\{display:none!important\}/);
 });

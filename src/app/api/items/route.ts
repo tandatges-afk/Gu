@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import {productSearchBigrams} from '@/lib/product-search';
 import {normalizeProductName,productNameIndexId,PRODUCT_NAME_INDEX_MIGRATION} from '@/lib/product-name';
 import { db } from '@/lib/firebase-admin';
 import { staffUser,handleError,jsonBody,ApiError } from '@/lib/http';
@@ -45,7 +46,7 @@ export async function POST(req:NextRequest) {
     const inspectionAngles=me.role==='admin'&&Array.isArray(b.inspectionAngles)&&b.inspectionAngles.length?normalizedAngles(b.inspectionAngles):[];
     const referenceShots=me.role==='admin'&&b.referenceShots&&typeof b.referenceShots==='object'&&!Array.isArray(b.referenceShots)?b.referenceShots as Record<string,unknown>:{};
     if(Object.entries(referenceShots).some(([angle,url])=>!inspectionAngles.includes(angle)||!validProductImageUrl(url,me.uid,process.env.CLOUDINARY_CLOUD_NAME||'')))throw new ApiError(400,'Ảnh chi tiết phải nằm trong góc chụp và được tải lên từ tài khoản Admin.');
-    const item={name,nameKey,sku,size,color,category,...(camera?{cameraModel,cameraSerial}:{}),inspectionAngles,referenceShots,dailyRate,bufferDays:0,requiresLaundry,replacementValue,imagePaths:b.imagePaths as string[],status:'AVAILABLE',createdAt:now,createdBy:me.uid};
+    const item={name,nameKey,nameSearchBigrams:productSearchBigrams(name),sku,size,color,category,...(camera?{cameraModel,cameraSerial}:{}),inspectionAngles,referenceShots,dailyRate,bufferDays:0,requiresLaundry,replacementValue,imagePaths:b.imagePaths as string[],status:'AVAILABLE',createdAt:now,createdBy:me.uid};
     const hangerCode=await db().runTransaction(async tx=>{
       // All reads precede all writes; increment is atomic even when two employees create simultaneously.
       const [exists,counter,serial,index,migration]=await Promise.all([tx.get(skuRef),tx.get(counterRef),serialRef?tx.get(serialRef):Promise.resolve(null),tx.get(nameRef),tx.get(migrationRef)]);
