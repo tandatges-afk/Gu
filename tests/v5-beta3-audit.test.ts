@@ -37,11 +37,12 @@ test('Admin only may cancel/void/review and settle legacy camera overtime automa
  assert.match(route,/cameraLateFeePending\)throw new ApiError\(409/);
  assert.match(route,/action==='AUTO_RESOLVE_CAMERA_LATE'/);
 });
-test('Mobile API does not return customer phone, payment or replacement value',()=>{
- assert.match(route,/if\(me\.role==='staff_mobile'\)\{[\s\S]*?const mobileOrder=\{[\s\S]*?return NextResponse\.json\(\{order:mobileOrder/);
- const chunk=route.match(/const mobileOrder=(\{[^;]+\});/)?.[1]||'';
- assert.ok(chunk);
- for(const forbidden of ['customerPhone','replacementValue','paid','total','depositDue'])assert.equal(chunk.includes(forbidden),false,forbidden);
+test('staff can capture proofs within full order detail, Admin-only approval remains enforced',()=>{
+ assert.match(route,/verifyProofUploads/);
+ assert.match(route,/APPROVE_RETURN/);
+ assert.match(route,/requireAdmin\(me\)/);
+ const capture=readFileSync('src/components/GuOrderCapture.tsx','utf8');
+ assert.match(capture,/phase==='RETURN'/);
 });
 test('Early handover atomically locks its extra interval and persists the actual start',()=>{
  assert.match(route,/const earlySlots=earlyHandover\?intervalRefs/);

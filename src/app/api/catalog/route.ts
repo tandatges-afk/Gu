@@ -2,6 +2,7 @@ import {NextRequest,NextResponse} from 'next/server';
 import {type Query} from 'firebase-admin/firestore';
 import {db} from '@/lib/firebase-admin';
 import {staffUser,handleError,ApiError} from '@/lib/http';
+import {productSearchText,matchesProductSearch} from '@/lib/product-search';
 export const runtime='nodejs';
 export const preferredRegion='sin1';
 export async function GET(req:NextRequest){
@@ -14,7 +15,16 @@ export async function GET(req:NextRequest){
   const mode=u.searchParams.get('field')||'';
   const token=String(u.searchParams.get('cursor')||'');
   let collection:Query=db().collection(kind),field=kind==='orders'?'createdAt':kind==='customers'?'name':'name';
-  // Firestore has no general substring search: support indexed name/code/phone prefixes.
+  // Indexed bigrams allow middle-of-name matches without scanning all 2,000 products.
+  // Existing products must be backfilled once with `npm run data:apply-names`.
+  if(kind==='items'&&term&&mode!=='code'&&!/^GU[-\d]/i.test(term)){
+   const normalized=productSearchText(term);
+   if(normalized.length<2)throw new ApiError(400,'Nhập ít nhất 2 ký tự để tìm sản phẩm.');
+   const snapshot=await db().collection('items').where('nameSearchBigrams','array-contains',normalized.slice(0,2)).limit(400).get();
+   const matches=snapshot.docs.filter(d=>!d.data().archivedAt&&matchesProductSearch(String(d.data().name||''),term)).slice(0,take);
+   return NextResponse.json({kind,results:matches.map(d=>({id:d.id,...d.data()})),cursor:null,hasMore:false,pageSize:take},{headers:{'Cache-Control':'private,no-store'}});
+  }
+  // Phone / product-code searches remain indexed prefix queries.
   if(term){
    if(kind==='items')field=mode==='code'||/^GU[-\d]/i.test(term)?'hangerCode':'name';
    else if(kind==='customers')field=mode==='phone'||/^[+\d]/.test(term)?'phone':'name';

@@ -888,3 +888,26 @@ html,body{background:var(--paper);color:var(--ink)}
  .gu-v5-mobile.gu-mobile-new .gu-mobile-submit-zone{margin-inline:-12px}
  .gu-v5-mobile.gu-mobile-new .gu-mobile-condition button{font-size:11px}
 }
+
+/* GU v5 Beta 11 · Unified workspace for desktop/tablet/phone */
+.gu-v11-customer-results{display:grid;gap:6px;max-height:220px;overflow-y:auto;padding:8px;border:1px solid #dce4ec;border-radius:14px;background:#f8fafc;margin:8px 0 12px}
+.gu-v11-customer-result{display:flex;align-items:center;justify-content:space-between;gap:14px;text-align:left;border:1px solid transparent;border-radius:10px;background:white;padding:12px;color:#1b334a;min-height:48px;cursor:pointer}
+.gu-v11-customer-result.chosen{border-color:#245b8d;background:#eaf4ff}.gu-v11-customer-result span{font-size:13px;color:#637789}
+.gu-next-day-risk{background:#fff0dc!important;color:#743c13!important;border:2px solid #ef9c35!important;box-shadow:inset 0 0 0 1px #fff1db}
+.gu-next-day-risk .gu-calendar-cell-result{font-weight:800;color:#8c3b08}
+.gu-next-day-risk-banner{display:flex;align-items:center;gap:13px;flex-wrap:wrap;border:1px solid #f0b45b;background:#fff5e7;color:#713d12;padding:15px 18px;border-radius:14px;margin:12px 0}
+.gu-next-day-risk-banner>div{flex:1;min-width:220px;display:grid;gap:4px}.gu-next-day-risk-banner span{font-size:13px}
+.gu-v11-capture-button{display:flex;justify-content:center;width:100%;min-height:48px;margin:12px 0}
+.gu-capture-overlay{position:fixed;inset:0;z-index:900;background:#0b1b2cba;display:flex;justify-content:center;align-items:stretch;padding:16px;overflow:auto}
+.gu-capture-dialog{width:min(100%,850px);align-self:flex-start;max-height:calc(100dvh - 32px);overflow:auto;background:#f9fbfd;border-radius:20px;box-shadow:0 18px 65px #0004;color:#18324a}
+.gu-capture-header{position:sticky;top:0;z-index:4;background:#fff;border-bottom:1px solid #dce6ee;padding:16px 20px;display:flex;justify-content:space-between;gap:10px;align-items:start}
+.gu-capture-header h2{font-size:22px;margin:3px 0}.gu-capture-header p{margin:0;color:#627589;font-size:13px}.gu-capture-kicker{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:#607c90}
+.gu-capture-dialog>.inline-alert{margin:14px}.gu-capture-progress{display:flex;align-items:center;gap:14px;padding:16px 20px}.gu-capture-progress span{white-space:nowrap;font-weight:700}.gu-capture-progress progress{width:100%;height:12px;accent-color:#2166a3}
+.gu-capture-item{margin:12px 20px 18px;padding:16px;background:white;border:1px solid #dae3eb;border-radius:14px}
+.gu-capture-item-title{display:flex;align-items:center;gap:14px}.gu-capture-item-title .product-photo,.gu-capture-item-title img{width:64px;height:64px;object-fit:contain;border-radius:8px}.gu-capture-item-title h3{margin:0 0 5px;font-size:17px}.gu-capture-item-title span{font-size:12px;color:#678}
+.gu-capture-angle{margin:12px 0;padding:12px;background:#f8fafc;border:1px solid #e3eaf1;border-radius:12px}.gu-capture-angle>b{display:block;margin-bottom:10px}.gu-capture-photo-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.gu-capture-photo-grid>div{min-width:0;display:grid;gap:6px;align-content:start}.gu-capture-photo-grid small{color:#627a91}.gu-capture-photo-grid img,.gu-capture-placeholder{width:100%;aspect-ratio:4/3;object-fit:contain;border:1px solid #d7e1e9;border-radius:9px;background:#f0f4f7}.gu-capture-placeholder{display:grid;place-items:center;color:#879bb0}.gu-capture-select{cursor:pointer;justify-content:center;min-height:45px}.gu-capture-select input{display:none}
+.gu-capture-conditions{display:flex;flex-wrap:wrap;gap:8px;padding:10px 0}.gu-capture-conditions button{border:1px solid #cedae5;padding:11px 12px;border-radius:9px;background:white;min-height:44px;cursor:pointer}.gu-capture-conditions button.chosen{border-color:#245d8e;background:#e9f3fd;font-weight:700}.gu-capture-conditions textarea{flex-basis:100%;min-height:65px}
+.gu-capture-footer{position:sticky;bottom:0;display:flex;justify-content:flex-end;gap:12px;background:#fff;border-top:1px solid #dae3eb;padding:14px 20px}.gu-capture-footer button{min-height:48px}
+@media(max-width:650px){.gu-capture-overlay{padding:0}.gu-capture-dialog{width:100%;max-height:100dvh;border-radius:0}.gu-capture-header{padding:12px}.gu-capture-item{margin:10px;padding:10px}.gu-capture-photo-grid{gap:8px}.gu-capture-footer{padding:10px}.gu-capture-footer button{flex:1;min-width:0;font-size:13px}.gu-next-day-risk-banner .btn{width:100%;justify-content:center}}
+
+.gu-next-day-risk-order{background:#fff3e5!important;box-shadow:inset 4px 0 #e88a22}.gu-next-day-risk-badge{background:#fff0d7;color:#81480e;border:1px solid #e9b15e;font-weight:800}

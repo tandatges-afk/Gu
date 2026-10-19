@@ -21,15 +21,12 @@ export async function staffUser(req: NextRequest) {
   const staff = await db().collection('staff').doc(uid).get();
   if (!staff.exists || staff.data()?.disabled === true) throw new ApiError(403, 'Tài khoản chưa được cấp quyền nhân viên.');
   const role = staff.data()?.role;
-  if (role !== 'admin' && role !== 'staff' && role !== 'staff_mobile') throw new ApiError(403, 'Quyền truy cập không hợp lệ.');
-  if(role==='staff_mobile'){
-    const path=req.nextUrl.pathname;
-    const allowed=path.startsWith('/api/v5/') || (path==='/api/uploads'&&req.method==='POST');
-    if(!allowed)throw new ApiError(403,'Tài khoản Mobile chỉ được tìm ảnh và kiểm nhận bằng ảnh.');
-  }
-  return { uid, role: role as Role, name: String(staff.data()?.name ?? '') };
+  // Historic staff_mobile documents are read as staff until an Admin migrates them.
+  // Responsive layout depends on screen width, never on Firebase role.
+  if(role!=='admin'&&role!=='staff'&&role!=='staff_mobile')throw new ApiError(403,'Quyền truy cập không hợp lệ.');
+  return {uid,role:(role==='admin'?'admin':'staff') as Role,name:String(staff.data()?.name??'')};
 }
-export function requirePcStaff(me:{role:Role}){if(me.role==='staff_mobile')throw new ApiError(403,'Tài khoản nhân viên mobile chỉ được tìm ảnh và chụp ảnh giao/nhận.');}
+export function requirePcStaff(_me:{role:Role}){/* All staff now use the same PC/mobile-responsive workspace. */}
 export function requireAdmin(me:{role:Role}){if(me.role!=='admin')throw new ApiError(403,'Chỉ Admin được duyệt và xóa đơn.');}
 export function handleError(err: unknown, endpoint?: string) {
   if (err instanceof ApiError) return NextResponse.json({ error: err.message, details: err.details }, {status: err.status});

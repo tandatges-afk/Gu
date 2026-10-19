@@ -19,20 +19,20 @@ test('Admin can define 1..10 independent required photo angles',()=>{
  assert.throws(()=>normalizedAngles(['Cổ áo','Cổ áo']));
  assert.throws(()=>normalizedAngles([]));
 });
-test('mobile-only role enforced beyond responsive UI',()=>{
- const auth=read('src/lib/http.ts');const v5=read('src/app/api/v5/orders/[id]/route.ts');
- assert.match(auth,/role==='staff_mobile'/);assert.match(auth,/allowed=path\.startsWith\('\/api\/v5\/'\)/);
- assert.match(v5,/requireAdmin\(me\)/);assert.match(v5,/requirePcStaff\(me\)/);
- assert.match(v5,/verifyProofUploads/);
+test('unified staff role accepts legacy mobile accounts without a separate site',()=>{
+ const auth=read('src/lib/http.ts');const main=read('src/app/page.tsx');
+ assert.match(auth,/role!=='staff_mobile'/);assert.match(auth,/role==='admin'\?'admin':'staff'/);
+ assert.doesNotMatch(main,/window\.location\.href='\/mobile'/);
+ assert.match(read('src/app/api/v5/orders/[id]/route.ts'),/verifyProofUploads/);
 });
 test('legacy and hourly locks checked together',()=>{
  const hourly=read('src/lib/v5-server.ts');const old=read('src/app/api/orders/[id]/route.ts');
  assert.match(hourly,/collection\('rentalSlots'\)/);
  assert.match(old,/v5DayIntervals/);
 });
-test('mobile receives jobs and Admin compares both photo sets',()=>{
- const mobile=read('src/app/mobile/page.tsx');const review=read('src/components/GuV5Review.tsx');
- assert.match(mobile,/gu-mobile-dialog/);assert.match(mobile,/Giao & nhận đồ/);assert.match(mobile,/Tìm bằng ảnh/);
+test('single capture workflow supports handover and return; Admin keeps review approval',()=>{
+ const capture=read('src/components/GuOrderCapture.tsx');const review=read('src/components/GuV5Review.tsx');
+ assert.match(capture,/HANDOVER_EXTRA/);assert.match(capture,/RECEIVE/);assert.match(capture,/preparePhonePhoto/);
  assert.match(review,/order\.handoverProof/);assert.match(review,/order\.returnProof/);assert.match(review,/APPROVE_RETURN/);
 });
 test('actual mobile handover is the clock origin for final 24h settlement',()=>{

@@ -51,13 +51,8 @@ export async function GET(req:NextRequest,ctx:{params:Promise<{id:string}>}){
  try{const me=await staffUser(req);const {id}=await ctx.params;if(!simpleId(id))throw new ApiError(400,'Mã đơn không hợp lệ.');
  const snap=await db().collection('orders').doc(id).get();if(!snap.exists||!snap.data()?.pricingVersion)throw new ApiError(404,'Không tìm thấy đơn quy trình mới.');
  const order={id:snap.id,...snap.data()} as RentalOrder;
- if(me.role==='staff_mobile'&&['VOIDED','CANCELLED'].includes(order.status))throw new ApiError(403,'Đơn đã đóng.');
+
  const ids=order.lines.map(x=>x.itemId);const itemSnaps=await Promise.all(ids.map(x=>db().collection('items').doc(x).get()));
- if(me.role==='staff_mobile'){
-  // Mobile may only identify an item and photograph it. Never transmit customer phone, payment, compensation or full stock records.
-  const mobileOrder={id:order.id,code:order.code,customerName:order.customerName,status:order.status,createdByName:order.createdByName,lines:order.lines.map(l=>({itemId:l.itemId,name:l.name,hangerCode:l.hangerCode,sku:l.sku,cameraSerial:l.cameraSerial})),photoTemplates:order.photoTemplates,referencePhotos:order.referencePhotos,pendingExtraItemIds:order.pendingExtraItemIds,returnStage:order.returnStage,handoverProof:order.handoverProof,returnProof:order.returnProof};
-  return NextResponse.json({order:mobileOrder,items:itemSnaps.map((d,i)=>({id:ids[i],name:d.data()?.name||'',imagePaths:d.data()?.imagePaths||[]}))},{headers:{'Cache-Control':'private,no-store'}});
- }
  return NextResponse.json({order,items:itemSnaps.map((d,i)=>({id:ids[i],...d.data()}))},{headers:{'Cache-Control':'private,no-store'}});
  }catch(e){return handleError(e,'/api/v5/orders/[id]');}
 }
@@ -67,7 +62,6 @@ export async function PATCH(req:NextRequest,ctx:{params:Promise<{id:string}>}){
   const b=await jsonBody(req);const action=String(b.action||'');
   if(!['HANDOVER','RECEIVE','APPROVE_RETURN','VOID','PAY','CANCEL','EXTEND','ADD_ITEMS','HANDOVER_EXTRA','AUTO_RESOLVE_CAMERA_LATE'].includes(action))throw new ApiError(400,'Thao tác không hợp lệ.');
   if(['VOID','CANCEL','APPROVE_RETURN','AUTO_RESOLVE_CAMERA_LATE'].includes(action))requireAdmin(me);
-  if(['HANDOVER','HANDOVER_EXTRA','RECEIVE'].includes(action)&&me.role!=='staff_mobile'&&me.role!=='admin')throw new ApiError(403,'Ảnh kiểm nhận phải được chụp tại client nhân viên mobile.');
   if(['PAY','EXTEND','ADD_ITEMS'].includes(action))requirePcStaff(me);
   const ref=db().collection('orders').doc(id);const job=db().collection('mobileJobs').doc(id);
   const now=new Date().toISOString();

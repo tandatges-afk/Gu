@@ -45,7 +45,7 @@ export async function POST(req:NextRequest){
     catch{throw new ApiError(409,`Góc chụp của sản phẩm “${item.name}” không hợp lệ. Admin cần kiểm tra lại.`);}
    }
    const referencePhotos=Object.fromEntries(items.map(i=>[i.id,i.referenceShots||{}]));
-   const record:Omit<RentalOrder,'id'>={code,customerId:customer.id,customerName:customer.name,customerPhone:customer.phone,pickupDate:vnDayKey(pickupAt),returnDate:vnDayKey(returnAt),pickupAt,returnAt,pricingVersion:'GU_HOURLY_V1',photoTemplates,referencePhotos,rentalDays:blocks,lines,total,paid:0,depositDue:0,note,status:'RESERVED',createdAt:now,updatedAt:now,createdBy:me.uid,createdByName:me.name,history:[{action:'CREATE_HOURLY',at:now,by:me.uid,detail:'Đơn tạo trên PC, chờ mobile chụp ảnh giao đồ'}]};
+   const record:Omit<RentalOrder,'id'>={code,customerId:customer.id,customerName:customer.name,customerPhone:customer.phone,pickupDate:vnDayKey(pickupAt),returnDate:vnDayKey(returnAt),pickupAt,returnAt,pricingVersion:'GU_HOURLY_V1',photoTemplates,referencePhotos,rentalDays:blocks,lines,total,paid:0,depositDue:0,note,status:'RESERVED',createdAt:now,updatedAt:now,createdBy:me.uid,createdByName:me.name,history:[{action:'CREATE_HOURLY',at:now,by:me.uid,detail:'Đơn đã được tạo, chụp ảnh tại màn giao hàng của nhân viên'}]};
    tx.create(orderRef,record);createIntervalWrites(tx,slots,snapshots,orderRef.id);
    tx.create(jobRef,{orderId:orderRef.id,code,customerName:customer.name,pickupAt,returnAt,stage:'HANDOVER',createdAt:now,updatedAt:now,creatorName:me.name});
    syncDebtIndex(tx,db(),{id:orderRef.id,...record});auditInTransaction(tx,me,'V5_ORDER_CREATE','order',orderRef.id,`${code} / ${items.length} sản phẩm, ${blocks} chu kỳ`);
