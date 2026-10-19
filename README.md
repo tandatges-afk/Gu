@@ -1,4 +1,12 @@
-# GU - Thuê đồ xinh | v5.0.0-beta.9
+# GU v5 Beta 10 — Firestore index diagnostics + responsive actions
+
+Bản phát hành kế thừa Beta 9, loại bỏ hai cách sắp xếp danh sách dùng document ID tường minh có nguy cơ yêu cầu composite index, bổ sung tên endpoint vào lỗi Firebase, chuẩn hóa bố cục nút Admin PC / Nhân viên PC / Nhân viên Mobile. Đính kèm hướng dẫn Word 12 hình minh họa tại `docs/GU-v5-Beta10-Huong-Dan-Co-Hinh-Anh-Admin-Nhan-Vien.docx`. Xem `docs/GU-v5-BETA10-INDEX-AND-UI.md` trước khi đẩy Production.
+
+**Không thay đổi cơ sở dữ liệu, không xóa dữ liệu và không chạy migration** để chữa lỗi này. Nếu còn `GU_DB_INDEX_REQUIRED`, bắt buộc cần Vercel Logs để lấy đúng composite index do Google chỉ định. Đây vẫn là bản Beta cần kiểm thử tích hợp.
+
+---
+
+# GU - Thuê đồ xinh | v5.0.0-beta.10
 
 ## Ba giao diện
 - Admin PC: quản trị sản phẩm, góc chụp, nhân viên, công nợ, duyệt ảnh giao/nhận, nhật ký và Cloudinary.

@@ -34,5 +34,5 @@ export async function GET(req:NextRequest){
   }
   return NextResponse.json({orders:orders.filter(o=>me.role==='admin'||o.status!=='RETURNED'&&o.status!=='CANCELLED'&&o.status!=='VOIDED'),start},
    {headers:{'Cache-Control':'private, no-store'}});
- }catch(e){return handleError(e);}
+ }catch(e){return handleError(e,'GET /api/calendar');}
 }

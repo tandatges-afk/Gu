@@ -15,5 +15,5 @@ export async function GET(req:NextRequest){
   const result=summaryFromDebtIndex(rows);
   return NextResponse.json({...result,indexed:true,legacyMigrationRequired:migration.data()?.completed!==true,legacyScanned:Number(migration.data()?.processed||0)},
     {headers:{'Cache-Control':'private, no-store'}});
- }catch(e){return handleError(e);}
+ }catch(e){return handleError(e,'GET /api/debts');}
 }

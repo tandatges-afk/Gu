@@ -29,7 +29,7 @@ export async function GET(req:NextRequest,ctx:{params:Promise<{id:string}>}) {
       if(creator.exists)order.createdByName=String(creator.data()?.name||'').trim();
     }
     return NextResponse.json(order,{headers:{'Cache-Control':'private, no-store'}});
-  } catch(e){return handleError(e);}
+  } catch(e){return handleError(e,'/api/orders/[id]');}
 }
 
 export async function PATCH(req:NextRequest,ctx:{params:Promise<{id:string}>}) {
@@ -193,5 +193,5 @@ export async function PATCH(req:NextRequest,ctx:{params:Promise<{id:string}>}) {
         `Đơn ${order.code}${action==='RETURN'?`; thiếu ${inspections.filter(x=>x.status==='MISSING').map(x=>x.sku).join(', ')||'không'}; phí ${compensationTotal} VND`:action==='PAY'?`; thu ${amount} VND`:''}`,now);
     });
     return NextResponse.json({ok:true});
-  }catch(e){return handleError(e);}
+  }catch(e){return handleError(e,'/api/orders/[id]');}
 }
