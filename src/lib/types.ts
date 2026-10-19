@@ -22,7 +22,7 @@ export interface RentalOrder {
   id: string; code: string; customerId: string; customerName: string; customerPhone: string;
   pickupDate: string; returnDate: string; rentalDays: number;
   lines: RentalLine[]; total: number; paid: number; depositDue: number;
-  compensationTotal?: number; returnInspection?: ReturnInspection[]; lateDays?: number; lateFeeTotal?: number; otherFeeTotal?: number; surchargeNote?: string; returnedAt?: string;
+  refundTotal?: number; compensationTotal?: number; returnInspection?: ReturnInspection[]; lateDays?: number; lateFeeTotal?: number; otherFeeTotal?: number; surchargeNote?: string; returnedAt?: string;
   pickupAt?: string; scheduledPickupAt?: string; returnAt?: string; pricingVersion?: 'GU_HOURLY_V1'; rentalType?: 'CLOTHING'|'ACCESSORY'; photoTemplates?: Record<string,string[]>; referencePhotos?: Record<string,Record<string,string>>; pendingExtraItemIds?: string[]; handoverProof?: import('./inspection-proof').ProofSet; returnProof?: import('./inspection-proof').ProofSet; returnStage?: 'AWAITING_ADMIN'|'APPROVED'; cameraLateFeePending?: boolean; cameraLatePendingItemIds?: string[]; cameraOvertimeFeeTotal?: number; voidedAt?: string; voidedBy?: string; note: string; status: OrderStatus; createdAt: string; updatedAt: string; createdBy: string; createdByName?: string; history: RentalEvent[];
 }
 export interface StaffProfile { uid: string; name: string; email: string; role: Role; disabled: boolean; createdAt?: string; }

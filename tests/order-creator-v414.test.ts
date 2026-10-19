@@ -13,7 +13,7 @@ test('đơn cũ có UID tra ra tên nhân viên, trường hợp không tìm đ�
   assert.equal(orderCreatorName({createdBy:'uid2',createdByName:'  '},{uid2:'Phạm Anh'}),'Phạm Anh');
 });
 test('máy chủ tự chụp tên từ staffUser, không đọc tên do client tự nhập',()=>{
-  const route=read('src/app/api/orders/route.ts');
+  const route=read('src/app/api/v5/orders/route.ts');
   assert.match(route,/const me=await staffUser\(req\)/);
   assert.match(route,/createdBy:me\.uid,createdByName:me\.name/);
   assert.doesNotMatch(route,/createdByName:b\./);

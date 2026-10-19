@@ -5,6 +5,11 @@ export function classifyServerFailure(error:unknown):ServerFailure|null{
  const e=error as {code?:unknown;message?:unknown;details?:unknown};
  // gRPC numeric status codes used by firebase-admin/firestore; strings are supported too.
  const code=typeof e.code==='string'?e.code.toUpperCase():e.code;
+ const message=String(e.message||'');
+ if(/Cannot use \"?undefined\"? as a Firestore value|found in field .*undefined/i.test(message))
+   return {code:'GU_DB_UNDEFINED',status:500,message:'Đơn có trường tùy chọn chưa được chuẩn hóa khi ghi Firestore. Kiểm tra phiên bản backend mới nhất.'};
+ if(/Thiếu FIREBASE_PROJECT_ID|Firebase Web Project ID không khớp/i.test(message))
+   return {code:'GU_FIREBASE_CONFIG',status:503,message:'Firebase Admin và ứng dụng web đang thiếu hoặc lệch cấu hình Project ID trên máy chủ.'};
  switch(code){
   case 7:case 'PERMISSION_DENIED': return {code:'GU_DB_PERMISSION',status:503,message:'Firestore từ chối truy cập. Kiểm tra quyền tài khoản dịch vụ trên project Firebase.'};
   case 8:case 'RESOURCE_EXHAUSTED':return {code:'GU_DB_LIMIT',status:503,message:'Firestore đã chạm giới hạn tài nguyên. Kiểm tra Usage và quota trong Firebase Console.'};

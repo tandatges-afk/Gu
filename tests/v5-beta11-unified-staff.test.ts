@@ -17,8 +17,8 @@ test('search anywhere and ignores all Vietnamese marks and case',()=>{
 test('clicked calendar day passes to v5 booking datetime and return is next day',()=>{
  const page=read('src/app/page.tsx'),booking=read('src/components/GuV5Booking.tsx');
  assert.match(page,/openBooking\(day===today\?'PICKUP':'RESERVE',item\.id,day\)/);
- assert.match(booking,/initialTimes\(initial\.pickupDate\)\.pickup/);
- assert.match(booking,/setUTCDate\(end\.getUTCDate\(\)\+1\)/);
+ assert.match(booking,/initialTimes\(initial\.pickupDate,initial\.returnDate,initial\.pickupHour,initial\.returnHour\)\.pickup/);
+ assert.match(booking,/setUTCDate\(next\.getUTCDate\(\)\+1\)/);
 });
 test('phone matches existing customer results and offers explicit selection',()=>{
  const booking=read('src/components/GuV5Booking.tsx');

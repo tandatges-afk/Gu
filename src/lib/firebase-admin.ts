@@ -16,4 +16,14 @@ function app() {
 }
 export function serverCredential() { return app().options.credential; }
 export function serverAuth() { return getAuth(app()); }
-export function db() { return getFirestore(app()); }
+// Firestore rejects optional undefined fields by default. GU keeps optional fields
+// (camera model, serial, legacy images) in nested orders; omit undefined on writes.
+const configured = new WeakSet<object>();
+export function db() {
+  const firestore = getFirestore(app());
+  if (!configured.has(firestore)) {
+    firestore.settings({ignoreUndefinedProperties:true});
+    configured.add(firestore);
+  }
+  return firestore;
+}

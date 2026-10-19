@@ -20,7 +20,7 @@ test('Finder and product form do not show unnecessary hints or undefined results
 });
 test('Firestore and Cloudinary operations remain intact despite removing Firestore usage panel',()=>{
  assert.match(read('src/app/api/items/route.ts'),/db\(\)\.collection\('items'\)/);
- assert.match(read('src/app/api/orders/route.ts'),/db\(\)/);
+ assert.match(read('src/app/api/v5/orders/route.ts'),/db\(\)/);
  assert.match(read('src/app/api/uploads/route.ts'),/api.cloudinary.com/);
 });
 test('Known Firestore errors are explained safely and unknown ones retain incident id',()=>{

@@ -74,7 +74,7 @@ const checks = [
   ['đồng bộ chỉ mục nợ', /syncDebtIndex/, 'src/app/api/orders/[id]/route.ts'],
   ['giám sát lưu trữ admin', /GuSystem/, 'src/app/page.tsx'],
   ['mã sản phẩm tự động', /hangerCode\??:/, 'src/lib/types.ts'],
-  ['lưu tên nhân viên tạo đơn', /createdByName:me\.name/, 'src/app/api/orders/route.ts'],
+  ['lưu tên nhân viên tạo đơn', /createdByName:me\.name/, 'src/app/api/v5/orders/route.ts'],
   ['tên nhân viên trong lịch', /gu-calendar-cell-creator/, 'src/app/page.tsx'],
   ['sản phẩm lưu trữ', /archivedAt\??:/, 'src/lib/types.ts'],
   ['số ngày trả trễ', /lateDays\??:/, 'src/lib/types.ts'],
@@ -116,7 +116,7 @@ checks.push(['menu PC không dùng bottom nav mobile', /gu-main-bottom-nav/, 'sr
 checks.push(['một giao diện cho PC và điện thoại', /GuOrderCapture/, 'src/app/page.tsx']);
 const absent = checks.filter(([name,pattern,file]) => missing.includes(file) || !pattern.test(read(file))).map(([name])=>name);
 const pkg = JSON.parse(read('package.json'));
-if (pkg.version !== '5.0.0-beta.11') absent.push('phiên bản 5.0.0-beta.11 trong package.json');
+if (pkg.version !== '5.0.1-patch.1') absent.push('phiên bản 5.0.1-patch.1 trong package.json');
 if (missing.length || absent.length) {
   console.error('KHÔNG ĐỒNG BỘ. Thiếu tệp:', missing.join(', ') || 'không');
   console.error('Thiếu thành phần:', absent.join(', ') || 'không');

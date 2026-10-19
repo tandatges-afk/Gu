@@ -52,5 +52,5 @@ export async function POST(req:NextRequest){
    return {id:orderRef.id,...record};
   });
   return NextResponse.json(result,{status:201});
- }catch(e){return handleError(e);}
+ }catch(e){return handleError(e,'POST /api/v5/orders');}
 }

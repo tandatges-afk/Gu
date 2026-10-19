@@ -113,6 +113,8 @@ export default function Home() {
   const [smartQuery,setSmartQuery]=useState('');
   const [smartStart,setSmartStart]=useState(vietnamToday());
   const [smartEnd,setSmartEnd]=useState(vietnamToday());
+  const [smartStartHour,setSmartStartHour]=useState('09:00');
+  const [smartEndHour,setSmartEndHour]=useState('09:00');
   const [smartLoading,setSmartLoading]=useState(false);
   const [smartResult,setSmartResult]=useState<{availableIds:string[];products?:InventoryItem[];pickupDate:string;returnDate:string;checkedAt:string;hasMore?:boolean}|null>(null);
   const [nearestLoading,setNearestLoading]=useState<string|null>(null);
@@ -122,7 +124,7 @@ export default function Home() {
   const [inventoryCategory,setInventoryCategory]=useState('ALL');
   const [bookingMode,setBookingMode]=useState<'RESERVE'|'PICKUP'>('RESERVE');
   const [newCustomer,setNewCustomer]=useState({name:'',phone:'',note:''});
-  const [booking,setBooking]=useState({customerId:'',itemIds:[] as string[],pickupDate:vietnamToday(),returnDate:vietnamToday(),depositDue:0,note:''});
+  const [booking,setBooking]=useState({customerId:'',itemIds:[] as string[],pickupDate:vietnamToday(),returnDate:vietnamToday(),pickupHour:'',returnHour:'',depositDue:0,note:''});
   const [payAmount,setPayAmount]=useState('');
   const [extendReturnDate,setExtendReturnDate]=useState('');
   const [imageUploading,setImageUploading]=useState(false);
@@ -211,7 +213,7 @@ export default function Home() {
     }catch(e){if(!cancelled)setErr(e instanceof Error?e.message:'Không tải được danh sách giặt.');}})();
     return()=>{cancelled=true;};
   },[user,page,laundryReload,api]);
-  useEffect(()=>{if(user&&data?.me.role==='admin'&&page==='reports'){
+  useEffect(()=>{if(user&&data?.me.role==='admin'&&['overview','reports'].includes(page)){
     api<{rows:{date:string;amount:number;payments:number}[];note:string}>('reports')
       .then(r=>{setReportDaily(r.rows);setReportNote(r.note);}).catch(e=>{setReportDaily(null);setReportNote(e instanceof Error?e.message:'Chưa có báo cáo.');});
   }},[user,data?.me.role,page,api]);
@@ -254,7 +256,7 @@ export default function Home() {
   const overdueOrders=orders.filter(o=>o.status==='PICKED_UP'&&o.returnDate<today);
   const isOverdue=(o:RentalOrder)=>o.status==='PICKED_UP'&&o.returnDate<today;
   const dueAmount=(o:RentalOrder)=>o.total+(o.compensationTotal||0)+(o.lateFeeTotal||0)+(o.otherFeeTotal||0);
-  const collected=orders.reduce((s,o)=>s+o.paid,0);
+  const collected=reportDaily?.reduce((s,o)=>s+o.amount,0);
   // Only fulfilled orders with unpaid balances are real receivables. Reservations are separate.
   const allOutstanding=debtSummary?.totalOutstanding;
   const search=(str:string)=>matchesProductSearch(str,query);
@@ -291,7 +293,7 @@ export default function Home() {
    const editCategory=(id:string,name:string)=>{setEditingCategory(id);setCategoryName(name);setErr('');setModal('category');};
   const removeItem=async(i:InventoryItem)=>{if(!confirm(`Lưu trữ sản phẩm ${i.name}? Các đơn lịch sử vẫn được giữ nguyên.`))return;setBusy(true);try{await api('items/'+i.id,{method:'DELETE'});setToast('Đã lưu trữ sản phẩm.');await refresh();setCatalogReload(v=>v+1);}catch(e){setErr(e instanceof Error?e.message:'Không thể xóa sản phẩm.');}finally{setBusy(false);}};
   const removeCategory=async(id:string,name:string)=>{if(!confirm(`Xóa danh mục ${name}? Danh mục đang có sản phẩm sẽ không được xóa.`))return;setBusy(true);try{await api('categories/'+id,{method:'DELETE'});setToast('Đã xóa danh mục.');await refresh();}catch(e){setErr(e instanceof Error?e.message:'Không thể xóa danh mục.');}finally{setBusy(false);}};
-  const openBooking=(mode:'RESERVE'|'PICKUP',itemId?:string,date?:string,endDate?:string)=>{const actualMode=date?(date===today?'PICKUP':'RESERVE'):mode;if(date&&date<today){setErr('Không thể tạo lịch thuê trong quá khứ.');return;}setBookingMode(actualMode);setBooking({customerId:'',itemIds:itemId?[itemId]:[],pickupDate:date||today,returnDate:endDate||date||today,depositDue:0,note:''});openModal('booking');};
+  const openBooking=(mode:'RESERVE'|'PICKUP',itemId?:string,date?:string,endDate?:string,pickupHour='',returnHour='')=>{const actualMode=date?(date===today?'PICKUP':'RESERVE'):mode;if(date&&date<today){setErr('Không thể tạo lịch thuê trong quá khứ.');return;}setBookingMode(actualMode);setBooking({customerId:'',itemIds:itemId?[itemId]:[],pickupDate:date||today,returnDate:endDate||date||today,pickupHour,returnHour,depositDue:0,note:''});openModal('booking');};
   const openDebtOrder=async(id:string)=>{
     try {const full=await api<RentalOrder>('orders/'+id);openDetail(full);}
     catch(e){setErr(e instanceof Error?e.message:'Không tải được đơn công nợ.');}
@@ -318,14 +320,14 @@ export default function Home() {
     (calendarCreator==='ALL'||calendarActive.some(o=>o.createdBy===calendarCreator&&o.lines.some(l=>l.itemId===i.id)&&o.pickupDate<=calendarDays[6]&&o.returnDate>=calendarStart))&&
     (calendarStatus==='ALL'||calendarItemState(i,calendarActive,calendarStart,7,today)===calendarStatus));
   const quickMatches=items.filter(i=>(calendarCategory==='ALL'||i.category===calendarCategory)&&
-    (!smartQuery||[i.name,i.category,i.color].some(v=>v.toLocaleLowerCase('vi-VN').includes(smartQuery.trim().toLocaleLowerCase('vi-VN')))));
+    (!smartQuery||[i.name,i.category,i.color].some(v=>matchesProductSearch(v,smartQuery.trim()))));
   const availableMatches=smartResult&&smartResult.pickupDate===smartStart&&smartResult.returnDate===smartEnd?
-    (smartResult.products||quickMatches.filter(i=>smartResult.availableIds.includes(i.id))).filter(i=>(calendarCategory==='ALL'||i.category===calendarCategory)&&(!smartQuery||[i.name,i.category,i.color].some(v=>v.toLocaleLowerCase('vi-VN').includes(smartQuery.trim().toLocaleLowerCase('vi-VN'))))):[];
+    (smartResult.products||quickMatches.filter(i=>smartResult.availableIds.includes(i.id))).filter(i=>(calendarCategory==='ALL'||i.category===calendarCategory)&&(!smartQuery||[i.name,i.category,i.color].some(v=>matchesProductSearch(v,smartQuery.trim())))):[];
   const findAvailable=async()=>{
     setSmartLoading(true);setNearestResult(null);setSmartResult(null);
     try {
       const result=await api<{availableIds:string[];products?:InventoryItem[];pickupDate:string;returnDate:string;checkedAt:string;hasMore?:boolean}>('smart-calendar',{
-        method:'POST',body:JSON.stringify({mode:'FIND_AVAILABLE',pickupDate:smartStart,returnDate:smartEnd,query:smartQuery})});
+        method:'POST',body:JSON.stringify({mode:'FIND_AVAILABLE',pickupDate:smartStart,returnDate:smartEnd,startHour:smartStartHour,endHour:smartEndHour,query:smartQuery})});
       setSmartResult(result);
     }catch(e){setErr(e instanceof Error?e.message:'Không thể tra cứu lịch trống.');}
     finally{setSmartLoading(false);}
@@ -334,7 +336,7 @@ export default function Home() {
     setNearestLoading(itemId);setNearestResult(null);
     try {
       const result=await api<{itemId:string;nextPickupDate:string|null;nextReturnDate:string|null;reason:string}>('smart-calendar',{
-        method:'POST',body:JSON.stringify({mode:'NEXT_AVAILABLE',itemId,pickupDate:smartStart,returnDate:smartEnd})});
+        method:'POST',body:JSON.stringify({mode:'NEXT_AVAILABLE',itemId,pickupDate:smartStart,returnDate:smartEnd,startHour:smartStartHour,endHour:smartEndHour})});
       setNearestResult(result);
     }catch(e){setErr(e instanceof Error?e.message:'Không thể tìm ngày trống tiếp theo.');}
     finally{setNearestLoading(null);}
@@ -408,7 +410,7 @@ export default function Home() {
         {page==='overview'&&<><div className="page-intro"><div><div className="eyebrow">STORE OVERVIEW</div><h1>Xin chào, {data.me.name?.split(' ').slice(-1)[0]||'bạn'} <span className="wave">✳</span></h1><p>Đây là những gì đang diễn ra tại cửa hàng hôm nay.</p></div><div className="action-row"><button className="btn btn-white" onClick={()=>openBooking('RESERVE')}><CalendarDays size={17}/> Đặt lịch trước</button><button className="btn btn-dark" onClick={()=>openBooking('PICKUP')}><Plus size={18}/> Tạo đơn · chụp ảnh giao</button></div></div>
           <div className="gu-mobile-action-panel"><div className="gu-mobile-greeting"><strong>Hôm nay tại GU</strong><span>{prettyDay(today)}</span></div><div className="gu-mobile-task-grid"><button type="button" onClick={()=>openTaskOrders('PICKUP_TODAY')}><CalendarDays size={18}/><strong>{orders.filter(o=>o.status==='RESERVED'&&o.pickupDate===today).length}</strong><small>Chờ giao hôm nay</small></button><button type="button" onClick={()=>openTaskOrders('RETURN_TODAY')}><Clock3 size={18}/><strong>{dueToday.length}</strong><small>Đến hẹn trả</small></button><button type="button" className={overdueOrders.length?'gu-mobile-danger':''} onClick={()=>openTaskOrders('OVERDUE')}><BellRing size={18}/><strong>{overdueOrders.length}</strong><small>Quá hạn</small></button></div></div>
           <GuInstallApp/>
-          <div className="stats-grid">{data.me.role==='admin'&&<Metric icon={Wallet} title="Đã thu (đơn gần đây)" value={money(collected)} detail="Trong tối đa 80 đơn mới nhất" tone="peach"/>}<Metric icon={ShoppingBag} title="Đơn đang hoạt động" value={String(data.counts?.activeOrders??active.length).padStart(2,'0')} detail={`${picked.length} đơn đã lấy hàng`} tone="purple"/><Metric icon={Shirt} title="Sản phẩm trong kho" value={String(data.counts?.items??items.length).padStart(2,'0')} detail={`${data.counts?.available??items.filter(i=>i.status==='AVAILABLE').length} bộ sẵn sàng`} tone="blue"/><Metric icon={ArrowDownLeft} title="Cần trả hôm nay" value={String(dueToday.length).padStart(2,'0')} detail="Đơn đến hạn trả hôm nay" tone="green"/><Metric icon={WashingMachine} title="Đang giặt" value={String(data.counts?.laundry??laundryRemote.length??0).padStart(2,'0')} detail="Trả xong sẽ tự chuyển vào đây" tone="blue"/>{data.me.role==='admin'&&<button type="button" className="gu-debt-metric-link" onClick={()=>setPage('debts')}><CreditCard size={20}/><span>Công nợ cần thu</span><strong>{allOutstanding===undefined?'Đang tính…':money(allOutstanding)}</strong><small>{debtSummary?.accounts.length||0} khách · Không tính đơn giữ chỗ</small><ArrowRight size={17}/></button>}</div>
+          <div className="stats-grid">{data.me.role==='admin'&&<Metric icon={Wallet} title="Thu ròng từ sổ quỹ" value={collected===undefined?'Đang tải…':money(collected)} detail="Dòng tiền ghi nhận, đã trừ hoàn tiền" tone="peach"/>}<Metric icon={ShoppingBag} title="Đơn đang hoạt động" value={String(data.counts?.activeOrders??active.length).padStart(2,'0')} detail={`${picked.length} đơn đã lấy hàng`} tone="purple"/><Metric icon={Shirt} title="Sản phẩm trong kho" value={String(data.counts?.items??items.length).padStart(2,'0')} detail={`${data.counts?.available??items.filter(i=>i.status==='AVAILABLE').length} bộ sẵn sàng`} tone="blue"/><Metric icon={ArrowDownLeft} title="Cần trả hôm nay" value={String(dueToday.length).padStart(2,'0')} detail="Đơn đến hạn trả hôm nay" tone="green"/><Metric icon={WashingMachine} title="Đang giặt" value={String(data.counts?.laundry??laundryRemote.length??0).padStart(2,'0')} detail="Trả xong sẽ tự chuyển vào đây" tone="blue"/>{data.me.role==='admin'&&<button type="button" className="gu-debt-metric-link" onClick={()=>setPage('debts')}><CreditCard size={20}/><span>Công nợ cần thu</span><strong>{allOutstanding===undefined?'Đang tính…':money(allOutstanding)}</strong><small>{debtSummary?.accounts.length||0} khách · Không tính đơn giữ chỗ</small><ArrowRight size={17}/></button>}</div>
           <section className="panel gu-today-tasks" aria-label="Việc hôm nay">
             <div className="panel-heading"><div><h3><ListTodo size={19}/> Việc hôm nay</h3><p>Chạm vào đơn để xử lý hoặc gọi trực tiếp cho khách.</p></div></div>
             <div className="gu-task-lists">{[
@@ -430,12 +432,14 @@ export default function Home() {
             <div className="gu-smart-heading"><div><h3><CalendarSearch size={20}/> Tìm đồ còn trống</h3></div></div>
             <div className="gu-smart-controls">
               <label>Từ ngày<input className="input" type="date" lang="vi-VN" min={today} value={smartStart} onChange={e=>{const v=e.target.value;setSmartStart(v);if(v>smartEnd)setSmartEnd(v);setSmartResult(null);setNearestResult(null);}}/></label>
-              <label>Đến ngày<input className="input" type="date" lang="vi-VN" min={smartStart} value={smartEnd} onChange={e=>{setSmartEnd(e.target.value);setSmartResult(null);setNearestResult(null);}}/></label>
+              <label>Đến ngày thuê<input className="input" type="date" lang="vi-VN" min={smartStart} value={smartEnd} onChange={e=>{setSmartEnd(e.target.value);setSmartResult(null);setNearestResult(null);}}/></label>
+              <label>Giờ nhận<input aria-label="Giờ bắt đầu thuê" className="input" type="time" value={smartStartHour} onChange={e=>{setSmartStartHour(e.target.value);setSmartResult(null);}}/></label>
+              <label>Giờ trả (ngày hôm sau ngày cuối)<input aria-label="Giờ trả thuê" className="input" type="time" value={smartEndHour} onChange={e=>{setSmartEndHour(e.target.value);setSmartResult(null);}}/></label>
               <label>Tên / màu<input className="input" type="search" value={smartQuery} onChange={e=>setSmartQuery(e.target.value)} placeholder="Tìm theo tên hoặc mã sản phẩm…"/></label>
               <button type="button" className="btn btn-dark" disabled={smartLoading||!smartStart||!smartEnd||smartEnd<smartStart} onClick={()=>void findAvailable()}>{smartLoading?<LoaderCircle size={16} className="spin"/>:<Search size={16}/>} Tìm đồ trống</button>
             </div>
-            {smartResult&&smartResult.pickupDate===smartStart&&smartResult.returnDate===smartEnd&&<div className="gu-smart-result" aria-live="polite"><div className="gu-smart-result-title"><strong>{availableMatches.length} món trống trong trang tìm kiếm</strong><small>{prettyDay(smartStart)} – {prettyDay(smartEnd)}</small></div>
-              <div className="gu-smart-items">{availableMatches.slice(0,24).map(i=><div className="gu-smart-product" key={i.id}><ProductImage paths={i.imagePaths}/><div><strong>{i.name}</strong><small>{getProductCode(i)||"Chưa có mã sản phẩm"} · {money(i.dailyRate)}/ngày</small></div><button className="btn btn-white" onClick={()=>openBooking(smartStart===today?'PICKUP':'RESERVE',i.id,smartStart,smartEnd)}>Chọn đồ <Plus size={15}/></button></div>)}
+            {smartResult&&smartResult.pickupDate===smartStart&&smartResult.returnDate===smartEnd&&<div className="gu-smart-result" aria-live="polite"><div className="gu-smart-result-title"><strong>{availableMatches.length} món trống trong trang tìm kiếm</strong><small>{prettyDay(smartStart)} {smartStartHour} – hết {prettyDay(smartEnd)}, trả hôm sau lúc {smartEndHour}</small></div>
+              <div className="gu-smart-items">{availableMatches.slice(0,24).map(i=><div className="gu-smart-product" key={i.id}><ProductImage paths={i.imagePaths}/><div><strong>{i.name}</strong><small>{getProductCode(i)||"Chưa có mã sản phẩm"} · {money(i.dailyRate)}/ngày</small></div><button className="btn btn-white" onClick={()=>openBooking(smartStart===today?'PICKUP':'RESERVE',i.id,smartStart,smartEnd,smartStartHour,smartEndHour)}>Chọn đồ <Plus size={15}/></button></div>)}
               {!availableMatches.length&&<div className="gu-smart-no-results">Không tìm thấy đồ trống theo bộ lọc hiện tại. Thử món khác hoặc bấm <strong>Ngày trống gần nhất</strong> trong lịch bên dưới.</div>}
               {availableMatches.length>24&&<small className="gu-smart-overflow">Hiển thị 24/{availableMatches.length} sản phẩm</small>}</div></div>}
             
@@ -467,7 +471,7 @@ export default function Home() {
             </article>)}
             {!calendarItems.length&&<div className="calendar-no-items">Không có sản phẩm trong danh mục đang chọn.</div>}
           </div>
-          {nearestResult&&<div className="gu-nearest-result" aria-live="polite"><CalendarSearch size={19}/><div><strong>{items.find(i=>i.id===nearestResult.itemId)?.name||'Sản phẩm'}:</strong> {nearestResult.nextPickupDate?`trống từ ${prettyDay(nearestResult.nextPickupDate)} đến ${prettyDay(nearestResult.nextReturnDate!)}`:nearestResult.reason}</div>{nearestResult.nextPickupDate&&<button className="btn btn-dark" onClick={()=>openBooking(nearestResult.nextPickupDate===today?'PICKUP':'RESERVE',nearestResult.itemId,nearestResult.nextPickupDate!,nearestResult.nextReturnDate!)}>Đặt ngày này</button>}<button className="icon-btn" title="Đóng" aria-label="Đóng kết quả" onClick={()=>setNearestResult(null)}><X size={16}/></button></div>}
+          {nearestResult&&<div className="gu-nearest-result" aria-live="polite"><CalendarSearch size={19}/><div><strong>{items.find(i=>i.id===nearestResult.itemId)?.name||'Sản phẩm'}:</strong> {nearestResult.nextPickupDate?`trống từ ${prettyDay(nearestResult.nextPickupDate)} đến ${prettyDay(nearestResult.nextReturnDate!)}`:nearestResult.reason}</div>{nearestResult.nextPickupDate&&<button className="btn btn-dark" onClick={()=>openBooking(nearestResult.nextPickupDate===today?'PICKUP':'RESERVE',nearestResult.itemId,nearestResult.nextPickupDate!,nearestResult.nextReturnDate!,smartStartHour,smartEndHour)}>Đặt ngày này</button>}<button className="icon-btn" title="Đóng" aria-label="Đóng kết quả" onClick={()=>setNearestResult(null)}><X size={16}/></button></div>}
           </section>
         </>}
         {['inventory','customers','orders'].includes(page)&&<div className="gu-catalog-pager" aria-live="polite"><span>{catalogLoading?'Đang tải…':catalogData?`${catalogData.results?.length ?? 0} kết quả`: ''}</span><button className="btn btn-white" type="button" disabled={catalogLoading||!catalogData?.hasMore} onClick={()=>setCatalogCursor(catalogData?.cursor||null)}>Trang kế tiếp <ChevronRight size={14}/></button><button className="btn btn-white" type="button" disabled={catalogLoading||!catalogCursor} onClick={()=>setCatalogCursor(null)}>Về trang đầu</button></div>}
@@ -487,7 +491,7 @@ export default function Home() {
         {page==='visual'&&<GuVisualFinder api={api}/>} 
         {page==='audit'&&data.me.role==='admin'&&<AuditPanel api={api}/>}
         {page==='system'&&data.me.role==='admin'&&<GuSystem api={api}/>} 
-        {page==='reports'&&data.me.role==='admin'&&<>{reportNote&&<div className="inline-alert" role="status">{reportNote}</div>}<div className="page-intro"><div><div className="eyebrow">BUSINESS INSIGHTS</div><h1>Báo cáo doanh thu</h1></div><div className="select-holder report-select"><select value={reportMode} onChange={e=>setReportMode(e.target.value as typeof reportMode)}><option value="day">14 ngày</option><option value="month">12 tháng</option><option value="year">5 năm</option></select></div></div><div className="stats-grid report-stats"><Metric icon={Wallet} title="Đã thu (đơn gần đây)" value={money(collected)} detail="Trong tối đa 80 đơn tải gần nhất" tone="peach"/><Metric icon={CircleDollarSign} title="Giá trị đơn gần đây" value={money(liveOrders.reduce((s,o)=>s+o.total,0))} detail="Chỉ các đơn trong dữ liệu tải gần đây" tone="purple"/><Metric icon={CreditCard} title="Công nợ cần thu" value={allOutstanding===undefined?'Đang tải…':money(allOutstanding)} detail="Đơn đã giao/trả, không tính đặt trước" tone="blue"/><Metric icon={BadgeCheck} title="Đã hoàn tất gần đây" value={String(orders.filter(o=>o.status==='RETURNED').length)} detail="Trong dữ liệu tải gần đây" tone="green"/></div><div className="report-layout"><section className="panel chart-panel"><div className="panel-heading"><div><h3>Dòng tiền thực thu</h3><p>Ghi nhận từ thao tác thu tiền của nhân viên, không tính doanh thu dự kiến.</p></div></div><div className="bar-chart">{chartRows.map((r,i)=><div key={r.key} className="bar-col"><div className="bar-value">{r.value?shortMoney(r.value):''}</div><div className={'bar '+(i===chartRows.length-1?'bar-highlight':'')} style={{height:Math.max(3,(r.value/chartMax)*195)+'px'}} title={r.key+' · '+money(r.value)}/><span>{r.label}</span></div>)}</div></section><section className="panel top-products"><div className="panel-heading"><div><h3>Sản phẩm được thuê nhiều</h3><p>Tính theo số lượt đặt không bị hủy</p></div></div>{items.map(i=>({item:i,count:liveOrders.filter(o=>o.lines.some(l=>l.itemId===i.id)).length})).sort((a,b)=>b.count-a.count).slice(0,5).map((x,idx)=><div className="rank-row" key={x.item.id}><span className="rank-num">{String(idx+1).padStart(2,'0')}</span><span className="mini-item-icon"><Shirt size={17}/></span><div><strong>{x.item.name}</strong><small>{x.item.category}</small></div><b>{x.count} lượt</b></div>)}{!items.length&&<Empty small text="Chưa có sản phẩm để thống kê."/>}</section></div></>}
+        {page==='reports'&&data.me.role==='admin'&&<>{reportNote&&<div className="inline-alert" role="status">{reportNote}</div>}<div className="page-intro"><div><div className="eyebrow">BUSINESS INSIGHTS</div><h1>Báo cáo doanh thu</h1></div><div className="select-holder report-select"><select value={reportMode} onChange={e=>setReportMode(e.target.value as typeof reportMode)}><option value="day">14 ngày</option><option value="month">12 tháng</option><option value="year">5 năm</option></select></div></div><div className="stats-grid report-stats"><Metric icon={Wallet} title="Thu ròng từ sổ quỹ" value={collected===undefined?'Đang tải…':money(collected)} detail="Thu tiền trừ hoàn tiền đã ghi nhận" tone="peach"/><Metric icon={CircleDollarSign} title="Giá trị đơn gần đây" value={money(liveOrders.reduce((s,o)=>s+o.total,0))} detail="Ước tính từ đơn tải gần đây, không phải toàn bộ" tone="purple"/><Metric icon={CreditCard} title="Công nợ cần thu" value={allOutstanding===undefined?'Đang tải…':money(allOutstanding)} detail="Đơn đã giao/trả, không tính đặt trước" tone="blue"/><Metric icon={BadgeCheck} title="Đã hoàn tất gần đây" value={String(orders.filter(o=>o.status==='RETURNED').length)} detail="Trong dữ liệu tải gần đây" tone="green"/></div><div className="report-layout"><section className="panel chart-panel"><div className="panel-heading"><div><h3>Dòng tiền thực thu</h3><p>Ghi nhận từ thao tác thu tiền của nhân viên, không tính doanh thu dự kiến.</p></div></div><div className="bar-chart">{chartRows.map((r,i)=><div key={r.key} className="bar-col"><div className="bar-value">{r.value?shortMoney(r.value):''}</div><div className={'bar '+(i===chartRows.length-1?'bar-highlight':'')} style={{height:Math.max(3,(r.value/chartMax)*195)+'px'}} title={r.key+' · '+money(r.value)}/><span>{r.label}</span></div>)}</div></section><section className="panel top-products"><div className="panel-heading"><div><h3>Sản phẩm được thuê nhiều</h3><p>Tính theo số lượt đặt không bị hủy</p></div></div>{items.map(i=>({item:i,count:liveOrders.filter(o=>o.lines.some(l=>l.itemId===i.id)).length})).sort((a,b)=>b.count-a.count).slice(0,5).map((x,idx)=><div className="rank-row" key={x.item.id}><span className="rank-num">{String(idx+1).padStart(2,'0')}</span><span className="mini-item-icon"><Shirt size={17}/></span><div><strong>{x.item.name}</strong><small>{x.item.category}</small></div><b>{x.count} lượt</b></div>)}{!items.length&&<Empty small text="Chưa có sản phẩm để thống kê."/>}</section></div></>}
         </>}
       </div>
     </main>

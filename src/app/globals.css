@@ -911,3 +911,12 @@ html,body{background:var(--paper);color:var(--ink)}
 @media(max-width:650px){.gu-capture-overlay{padding:0}.gu-capture-dialog{width:100%;max-height:100dvh;border-radius:0}.gu-capture-header{padding:12px}.gu-capture-item{margin:10px;padding:10px}.gu-capture-photo-grid{gap:8px}.gu-capture-footer{padding:10px}.gu-capture-footer button{flex:1;min-width:0;font-size:13px}.gu-next-day-risk-banner .btn{width:100%;justify-content:center}}
 
 .gu-next-day-risk-order{background:#fff3e5!important;box-shadow:inset 4px 0 #e88a22}.gu-next-day-risk-badge{background:#fff0d7;color:#81480e;border:1px solid #e9b15e;font-weight:800}
+
+/* GU v5.0.1: manual refund settlement + audit receipt UI */
+.gu-refund-section {border:1px solid var(--line,#ddd7cd);border-radius:12px;padding:14px;margin:14px 0;display:grid;gap:10px;background:rgba(120,110,90,.055)}
+.gu-refund-confirm {display:flex;align-items:flex-start;gap:9px;line-height:1.5;font-size:.9rem;cursor:pointer}
+.gu-refund-confirm input {margin-top:4px;accent-color:#393633}
+.gu-cash-ledger {margin:10px 0;padding:12px;border-radius:12px;border:1px solid var(--line,#ddd7cd)}
+.gu-cash-ledger summary {cursor:pointer;font-weight:600}
+.gu-cash-ledger p {margin:10px 0 0;font-size:.88rem;overflow-wrap:anywhere}
+@media (max-width:600px) {.gu-refund-section {padding:10px}.gu-refund-section .input {width:100%}}

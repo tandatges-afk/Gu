@@ -9,20 +9,58 @@ export async function GET(req:NextRequest){
  try{
   const me=await staffUser(req);const u=new URL(req.url);
   const kind=u.searchParams.get('kind')||'items';
+  const ids=u.searchParams.get('ids');
+  if(ids!==null){
+    if(kind!=='items')throw new ApiError(400,'Chỉ hỗ trợ lấy sản phẩm theo mã.');
+    const wanted=ids.split(',').filter(Boolean);
+    if(!wanted.length||wanted.length>30||new Set(wanted).size!==wanted.length||wanted.some(id=>!/^[\w-]{10,128}$/.test(id)))throw new ApiError(400,'Danh sách mã sản phẩm không hợp lệ.');
+    const snaps=await db().getAll(...wanted.map(id=>db().collection('items').doc(id)));
+    return NextResponse.json({kind,results:snaps.filter(d=>d.exists&&!d.data()?.archivedAt).map(d=>({id:d.id,...d.data()})),cursor:null,hasMore:false},
+       {headers:{'Cache-Control':'private,no-store'}});
+  }
   if(!['items','customers','orders'].includes(kind))throw new ApiError(400,'Loại dữ liệu không hợp lệ.');
   const take=Math.max(1,Math.min(50,Number(u.searchParams.get('size'))||30));
   const term=String(u.searchParams.get('q')||'').trim().slice(0,80);
   const mode=u.searchParams.get('field')||'';
   const token=String(u.searchParams.get('cursor')||'');
   let collection:Query=db().collection(kind),field=kind==='orders'?'createdAt':kind==='customers'?'name':'name';
-  // Indexed bigrams allow middle-of-name matches without scanning all 2,000 products.
-  // Existing products must be backfilled once with `npm run data:apply-names`.
+  // Single-char and anywhere-in-name lookup use one-character and two-character
+  // indexes. Existing inventory needs `data:apply-names` after this release.
+  // Cursor points to the last *scanned* row, not the last matching row, so
+  // filters cannot silently skip results between pages.
   if(kind==='items'&&term&&mode!=='code'&&!/^GU[-\d]/i.test(term)){
    const normalized=productSearchText(term);
-   if(normalized.length<2)throw new ApiError(400,'Nhập ít nhất 2 ký tự để tìm sản phẩm.');
-   const snapshot=await db().collection('items').where('nameSearchBigrams','array-contains',normalized.slice(0,2)).limit(400).get();
-   const matches=snapshot.docs.filter(d=>!d.data().archivedAt&&matchesProductSearch(String(d.data().name||''),term)).slice(0,take);
-   return NextResponse.json({kind,results:matches.map(d=>({id:d.id,...d.data()})),cursor:null,hasMore:false,pageSize:take},{headers:{'Cache-Control':'private,no-store'}});
+   if(!normalized)return NextResponse.json({kind,results:[],cursor:null,hasMore:false,pageSize:take});
+   const indexKey=normalized.length===1?normalized:normalized.slice(0,2);
+   let collection=db().collection('items').where('nameSearchBigrams','array-contains',indexKey);
+   if(token){
+    let parsed:unknown;
+    try{parsed=JSON.parse(Buffer.from(token,'base64url').toString('utf8'));}catch{throw new ApiError(400,'Trang tìm kiếm không hợp lệ.');}
+    if(!Array.isArray(parsed)||parsed.length!==3||parsed[0]!=='search'||parsed[1]!==normalized||typeof parsed[2]!=='string'||!/^[\w-]{10,128}$/.test(parsed[2]))throw new ApiError(400,'Trang tìm kiếm không hợp lệ.');
+    const last=await db().collection('items').doc(parsed[2]).get();
+    if(!last.exists)throw new ApiError(409,'Danh sách đã thay đổi; vui lòng tìm lại.');
+    collection=collection.startAfter(last);
+   }
+   const matches:Array<{id:string;[key:string]:unknown}>=[];
+   let lastId:string|null=null;let hasMore=false;
+   for(let page=0;page<12;page++){
+    const snap=await collection.limit(100).get();
+    if(snap.empty){hasMore=false;break;}
+    for(const doc of snap.docs){
+     lastId=doc.id;
+     const data=doc.data();
+     if(!data.archivedAt&&matchesProductSearch([String(data.name||''),String(data.hangerCode||''),String(data.category||'')].join(' '),term)){
+      matches.push({id:doc.id,...data});
+      if(matches.length>=take)break;
+     }
+    }
+    hasMore=snap.size===100;
+    if(matches.length>=take||!hasMore)break;
+    collection=collection.startAfter(snap.docs[snap.docs.length-1]);
+   }
+   const cursor=hasMore&&lastId?Buffer.from(JSON.stringify(['search',normalized,lastId])).toString('base64url'):null;
+   return NextResponse.json({kind,results:matches,cursor,hasMore:Boolean(cursor),pageSize:take,
+    searchNote:'Tìm không dấu trên kho đã đồng bộ chỉ mục; có thể tải trang tiếp theo.'},{headers:{'Cache-Control':'private,no-store'}});
   }
   // Phone / product-code searches remain indexed prefix queries.
   if(term){

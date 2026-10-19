@@ -22,7 +22,7 @@ export function GuVisualFinder({api,onChoose}:{api:ApiCall;onChoose?:(item:Inven
  useEffect(()=>{const onPaste=(e:ClipboardEvent)=>{const file=Array.from(e.clipboardData?.files||[]).find(f=>f.type.startsWith('image/'));if(file){setFile(file);setNote('Đã dán ảnh bằng Ctrl+V.');}};window.addEventListener('paste',onPaste);return()=>window.removeEventListener('paste',onPaste);},[]);
  const scan=async()=>{if(!file)return;setLoading(true);setNote('');setResults([]);setChosen(null);
  try{const ref=await photoVector(file);let cursor:string|null=null;const catalog:InventoryItem[]=[];
- for(let page=0;page<3;page++){const q='v5/visual-catalog?size=50'+(cursor?'&cursor='+encodeURIComponent(cursor):'');const r:{results:InventoryItem[];cursor:string|null}=await api(q);catalog.push(...r.results);cursor=r.cursor;if(!cursor)break;}
+ for(let page=0;page<200;page++){const q='v5/visual-catalog?size=50'+(cursor?'&cursor='+encodeURIComponent(cursor):'');const r:{results:InventoryItem[];cursor:string|null}=await api(q);catalog.push(...r.results);cursor=r.cursor;if(!cursor)break;}if(cursor)throw Error('Kho quá lớn để so sánh toàn bộ trong trình duyệt. Hãy lọc kho trước hoặc sử dụng mã móc.');
  const candidates=catalog.filter(i=>!i.archivedAt&&i.imagePaths?.[0]);const scored:Array<{item:InventoryItem;score:number}>=[];
  let index=0;await Promise.all(Array.from({length:6},async()=>{while(index<candidates.length){const item=candidates[index++];try{const fp=await photoVector(thumbCloudinaryUrl(item.imagePaths![0],120));scored.push({item,score:distance(ref,fp)});}catch{/* image unavailable */}}}));
  scored.sort((a,b)=>a.score-b.score);setResults(scored.slice(0,12));

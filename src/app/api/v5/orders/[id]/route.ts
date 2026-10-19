@@ -4,6 +4,7 @@ import {staffUser,handleError,jsonBody,ApiError,requireAdmin,requirePcStaff} fro
 import {billableBlocks,vnDayKey} from '@/lib/hourly-pricing';
 import {rentalCharge,cameraPackageSnapshot,isCameraCategory,isCameraModel} from '@/lib/camera-rental';
 import {approvedLineQuote} from '@/lib/v5-review-pricing';
+import {returnReconciliation} from '@/lib/settlement-ledger';
 import {completeProof,type PhotoProof,type Capture} from '@/lib/inspection-proof';
 import {intervalRefs,checkIntervalAvailability,createIntervalWrites,removeOrderIntervals,requiredTemplates,simpleId} from '@/lib/v5-server';
 import {syncDebtIndex} from '@/lib/debt-index';
@@ -53,8 +54,10 @@ export async function GET(req:NextRequest,ctx:{params:Promise<{id:string}>}){
  const order={id:snap.id,...snap.data()} as RentalOrder;
 
  const ids=order.lines.map(x=>x.itemId);const itemSnaps=await Promise.all(ids.map(x=>db().collection('items').doc(x).get()));
- return NextResponse.json({order,items:itemSnaps.map((d,i)=>({id:ids[i],...d.data()}))},{headers:{'Cache-Control':'private,no-store'}});
- }catch(e){return handleError(e,'/api/v5/orders/[id]');}
+ // Admin-only reconciliation history; never expose payment methods to other staff.
+ const payments=me.role==='admin'?(await db().collection('orders').doc(id).collection('cashMovements').orderBy('createdAt','desc').limit(100).get()).docs.map(s=>({id:s.id,...s.data()})):[];
+ return NextResponse.json({order,payments,items:itemSnaps.map((d,i)=>({id:ids[i],...d.data()}))},{headers:{'Cache-Control':'private,no-store'}});
+ }catch(e){return handleError(e,'GET /api/v5/orders/[id]');}
 }
 export async function PATCH(req:NextRequest,ctx:{params:Promise<{id:string}>}){
  try{
@@ -132,13 +135,27 @@ export async function PATCH(req:NextRequest,ctx:{params:Promise<{id:string}>}){
     const otherFee=Number(b.otherFeeTotal||0);if(!Number.isSafeInteger(otherFee)||otherFee<0||otherFee>100_000_000)throw new ApiError(400,'Phụ phí khác không hợp lệ.');
     const note=typeof b.surchargeNote==='string'?b.surchargeNote.slice(0,300):'';if(otherFee>0&&!note)throw new ApiError(400,'Ghi lý do phụ phí khác.');
     const paidTotal=order.paid||0;
-    if(rent+compensation+otherFee<paidTotal)throw new ApiError(409,'Khách đã trả nhiều hơn số tính thực tế; cần đối soát hoàn tiền trước khi duyệt.');
+    const refundDue=returnReconciliation({rent,compensation,otherFee,netPaid:paidTotal}).refund;
+    const refundMethod=String(b.refundMethod||'');
+    const refundReference=String(b.refundReference||'').trim().slice(0,100);
+    if(refundDue>0&&(b.confirmRefund!==true||!['CASH','TRANSFER'].includes(refundMethod)))
+      throw new ApiError(409,`Cần xác nhận đã hoàn ${refundDue.toLocaleString('vi-VN')}đ qua tiền mặt/chuyển khoản trước khi duyệt.`);
+    if(refundDue>0&&refundMethod==='TRANSFER'&&refundReference.length<4)
+      throw new ApiError(400,'Nhập mã giao dịch hoặc nội dung chuyển khoản hoàn tiền.');
+    const netPaid=paidTotal-refundDue;
+    if(refundDue>0){
+      // This action only RECORDS a completed manual refund; it does not transfer funds.
+      const movement=ref.collection('cashMovements').doc();
+      tx.create(movement,{orderId:id,kind:'REFUND',amount:refundDue,method:refundMethod,reference:refundReference,
+        actorUid:me.uid,actorName:me.name,createdAt:now,description:'Hoàn tiền đã thực hiện khi duyệt trả hàng'});
+      tx.set(db().collection('cashDaily').doc(vnDayKey(now)),{amount:FieldValue.increment(-refundDue),refunds:FieldValue.increment(1),updatedAt:now},{merge:true});
+    }
     const status:'RETURNED'='RETURNED';
     const lateFeeTotal=Math.max(0,rent-order.total);
     // v5 stores actual rental amount as total, not total + separate late charge.
-    const revised={...order,total:rent,paid:paidTotal,status,compensationTotal:compensation,otherFeeTotal:otherFee,lateFeeTotal:0,rentalDays:actualBlocks,cameraLateFeePending:pendingCameraIds.length>0,cameraLatePendingItemIds:pendingCameraIds,cameraOvertimeFeeTotal,returnStage:'APPROVED' as const,updatedAt:now};
+    const revised={...order,total:rent,paid:netPaid,refundTotal:(order.refundTotal||0)+refundDue,status,compensationTotal:compensation,otherFeeTotal:otherFee,lateFeeTotal:0,rentalDays:actualBlocks,cameraLateFeePending:pendingCameraIds.length>0,cameraLatePendingItemIds:pendingCameraIds,cameraOvertimeFeeTotal,returnStage:'APPROVED' as const,updatedAt:now};
     syncDebtIndex(tx,db(),revised);
-    tx.update(ref,{total:rent,status,compensationTotal:compensation,otherFeeTotal:otherFee,lateFeeTotal:0,rentalDays:actualBlocks,cameraLateFeePending:pendingCameraIds.length>0,cameraLatePendingItemIds:pendingCameraIds,cameraOvertimeFeeTotal,returnStage:'APPROVED',reviewedBy:me.uid,reviewedByName:me.name,reviewedAt:now,returnedAt:order.returnProof.at,updatedAt:now,history:[...order.history,{action:'ADMIN_APPROVE_RETURN',by:me.uid,at:now,amount:rent,detail:`Duyệt nhận vật lý; tiền thuê tạm tính ${rent}, tăng do thời gian ${lateFeeTotal}, đền bù ${compensation}, phụ phí ${otherFee} (${note}); phí trễ máy ảnh tự tính ${cameraOvertimeFeeTotal}`}]});
+    tx.update(ref,{total:rent,paid:netPaid,refundTotal:(order.refundTotal||0)+refundDue,status,compensationTotal:compensation,otherFeeTotal:otherFee,lateFeeTotal:0,rentalDays:actualBlocks,cameraLateFeePending:pendingCameraIds.length>0,cameraLatePendingItemIds:pendingCameraIds,cameraOvertimeFeeTotal,returnStage:'APPROVED',reviewedBy:me.uid,reviewedByName:me.name,reviewedAt:now,returnedAt:order.returnProof.at,updatedAt:now,history:[...order.history,{action:'ADMIN_APPROVE_RETURN',by:me.uid,at:now,amount:rent,detail:`Duyệt nhận; thuê ${rent}, tăng thời gian ${lateFeeTotal}, đền bù ${compensation}, phụ phí ${otherFee} (${note}), hoàn thực tế ${refundDue} (${refundMethod||'không có'}); phí máy ảnh ${cameraOvertimeFeeTotal}`}]});
     itemRefs.forEach((r,i)=>{const missing=order.returnProof?.items.find(p=>p.itemId===order.lines[i].itemId)?.condition==='MISSING';const item=snaps[i].data() as InventoryItem;const issue=order.returnProof?.items.find(p=>p.itemId===order.lines[i].itemId)?.condition==='ISSUE';const state=missing?'MISSING':issue?'MAINTENANCE':item.requiresLaundry===false?'AVAILABLE':'LAUNDRY';tx.update(r,{status:state,currentOrderId:null,expectedReturnDate:null,...(state==='LAUNDRY'?{laundryStartedAt:now,laundryCompletedAt:null}:{})});});
     // A completed handover+return is ONE round per individual physical asset.
     trackerRefs.forEach((trackerRef,i)=>{
@@ -184,6 +201,7 @@ export async function PATCH(req:NextRequest,ctx:{params:Promise<{id:string}>}){
     if(amount>allowed)throw new ApiError(409,'Số tiền thu vượt số còn phải thu.');
     const revised={...order,paid:order.paid+amount,updatedAt:now};syncDebtIndex(tx,db(),revised);
     const day=vnDayKey(now);tx.set(db().collection('cashDaily').doc(day),{amount:FieldValue.increment(amount),payments:FieldValue.increment(1),updatedAt:now},{merge:true});
+    tx.create(ref.collection('cashMovements').doc(),{orderId:id,kind:'PAYMENT',amount,method:'UNSPECIFIED',reference:'',actorUid:me.uid,actorName:me.name,createdAt:now,description:'Thu tiền trên đơn v5'});
     tx.update(ref,{paid:order.paid+amount,updatedAt:now,history:[...order.history,{action:'PAY',by:me.uid,at:now,amount,detail:'Thu tiền theo bảng giá giờ'}]});
    }else if(action==='ADD_ITEMS'){
     if(!order.pickupAt||!order.returnAt||order.returnStage==='AWAITING_ADMIN'||order.pendingExtraItemIds?.length)throw new ApiError(409,'Đơn đang chờ chụp bổ sung hoặc nhận trả.');
@@ -225,5 +243,5 @@ export async function PATCH(req:NextRequest,ctx:{params:Promise<{id:string}>}){
     after(async()=>{try{await runEvidenceCleanup(8);}catch(error){console.error('Deferred evidence cleanup',error);}});
   }
   return NextResponse.json({ok:true});
- }catch(e){return handleError(e,'/api/v5/orders/[id]');}
+ }catch(e){return handleError(e,'PATCH /api/v5/orders/[id]');}
 }

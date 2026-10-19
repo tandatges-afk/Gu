@@ -1,3 +1,5 @@
+> **GU v5.0.1-patch.1:** Chi tiết bản vá, điểm chưa nghiệm thu và hướng dẫn triển khai an toàn tại [docs/GU-v5.0.1-PATCH1-SUA-LOI-VA-TRIEN-KHAI.md](docs/GU-v5.0.1-PATCH1-SUA-LOI-VA-TRIEN-KHAI.md).
+
 ## GU v5.0.0 Beta 11 — 1 nhân viên / 2 kích thước màn hình
 
 - Đăng nhập tại `/` trên PC lẫn điện thoại; không còn `/mobile` và không tạo vai trò nhân viên riêng theo thiết bị.
