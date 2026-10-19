@@ -40,6 +40,7 @@ export async function PATCH(req:NextRequest,ctx:{params:Promise<{id:string}>}) {
     const b=await jsonBody(req);
     const action=String(b.action);
     if(!['PICKUP','RETURN','CANCEL','PAY','ADD_ITEMS','EXTEND'].includes(action))throw new ApiError(400,'Thao tác không hợp lệ.');
+    if(action==='CANCEL'&&me.role!=='admin')throw new ApiError(403,'Chỉ Admin được hủy lịch, kể cả đơn được tạo từ phiên bản cũ.');
     const amount=action==='PAY'?positiveVnd(b.amount,'Số tiền thanh toán'):0;
     const addIds=action==='ADD_ITEMS'?b.itemIds:[];
     if(action==='ADD_ITEMS'&&(!Array.isArray(addIds)||!addIds.length||addIds.some(x=>typeof x!=='string'||!/^[a-zA-Z0-9]{10,64}$/.test(x))||new Set(addIds).size!==addIds.length))
@@ -49,6 +50,7 @@ export async function PATCH(req:NextRequest,ctx:{params:Promise<{id:string}>}) {
       const snap=await tx.get(ref);
       if(!snap.exists)throw new ApiError(404,'Không tìm thấy đơn hàng.');
       const order={id:snap.id,...snap.data()} as RentalOrder;
+      if(order.pricingVersion)throw new ApiError(409,'Đơn này dùng quy trình chụp ảnh và bảng giá 24 giờ; hãy thao tác trong trang đơn GU mới.');
       const today=vietnamToday();
       if(action==='PICKUP'&&order.status!=='RESERVED')throw new ApiError(409,'Chỉ đơn đặt trước mới được giao hàng.');
       if(action==='PICKUP'&&(order.pickupDate>today||order.returnDate<today))throw new ApiError(409,'Chưa đến lịch nhận hoặc đã qua ngày trả; cần điều chỉnh lịch trước.');
@@ -71,6 +73,9 @@ export async function PATCH(req:NextRequest,ctx:{params:Promise<{id:string}>}) {
         // Read all documents before writing: Firestore transactions require that order.
         const lockSnaps=await Promise.all(refs.map(r=>tx.get(r)));
         const itemSnaps=await Promise.all(itemRefs.map(r=>tx.get(r)));
+        // GU v5 blocks hourly intervals. Legacy extensions occupy an entire day and must not overlap any v5 reservation.
+        const hourlySnaps=await Promise.all(plan.additionalSlots.map(s=>tx.get(db().collection('v5DayIntervals').doc(s.itemId+'_'+s.day))));
+        if(hourlySnaps.some(s=>Array.isArray(s.data()?.entries)&&s.data()!.entries.length>0))throw new ApiError(409,'Lịch theo giờ đã được giữ bởi đơn phiên bản mới.');
         const conflicts=lockSnaps.flatMap((snap,i)=>snap.exists?[{date:plan.additionalSlots[i].day,itemId:plan.additionalSlots[i].itemId}]:[]);
         if(conflicts.length)throw new ApiError(409,'Lịch gia hạn trùng với đơn khác.',conflicts.slice(0,10));
         if(itemSnaps.some(s=>!s.exists||s.data()?.archivedAt||['MISSING','MAINTENANCE'].includes(String(s.data()?.status))))
@@ -109,6 +114,8 @@ export async function PATCH(req:NextRequest,ctx:{params:Promise<{id:string}>}) {
         // Count every existing lock and new lock for transaction safety.
         assertSlotCapacity(slotList.length+order.lines.reduce((s,l)=>s+lineOccupiedDays(l,order).length,0));
         const locks=await Promise.all(slotList.map(x=>tx.get(x.ref)));
+        const hourlySnaps=await Promise.all(slotList.map(s=>tx.get(db().collection('v5DayIntervals').doc(s.line.itemId+'_'+s.day))));
+        if(hourlySnaps.some(s=>Array.isArray(s.data()?.entries)&&s.data()!.entries.length>0))throw new ApiError(409,'Món bổ sung đã có lịch theo giờ từ GU mới.');
         const conflicts=locks.flatMap((s,i)=>s.exists?[{sku:slotList[i].line.sku,date:slotList[i].day}]:[]);
         if(conflicts.length)throw new ApiError(409,'Các sản phẩm thêm vào đã có người giữ lịch.',conflicts.slice(0,10));
         const now=new Date().toISOString();

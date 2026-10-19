@@ -3,9 +3,9 @@ import type {Transaction,Firestore} from 'firebase-admin/firestore';
 import type {DebtAccount} from './debts';
 /** Only open receivables and future bookings are indexed. Historical paid orders are not re-scanned. */
 export function debtIndexKind(o:RentalOrder):'open'|'reserved'|null{
- if(o.status==='CANCELLED')return null;
+ if(o.status==='CANCELLED'||o.status==='VOIDED')return null;
  const outstanding=Math.max(0,(o.total||0)+(o.compensationTotal||0)+(o.lateFeeTotal||0)+(o.otherFeeTotal||0)-(o.paid||0));
- if(outstanding<=0)return null;
+ if(outstanding<=0&&!o.cameraLateFeePending)return null;
  return o.status==='RESERVED'?'reserved':o.status==='PICKED_UP'||o.status==='RETURNED'?'open':null;
 }
 export function debtIndexRecord(o:RentalOrder){
@@ -13,7 +13,7 @@ export function debtIndexRecord(o:RentalOrder){
  const balance=Math.max(0,(o.total||0)+(o.compensationTotal||0)+(o.lateFeeTotal||0)+(o.otherFeeTotal||0)-(o.paid||0));
  return {kind,orderId:o.id,customerId:o.customerId,customerName:o.customerName,customerPhone:o.customerPhone,
    code:o.code,status:o.status,pickupDate:o.pickupDate,returnDate:o.returnDate,
-   amount:balance+(o.paid||0),paid:o.paid||0,outstanding:balance,updatedAt:o.updatedAt||o.createdAt||''};
+   amount:balance+(o.paid||0),paid:o.paid||0,outstanding:balance,cameraLateFeePending:Boolean(o.cameraLateFeePending),updatedAt:o.updatedAt||o.createdAt||''};
 }
 export function syncDebtIndex(tx:Transaction,store:Firestore,o:RentalOrder){
  const ref=store.collection('debtLedger').doc(o.id);
@@ -22,12 +22,13 @@ export function syncDebtIndex(tx:Transaction,store:Firestore,o:RentalOrder){
 }
 export function summaryFromDebtIndex(rows:readonly ReturnType<typeof debtIndexRecord>[]){
  const accounts=new Map<string,DebtAccount>();
- let totalOutstanding=0,unpaidOrders=0,futureReservations=0,reservationUnpaid=0;
+ let totalOutstanding=0,unpaidOrders=0,futureReservations=0,reservationUnpaid=0,pendingCameraLateCount=0;
  for(const r of rows){
    if(!r.kind)continue;
    if(r.kind==='reserved'){futureReservations++;reservationUnpaid+=r.outstanding;continue;}
    const key=r.customerId||'phone:'+r.customerPhone.replace(/\D/g,'');
-   const item={id:r.orderId,code:r.code,customerId:r.customerId,customerName:r.customerName,customerPhone:r.customerPhone,
+   if(r.cameraLateFeePending)pendingCameraLateCount++;
+   const item={id:r.orderId,code:r.code,customerId:r.customerId,customerName:r.customerName,customerPhone:r.customerPhone,cameraLateFeePending:Boolean(r.cameraLateFeePending),
      status:r.status,pickupDate:r.pickupDate,returnDate:r.returnDate,amount:r.amount,paid:r.paid,outstanding:r.outstanding};
    let account=accounts.get(key);
    if(!account){account={key,customerId:r.customerId,customerName:r.customerName,customerPhone:r.customerPhone,outstanding:0,orderCount:0,orders:[]};accounts.set(key,account);}
@@ -36,5 +37,5 @@ export function summaryFromDebtIndex(rows:readonly ReturnType<typeof debtIndexRe
  }
  const sorted=[...accounts.values()].sort((a,b)=>b.outstanding-a.outstanding||a.customerName.localeCompare(b.customerName,'vi'));
  for(const account of sorted)account.orders.sort((a,b)=>b.returnDate.localeCompare(a.returnDate));
- return {accounts:sorted,totalOutstanding,unpaidOrders,futureReservations,reservationUnpaid};
+ return {accounts:sorted,totalOutstanding,unpaidOrders,futureReservations,reservationUnpaid,pendingCameraLateCount};
 }

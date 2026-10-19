@@ -13,6 +13,7 @@ export async function POST(req:NextRequest) {
   try {
     const me=await staffUser(req);
     const b=await jsonBody(req);
+    throw new ApiError(410,'Cần tải lại GU để tạo đơn theo giờ (v5). Đơn cũ vẫn được giữ nguyên.');
     const parsed=rentalRequest(b);
     const mode=bookingMode(b.mode);
     verifyImmediatePickup(mode,parsed.pickupDate);

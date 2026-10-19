@@ -2,6 +2,7 @@ import {NextRequest,NextResponse} from 'next/server';
 import {staffUser,handleError,ApiError} from '@/lib/http';
 import {serverCredential,db} from '@/lib/firebase-admin';
 import {FIRESTORE_FREE,CLOUDINARY_FREE_CREDITS,pacificDayWindow,sumMonitoringSeries,latestMonitoringValue,metricUsage} from '@/lib/usage-metrics';
+import {explainMonitoringError} from '@/lib/monitoring-error';
 export const runtime='nodejs';
 export const preferredRegion='sin1';
 export const dynamic='force-dynamic';
@@ -12,10 +13,13 @@ const TTL=5*60*1000;
 async function monitoringMetric(metric:string,start:string,end:string,mode:'sum'|'latest',token:string,project:string){
   const params=new URLSearchParams({filter:`metric.type="firestore.googleapis.com/${metric}" AND resource.type="firestore.googleapis.com/Database"`,
     'interval.startTime':start,'interval.endTime':end,'aggregation.alignmentPeriod':'3600s',
-    'aggregation.perSeriesAligner':mode==='sum'?'ALIGN_SUM':'ALIGN_MAX','pageSize':'1000'});
+    'aggregation.perSeriesAligner':mode==='sum'?'ALIGN_SUM':'ALIGN_MAX','view':'FULL','pageSize':'1000'});
   const r=await fetch(`https://monitoring.googleapis.com/v3/projects/${encodeURIComponent(project)}/timeSeries?${params}`,{
     headers:{Authorization:`Bearer ${token}`},cache:'no-store',signal:AbortSignal.timeout(8000)});
-  if(!r.ok)throw new Error('Cloud Monitoring '+r.status+' (cần Monitoring Viewer và bật Monitoring API).');
+  if(!r.ok){
+    const googleError=await r.json().catch(()=>null);
+    throw new Error(explainMonitoringError(r.status,googleError));
+  }
   const result=await r.json();
   // We use 1-hour buckets and a single daily interval, usually < 24 points.
   if(result.nextPageToken)throw new Error('Cloud Monitoring phân trang; chưa có số liệu đầy đủ.');
@@ -66,7 +70,8 @@ export async function GET(req:NextRequest){
     const me=await staffUser(req);
     if(me.role!=='admin')throw new ApiError(403,'Chỉ Admin được xem thông tin hệ thống.');
     const now=new Date(),window=pacificDayWindow(now);
-    if(!cached||Date.now()-cached.at>TTL){
+    const forceRefresh=req.nextUrl.searchParams.get('refresh')==='1';
+    if(forceRefresh||!cached||Date.now()-cached.at>TTL){
       const [firestore,cloudinary,counts]=await Promise.all([firestoreReport(now,window),cloudinaryReport(),
         Promise.allSettled(['items','customers','orders','debtLedger'].map(async name=>[name,(await db().collection(name).count().get()).data().count] as const))]);
       const collectionCounts=Object.fromEntries(counts.flatMap(x=>x.status==='fulfilled'?[x.value]:[]));

@@ -16,12 +16,12 @@ export async function PATCH(req:NextRequest,ctx:{params:Promise<{id:string}>}) {
     // Auth switch first, then Firestore: staffUser and the upload API check the staff doc.
     const snap=await ref.get();
     if(!snap.exists)throw new ApiError(404,'Tài khoản không tồn tại.');
-    if(snap.data()?.role!=='staff')throw new ApiError(403,'Không được thay đổi quyền Admin trong giao diện này.');
+    if(!['staff','staff_mobile'].includes(String(snap.data()?.role)))throw new ApiError(403,'Không được thay đổi quyền Admin trong giao diện này.');
     await serverAuth().updateUser(id,{disabled:b.disabled});
     try {
       await db().runTransaction(async tx=>{
         const current=await tx.get(ref);
-        if(!current.exists||current.data()?.role!=='staff')throw new ApiError(409,'Trạng thái tài khoản đã thay đổi.');
+        if(!current.exists||!['staff','staff_mobile'].includes(String(current.data()?.role)))throw new ApiError(409,'Trạng thái tài khoản đã thay đổi.');
         tx.update(ref,{disabled:b.disabled});
         auditInTransaction(tx,me,b.disabled?'STAFF_DISABLE':'STAFF_ENABLE','staff',id,`${b.disabled?'Khóa':'Mở'} tài khoản ${snap.data()?.email||id}`);
       });

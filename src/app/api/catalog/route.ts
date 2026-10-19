@@ -37,7 +37,7 @@ export async function GET(req:NextRequest){
   }
   const snapshot=await collection.limit(take+1).get();
   let docs=snapshot.docs.slice(0,take);
-  if(kind==='orders'&&me.role!=='admin')docs=docs.filter(d=>!['RETURNED','CANCELLED'].includes(String(d.data().status)));
+  if(kind==='orders'&&me.role!=='admin')docs=docs.filter(d=>!['RETURNED','CANCELLED','VOIDED'].includes(String(d.data().status)));
   const last=snapshot.docs.slice(0,take).at(-1);
   const cursor=snapshot.size>take&&last?Buffer.from(JSON.stringify([String(last.get(field)||''),last.id])).toString('base64url'):null;
   return NextResponse.json({kind,results:docs.map(d=>({id:d.id,...d.data()})),cursor,hasMore:Boolean(cursor),pageSize:take,

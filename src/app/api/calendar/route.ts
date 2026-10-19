@@ -15,7 +15,13 @@ export async function GET(req:NextRequest){
   const dates=Array.from({length:7},(_,i)=>addDays(start,i));
   const refs=itemIds.flatMap(id=>dates.map(day=>db().collection('rentalSlots').doc(slotId(id,day))));
   const locks=await db().getAll(...refs);
-  const ordersIds=[...new Set(locks.filter(s=>s.exists).map(s=>String(s.data()?.orderId||'')))].filter(Boolean);
+  // GU v5 hourly reservations are indexed in day interval documents.
+  const hourlyRefs=itemIds.flatMap(id=>dates.map(day=>db().collection('v5DayIntervals').doc(id+'_'+day)));
+  const hourly=await db().getAll(...hourlyRefs);
+  const ordersIds=[...new Set([
+    ...locks.filter(s=>s.exists).map(s=>String(s.data()?.orderId||'')),
+    ...hourly.flatMap(s=>((s.data()?.entries||[]) as Array<{orderId:string}>).map(x=>x.orderId))
+  ])].filter(Boolean);
   // Include overdue pickups even after scheduled slots; only for visible products.
   const items=await db().getAll(...itemIds.map(id=>db().collection('items').doc(id)));
   for(const item of items)if(item.data()?.status==='RENTED'&&item.data()?.currentOrderId)ordersIds.push(String(item.data()?.currentOrderId));
@@ -26,7 +32,7 @@ export async function GET(req:NextRequest){
    const snaps=await db().getAll(...unique.slice(i,i+100).map(id=>db().collection('orders').doc(id)));
    orders.push(...snaps.filter(d=>d.exists).map(d=>({id:d.id,...d.data()} as RentalOrder)));
   }
-  return NextResponse.json({orders:orders.filter(o=>me.role==='admin'||o.status!=='RETURNED'&&o.status!=='CANCELLED'),start},
+  return NextResponse.json({orders:orders.filter(o=>me.role==='admin'||o.status!=='RETURNED'&&o.status!=='CANCELLED'&&o.status!=='VOIDED'),start},
    {headers:{'Cache-Control':'private, no-store'}});
  }catch(e){return handleError(e);}
 }

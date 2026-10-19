@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { staffUser, handleError, ApiError } from '@/lib/http';
+import {db} from '@/lib/firebase-admin';
+import {simpleId} from '@/lib/v5-server';
 import { imageMagicMatches, validProductImageUrl } from '@/lib/cloudinary-images';
 import { randomUUID } from 'node:crypto';
 
@@ -26,8 +28,20 @@ export async function POST(req: NextRequest) {
     const header = new Uint8Array(await image.slice(0, 16).arrayBuffer());
     if (!imageMagicMatches(header, image.type)) throw new ApiError(400, 'Nội dung ảnh không đúng định dạng.');
 
+    const purpose=String(form.get('purpose')||'product');
+    const orderId=String(form.get('orderId')||'');
+    if(!['product','handover','return'].includes(purpose))throw new ApiError(400,'Loại ảnh không hợp lệ.');
+    if(me.role==='staff_mobile'&&purpose==='product')throw new ApiError(403,'Nhân viên Mobile không được thêm ảnh sản phẩm.');
+    if(purpose!=='product'){
+      if(me.role!=='staff_mobile'&&me.role!=='admin')throw new ApiError(403,'Ảnh giao nhận chỉ chụp trên Mobile.');
+      if(!simpleId(orderId))throw new ApiError(400,'Mã đơn không hợp lệ.');
+      const order=await db().collection('orders').doc(orderId).get();
+      if(!order.exists||!order.data()?.pricingVersion||['RETURNED','CANCELLED','VOIDED'].includes(order.data()?.status))throw new ApiError(409,'Đơn đã đóng hoặc không dùng quy trình ảnh.');
+      if(purpose==='handover'&&order.data()?.status!=='RESERVED'&&!(order.data()?.status==='PICKED_UP'&&Array.isArray(order.data()?.pendingExtraItemIds)&&order.data()!.pendingExtraItemIds.length))throw new ApiError(409,'Đơn không còn chờ giao.');
+      if(purpose==='return'&&order.data()?.status!=='PICKED_UP')throw new ApiError(409,'Đơn không ở trạng thái nhận trả.');
+    }
     const id = randomUUID();
-    const publicId = `gu/products/${me.uid}/${id}`;
+    const publicId = purpose==='product'?`gu/products/${me.uid}/${id}`:`gu/inspections/${me.uid}/${orderId}/${purpose}/${id}`;
     const upload = new FormData();
     upload.append('file', image, `photo.${image.type==='image/png'?'png':image.type==='image/webp'?'webp':'jpg'}`);
     upload.append('public_id', publicId);
@@ -46,8 +60,9 @@ export async function POST(req: NextRequest) {
     const response: unknown = await result.json();
     const url = (response && typeof response==='object' && 'secure_url' in response)
       ? (response as {secure_url:unknown}).secure_url : undefined;
-    if (!validProductImageUrl(url, me.uid, cloudName))
+    if (!(purpose==='product'?validProductImageUrl(url, me.uid, cloudName):typeof url==='string'&&url.startsWith(`https://res.cloudinary.com/${cloudName}/image/upload/`)&&url.includes(`/gu/inspections/${me.uid}/${orderId}/${purpose}/${id}.`)))
       throw new ApiError(502, 'Cloudinary trả về liên kết ảnh không hợp lệ.');
+    if(purpose!=='product')await db().collection('proofUploads').doc(id).create({url,uid:me.uid,orderId,phase:purpose,createdAt:new Date().toISOString()});
     return NextResponse.json({ path:url }, {status:201});
   } catch (error) { return handleError(error); }
 }
