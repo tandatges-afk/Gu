@@ -29,7 +29,8 @@ export async function POST(req:NextRequest){
       for(let offset=0;offset<pairs.length;offset+=300){
         const batch=pairs.slice(offset,offset+300);
         const snaps=await db().getAll(...batch.map(p=>p.ref));
-        snaps.forEach((snap,i)=>{if(snap.exists)busyIds.add(batch[i].item.id);});
+        const timed=await db().getAll(...batch.map(p=>db().collection('v5DayIntervals').doc(p.item.id+'_'+p.date)));
+        snaps.forEach((snap,i)=>{if(snap.exists||(timed[i].data()?.entries||[]).length)busyIds.add(batch[i].item.id);});
       }
       const available=candidates.filter(i=>!busyIds.has(i.id));
       return NextResponse.json({mode:'FIND_AVAILABLE',pickupDate:start,returnDate:end,
@@ -49,7 +50,8 @@ export async function POST(req:NextRequest){
       const refs=days.map(date=>db().collection('rentalSlots').doc(slotId(itemId,date)));
       // At most 120 IDs. Exact lock read; does not require a composite index.
       const snapshots=await db().getAll(...refs);
-      const occupied=new Set(snapshots.flatMap((s,i)=>s.exists?[days[i]]:[]));
+      const timed=await db().getAll(...days.map(date=>db().collection('v5DayIntervals').doc(itemId+'_'+date)));
+      const occupied=new Set(snapshots.flatMap((s,i)=>s.exists||(timed[i].data()?.entries||[]).length?[days[i]]:[]));
       const next=nearestFreeStart(start,rentalDays,occupied);
       return NextResponse.json({mode:'NEXT_AVAILABLE',itemId,nextPickupDate:next,nextReturnDate:next?addDays(next,rentalDays-1):null,reason:next?'':'Không tìm thấy khoảng trống phù hợp trong 90 ngày tới.'},{headers:{'Cache-Control':'no-store'}});
     }

@@ -21,5 +21,5 @@ test('rental slots and product/gallery thumbnails use square 1:1 aspect ratio',(
 test('mobile dashboard has one order-action pair, not two duplicate groups',()=>{
   assert.equal((page.match(/className="gu-mobile-quick-actions"/g)||[]).length,0);
   assert.ok(page.includes("Đặt lịch trước</button>"));
-  assert.ok(page.includes("Tạo đơn · giao ngay</button>"));
+  assert.ok(page.includes("Tạo đơn · chụp ảnh giao</button>"));
 });

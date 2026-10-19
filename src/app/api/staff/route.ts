@@ -21,12 +21,13 @@ export async function POST(req:NextRequest) {
     const name=assertText(b.name,'Họ tên',100);
     const email=assertText(b.email,'Email',200).toLowerCase();
     if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))throw new ApiError(400,'Email không hợp lệ.');
+    const role=b.role==='staff_mobile'?'staff_mobile':'staff';
     const password=b.password;
     if(typeof password!=='string'||password.length<12||password.length>128)throw new ApiError(400,'Mật khẩu ban đầu phải từ 12–128 ký tự.');
     // Only create STAFF here. Admin privileges must be provisioned securely by the owner.
     const account=await serverAuth().createUser({email,password,displayName:name,disabled:false});
     const uid=account.uid;createdUid=uid;
-    const profile={name,email,role:'staff' as const,disabled:false,createdAt:new Date().toISOString(),createdBy:me.uid};
+    const profile={name,email,role,disabled:false,createdAt:new Date().toISOString(),createdBy:me.uid};
     const audit=auditDoc(me,'STAFF_CREATE','staff',uid,`Cấp tài khoản ${email}`);
     const batch=db().batch();batch.create(db().collection('staff').doc(uid),profile);batch.create(audit.ref,audit.record);
     await batch.commit();

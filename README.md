@@ -222,3 +222,42 @@ Xem `docs/GU-v4.2.0-TRIEN-KHAI-5-NAM.md` trước khi nâng cấp. Công nợ v�
 
 Xem `docs/CHANGELOG-v4.2.1.md`. Mã tiền được nhập có dấu chấm theo định dạng Việt Nam ở giao diện, nhưng server nhận giá trị nguyên VND.
 Nếu bảng Hệ thống báo Cloud Monitoring 403: bật Monitoring API và cấp `roles/monitoring.viewer` cho service account có email trùng `FIREBASE_CLIENT_EMAIL` (trong Google Cloud IAM của đúng project). Không chia sẻ private key hoặc API Secret.
+
+## GU v5.0.0-beta.1 — ba client / 24 giờ / chụp ảnh chứng cứ
+
+**Chưa phát hành Production.** Xem chi tiết `docs/GU-v5-THREE-CLIENTS-BETA.md` trước khi thử.
+
+- Admin PC/mobile: `/` — quản trị và duyệt ảnh nhận trả.
+- Staff PC: `/` — tạo đơn theo giờ và tư vấn ảnh.
+- Staff mobile: `/mobile` — chỉ tìm ảnh và chụp giao/nhận, tài khoản có `role=staff_mobile`.
+- Đơn cũ vẫn dùng giá/lịch cũ. Đơn mới dùng `GU_HOURLY_V1`.
+- Visual match hiện dùng đối chiếu đơn giản tối đa 150 sản phẩm, chưa phải AI trên 2.000 sản phẩm.
+- Ảnh chứng cứ cần chuyển sang lưu trữ riêng tư trước khi dùng cho khách hàng thật.
+
+
+## GU v5.0.0-beta.2 — 7 lượt ảnh và bảng giá Canon
+
+- Quản lý 4 Canon EOS R50 + 1 Canon M50 là 5 mã sản phẩm/serial riêng, nhập thủ công **serial** nhưng GU tự cấp mã sản phẩm.
+- Giá R50 3h/6h/24h/48h: 110k/130k/190k/350k, M50: 90k/110k/180k/340k. Hơn 48 giờ chưa có phí trễ.
+- Giữ tối đa 7 lượt ảnh đã duyệt giao+nhận theo từng thiết bị, tác vụ xóa Cloudinary có retry.
+- Xem `docs/GU-v5-CAMERA-RETENTION-BETA.md` về giới hạn, quyền riêng tư, cấu hình Cron và cách kiểm thử.
+
+
+## GU v5.0.0-beta.3 — Rà soát luồng 3 client & nghiệp vụ
+
+Bản thử nghiệm này sửa phân quyền hủy đơn, giao sớm và khóa giờ, quyết toán máy ảnh quá 48 giờ, cách ly hàng có vấn đề, bảo mật dữ liệu nhân viên mobile, kết quả tìm bằng ảnh và hàng đợi xóa ảnh. Xem `docs/GU-v5-BETA3-KIEM-TRA-LOGIC.md`. Không triển khai vào Production khi chưa chạy `npm run typecheck`, `npm run build` và kiểm thử đầy đủ trên Firebase staging.
+
+
+## GU v5.0.0-beta.4 — Tự động tính phí trễ máy ảnh (bản beta)
+
+**Thay đổi mới nhất:** Đối với Canon EOS R50 và Canon M50, giờ giao thực tế là điểm bắt đầu.
+Mỗi đơn lưu riêng gói thuê đã chốt 3h, 6h, 24h hoặc 48h và giá gốc tương ứng.
+Quá hạn gói: cộng **10.000đ cho mỗi giờ trễ bắt đầu** (vượt 1 phút cũng +10.000đ).
+Không tự chuyển gói 3h sang giá gói 6h khi khách trả muộn. Áp dụng tiếp cả sau 48h.
+Tiền trễ được **gộp trong `total`** và **không nhân đôi vào `lateFeeTotal`**.
+Admin thấy chi tiết gói, giờ trễ, tiền trễ trong màn hình duyệt ảnh nhận.
+Các đơn đã trả của beta3 có trạng thái chờ quyết toán có nút **Tính tự động phí trễ máy ảnh** cho Admin.
+Xem `docs/GU-v5-BETA4-CAMERA-OVERTIME.md`.
+
+**Chưa kiểm tra build Next.js/Firebase live:** Cần chạy `npm run typecheck`, `npm run build`
+và thử tạo/giao/nhận/duyệt trên staging trước khi triển khai Production.

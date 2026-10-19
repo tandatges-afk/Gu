@@ -17,6 +17,6 @@ test('mobile day buttons remain square and at least 44px across', () => {
 });
 
 test('compact calendar preserves order detail and quick create interaction', () => {
-  assert.match(page, /onClick=\{\(\)=>shown\?openDetail\(shown\):openBooking\(/);
+  assert.match(page, /onClick=\{\(\)=>matching\.length>1\?setCalendarMatches\(matching\):shown\?openDetail\(shown\):openBooking\(/);
   assert.match(page, /title=\{title\} aria-label=/);
 });

@@ -17,7 +17,8 @@ export async function POST(req:NextRequest) {
     const blocked=existing.filter(x=>Boolean(x.archivedAt)||x.status==='LAUNDRY'||x.status==='MAINTENANCE'||x.status==='MISSING'||!(x.replacementValue>0)||(x.status==='RENTED' && !!x.expectedReturnDate && x.expectedReturnDate<vietnamToday()));
     const refs=requiredSlots(existing,parsed.pickupDate,parsed.returnDate);
     const occupied=await db().getAll(...refs.map(x=>x.ref));
-    const conflicts=occupied.flatMap((s,i)=>s.exists?[{itemId:refs[i].item.id,sku:refs[i].item.sku,date:refs[i].day}]:[]);
+    const timed=await db().getAll(...refs.map(x=>db().collection('v5DayIntervals').doc(x.item.id+'_'+x.day)));
+    const conflicts=occupied.flatMap((s,i)=>s.exists||(timed[i].data()?.entries||[]).length?[{itemId:refs[i].item.id,sku:refs[i].item.sku,date:refs[i].day}]:[]);
     return NextResponse.json({available:!blocked.length&&!conflicts.length,conflicts,reason:blocked.length?'Không thể cho thuê (giặt/bảo trì/thất lạc/chưa định giá): '+blocked.map(x=>x.sku).join(', '):''});
   } catch(e){return handleError(e);}
 }

@@ -23,7 +23,7 @@ test('chọn món phải có nhãn rõ và không chỉ đổi sắc độ',()=>
 test('mục công nợ riêng trong nhóm admin, không tính đơn đặt trước',()=>{
  const page=read('src/app/page.tsx');
  const accounting=read('src/lib/debts.ts');
- assert.match(page,/ids:\['debts','reports','staff','audit','system'\]/);
+ assert.match(page,/ids:\[(?:'reviews',)?'debts','reports','staff','audit','system'\]/);
  assert.match(accounting,/order.status==='RESERVED'/);
  assert.match(accounting,/reservationUnpaid/);
 });

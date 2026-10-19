@@ -3,6 +3,9 @@ import { db } from '@/lib/firebase-admin';
 import { staffUser,handleError,jsonBody,ApiError } from '@/lib/http';
 import { positiveVnd,assertText } from '@/lib/rental';
 import { validProductImageUrl } from '@/lib/cloudinary-images';
+import {rentalKind} from '@/lib/hourly-pricing';
+import {isCameraCategory,isCameraModel} from '@/lib/camera-rental';
+import {normalizedAngles,DEFAULT_ANGLES} from '@/lib/inspection-proof';
 import { auditInTransaction } from '@/lib/audit';
 export const runtime='nodejs';
 export const preferredRegion='sin1';
@@ -38,10 +41,20 @@ export async function PATCH(req:NextRequest,ctx:{params:Promise<{id:string}>}) {
         const category=assertText(b.category,'Danh mục',50);
         const size=assertText(b.size,'Size',30);
         const color=assertText(b.color??'','Màu sắc',40,false);
-        const dailyRate=positiveVnd(b.dailyRate,'Giá thuê/ngày');
+        const camera=isCameraCategory(category);
+        if(camera&&me.role!=='admin')throw new ApiError(403,'Chỉ Admin được chỉnh máy ảnh.');
+        if(Boolean(snap.data()?.cameraModel)!==camera)throw new ApiError(409,'Không đổi sản phẩm thường thành máy ảnh hoặc ngược lại. Hãy tạo một sản phẩm máy ảnh riêng.');
+        if(camera&&(!isCameraModel(b.cameraModel)||b.cameraModel!==snap.data()?.cameraModel||b.cameraSerial!==snap.data()?.cameraSerial))throw new ApiError(409,'Model và serial đã gắn cố định với mã sản phẩm.');
+        const dailyRate=camera?0:rentalKind(category)==='ACCESSORY'?20000:50000;
         if(typeof b.requiresLaundry!=='boolean')throw new ApiError(400,'Vui lòng xác nhận yêu cầu giặt.');
+        if(camera&&b.requiresLaundry)throw new ApiError(400,'Máy ảnh không chuyển sang giặt.');
         if(!Array.isArray(b.imagePaths)||b.imagePaths.length>5||b.imagePaths.some((url:unknown)=>typeof url!=='string'||!(snap.data()?.imagePaths||[]).includes(url)&&!validProductImageUrl(url,me.uid,process.env.CLOUDINARY_CLOUD_NAME||'')))throw new ApiError(400,'Ảnh sản phẩm không hợp lệ.');
         patch={name,category,size,color,dailyRate,requiresLaundry:b.requiresLaundry,imagePaths:b.imagePaths,bufferDays:0};
+        if(me.role==='admin'){const angles=normalizedAngles(b.inspectionAngles??snap.data()?.inspectionAngles??DEFAULT_ANGLES);patch.inspectionAngles=angles;
+          const referenceShots=b.referenceShots??snap.data()?.referenceShots??{};
+          if(typeof referenceShots!=='object'||Array.isArray(referenceShots)||Object.entries(referenceShots as Record<string,unknown>).some(([angle,url])=>!angles.includes(angle)||!(Object.values(snap.data()?.referenceShots||{}).includes(url)||validProductImageUrl(url,me.uid,process.env.CLOUDINARY_CLOUD_NAME||''))))throw new ApiError(400,'Ảnh chuẩn góc chụp không hợp lệ.');
+          patch.referenceShots=referenceShots;
+        }
         if(me.role==='admin' && b.replacementValue!==undefined)patch.replacementValue=positiveVnd(b.replacementValue,'Giá trị đền bù');
       }else if(updatingValue)patch={replacementValue:value};
       else if(cleaned)patch={status:'AVAILABLE',laundryCompletedAt:new Date().toISOString()};
@@ -68,6 +81,8 @@ export async function DELETE(req:NextRequest,ctx:{params:Promise<{id:string}>}){
     // Lock entries are persisted for every active reserved/picked-up order.
     const locks=await db().collection('rentalSlots').where('itemId','==',id).limit(1).get();
     if(!locks.empty)throw new ApiError(409,'Không thể xóa sản phẩm đang có lịch giữ hoặc chưa trả.');
+    const hourly=await db().collection('v5DayIntervals').where('itemId','==',id).limit(5).get();
+    if(hourly.docs.some(d=>(d.data()?.entries||[]).length))throw new ApiError(409,'Sản phẩm đã được đặt lịch theo giờ.');
     await db().runTransaction(async tx=>{
       const snap=await tx.get(ref);
       if(!snap.exists)throw new ApiError(404,'Không tìm thấy sản phẩm.');

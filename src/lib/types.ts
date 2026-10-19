@@ -1,15 +1,18 @@
 export type ItemStatus = 'AVAILABLE' | 'RENTED' | 'LAUNDRY' | 'MAINTENANCE' | 'MISSING';
-export type OrderStatus = 'RESERVED' | 'PICKED_UP' | 'RETURNED' | 'CANCELLED';
-export type Role = 'admin' | 'staff';
+export type OrderStatus = 'RESERVED' | 'PICKED_UP' | 'RETURNED' | 'CANCELLED' | 'VOIDED';
+export type Role = 'admin' | 'staff' | 'staff_mobile';
 export interface InventoryItem {
   id: string; name: string; sku: string; hangerCode?: string; category: string; size: string; color: string;
+  cameraModel?: import('./camera-rental').CameraModel; cameraSerial?: string;
   dailyRate: number; bufferDays: number; replacementValue: number;
-  archivedAt?: string|null; imagePaths?: string[]; requiresLaundry?: boolean; laundryStartedAt?: string|null; laundryCompletedAt?: string|null; expectedReturnDate?: string|null; currentOrderId?: string|null; status: ItemStatus; createdAt: string; createdBy?: string;
+  inspectionAngles?: string[]; referenceShots?: Record<string,string>; archivedAt?: string|null; imagePaths?: string[]; requiresLaundry?: boolean; laundryStartedAt?: string|null; laundryCompletedAt?: string|null; expectedReturnDate?: string|null; currentOrderId?: string|null; status: ItemStatus; createdAt: string; createdBy?: string;
 }
 export interface Customer { id: string; name: string; phone: string; sizeNote?: string; note: string; createdAt: string; }
 export interface RentalLine {
   itemId: string; name: string; sku: string; hangerCode?: string; size: string;
-  dailyRate: number; bufferDays: number; replacementValue: number; lineTotal: number; startDate?: string;
+  cameraModel?: import('./camera-rental').CameraModel; cameraSerial?: string;
+  cameraPackageHours?: import('./camera-rental').CameraPackageHours; cameraPackageBasePrice?: number;
+  dailyRate: number; category?: string; bufferDays: number; replacementValue: number; lineTotal: number; startDate?: string; startAt?: string;
 }
 export interface ProductCategory { id: string; name: string; createdAt: string; }
 export type InspectionStatus = 'OK' | 'MISSING';
@@ -20,7 +23,7 @@ export interface RentalOrder {
   pickupDate: string; returnDate: string; rentalDays: number;
   lines: RentalLine[]; total: number; paid: number; depositDue: number;
   compensationTotal?: number; returnInspection?: ReturnInspection[]; lateDays?: number; lateFeeTotal?: number; otherFeeTotal?: number; surchargeNote?: string; returnedAt?: string;
-  note: string; status: OrderStatus; createdAt: string; updatedAt: string; createdBy: string; createdByName?: string; history: RentalEvent[];
+  pickupAt?: string; scheduledPickupAt?: string; returnAt?: string; pricingVersion?: 'GU_HOURLY_V1'; rentalType?: 'CLOTHING'|'ACCESSORY'; photoTemplates?: Record<string,string[]>; referencePhotos?: Record<string,Record<string,string>>; pendingExtraItemIds?: string[]; handoverProof?: import('./inspection-proof').ProofSet; returnProof?: import('./inspection-proof').ProofSet; returnStage?: 'AWAITING_ADMIN'|'APPROVED'; cameraLateFeePending?: boolean; cameraLatePendingItemIds?: string[]; cameraOvertimeFeeTotal?: number; voidedAt?: string; voidedBy?: string; note: string; status: OrderStatus; createdAt: string; updatedAt: string; createdBy: string; createdByName?: string; history: RentalEvent[];
 }
 export interface StaffProfile { uid: string; name: string; email: string; role: Role; disabled: boolean; createdAt?: string; }
 export interface AuditRecord {
