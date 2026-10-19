@@ -4,14 +4,16 @@ import { Role } from './types';
 import { classifyTokenFailure } from './auth-errors';
 import { randomUUID } from 'node:crypto';
 import {classifyServerFailure} from './server-error-classifier';
+import { currentStaffAccess, isoWeekMonday, vnDate, type ShiftWeekRecord } from './shift-schedule';
 export class ApiError extends Error {
   constructor(public status: number, message: string, public details?: unknown) { super(message); }
 }
-export async function staffUser(req: NextRequest) {
+export async function staffUser(req: NextRequest, options?:{allowSchedule?:boolean}) {
   const token = req.headers.get('authorization')?.match(/^Bearer (.+)$/)?.[1];
   if (!token) throw new ApiError(401, 'Vui lòng đăng nhập.');
   let uid: string;
-  try { uid = (await serverAuth().verifyIdToken(token, true)).uid; }
+  let authAtMs: number;
+  try { const verified=await serverAuth().verifyIdToken(token, true);uid=verified.uid;authAtMs=Number(verified.auth_time||0)*1000; }
   catch (error) {
     const failure = classifyTokenFailure(error);
     // Only diagnostic code is logged; never log token, secrets, or raw exception text.
@@ -24,7 +26,26 @@ export async function staffUser(req: NextRequest) {
   // Historic staff_mobile documents are read as staff until an Admin migrates them.
   // Responsive layout depends on screen width, never on Firebase role.
   if(role!=='admin'&&role!=='staff'&&role!=='staff_mobile')throw new ApiError(403,'Quyền truy cập không hợp lệ.');
-  return {uid,role:(role==='admin'?'admin':'staff') as Role,name:String(staff.data()?.name??'')};
+  const normalizedRole=(role==='admin'?'admin':'staff') as Role;
+  let shift:ReturnType<typeof currentStaffAccess>|undefined;
+  if(normalizedRole==='staff'){
+    const monday=isoWeekMonday(vnDate(new Date()));
+    const record=await db().collection('shiftWeeks').doc(monday).get();
+    shift=currentStaffAccess(new Date(),uid,(record.exists?record.data():null) as ShiftWeekRecord|null);
+    // Grace exists only for an ALREADY-authenticated worker finishing the shift.
+    // A new Firebase login after shift end cannot enter the 15-minute grace.
+    if(shift.grace&&(!shift.shiftEndedAt||!authAtMs||authAtMs>=Date.parse(shift.shiftEndedAt)))
+      shift={...shift,canWork:false};
+    // Optional migration cutover: do not lock out all existing employees mid-week.
+    // Set GU_SHIFT_ENFORCE_FROM to the Monday AFTER first registration Sunday.
+    const enforceFrom=process.env.GU_SHIFT_ENFORCE_FROM||'';
+    if(/^\d{4}-\d{2}-\d{2}$/.test(enforceFrom) && enforceFrom>vnDate(new Date())){
+      try{if(isoWeekMonday(enforceFrom)===enforceFrom)shift={...shift,canWork:true,grace:false,allowedUntil:null};}
+      catch{/* Ignore malformed rollout date; enforce the normal shift policy. */}
+    }
+    if(!options?.allowSchedule&&!shift.canWork)throw new ApiError(403,'Ngoài ca làm việc đã đăng ký. Chỉ được truy cập quản lý trong ca và 15 phút sau khi kết thúc.',{code:'SHIFT_REQUIRED'});
+  }
+  return {uid,role:normalizedRole,name:String(staff.data()?.name??''),shift};
 }
 export function requirePcStaff(_me:{role:Role}){/* All staff now use the same PC/mobile-responsive workspace. */}
 export function requireAdmin(me:{role:Role}){if(me.role!=='admin')throw new ApiError(403,'Chỉ Admin được duyệt và xóa đơn.');}
