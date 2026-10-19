@@ -1,6 +1,6 @@
 {
   "name": "gu-thue-do-xinh",
-  "version": "5.0.0-beta.8",
+  "version": "5.0.0-beta.9",
   "private": true,
   "type": "module",
   "scripts": {
@@ -13,7 +13,9 @@
     "verify:release": "node scripts/verify-release.mjs",
     "data:plan": "node --env-file=.env.local scripts/reset-demo-data.mjs --plan",
     "data:backup": "node --env-file=.env.local scripts/reset-demo-data.mjs --backup",
-    "diagnose:monitoring": "node --experimental-strip-types --env-file=.env.local scripts/diagnose-monitoring.mjs"
+    "diagnose:monitoring": "node --experimental-strip-types --env-file=.env.local scripts/diagnose-monitoring.mjs",
+    "data:index-names": "node --experimental-strip-types --env-file=.env.local scripts/migrate-product-names.mjs --plan",
+    "data:apply-names": "node --experimental-strip-types --env-file=.env.local scripts/migrate-product-names.mjs --execute --confirm=INDEX-gugu-547e3"
   },
   "dependencies": {
     "firebase": "^12.0.0",

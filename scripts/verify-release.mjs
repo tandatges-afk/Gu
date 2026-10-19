@@ -28,6 +28,8 @@ const required = [
   'src/app/api/system/route.ts',
   'src/lib/monitoring-error.ts',
   'src/lib/server-error-classifier.ts',
+  'src/lib/product-name.ts',
+  'scripts/migrate-product-names.mjs',
   'src/app/api/catalog/route.ts',
   'src/app/api/calendar/route.ts',
   'src/app/api/tasks/route.ts',
@@ -76,6 +78,9 @@ const checks = [
   ['hàm tính ngày trễ', /export\s+(?:function|const)\s+lateDays\b/, 'src/lib/rental.ts'],
   ['hàm tính phí trễ', /export\s+(?:function|const)\s+lateBaseCharge\b/, 'src/lib/rental.ts'],
 ];
+checks.push(['tên sản phẩm duy nhất giao dịch', /productNameIndex/, 'src/app/api/items/route.ts']);
+checks.push(['sửa tên sản phẩm đồng bộ index', /nextNameRef/, 'src/app/api/items/[id]/route.ts']);
+checks.push(['migrating tên sản phẩm cũ', /DUPLICATE GROUPS/, 'scripts/migrate-product-names.mjs']);
 checks.push(['tiền phân cách hàng nghìn', /formatVndInput/, 'src/components/GuMoneyInput.tsx']);
 checks.push(['giá thuê dùng tiền định dạng', /GuMoneyInput required/, 'src/app/page.tsx']);
 checks.push(['chỉ giữ Cloudinary trong giám sát Admin', /cloudinaryReport/, 'src/app/api/system/route.ts']);
@@ -100,7 +105,7 @@ checks.push(['menu PC không dùng bottom nav mobile', /gu-main-bottom-nav/, 'sr
 checks.push(['menu mobile riêng', /gu-staff-bottom-nav/, 'src/app/mobile/page.tsx']);
 const absent = checks.filter(([name,pattern,file]) => missing.includes(file) || !pattern.test(read(file))).map(([name])=>name);
 const pkg = JSON.parse(read('package.json'));
-if (pkg.version !== '5.0.0-beta.8') absent.push('phiên bản 5.0.0-beta.8 trong package.json');
+if (pkg.version !== '5.0.0-beta.9') absent.push('phiên bản 5.0.0-beta.9 trong package.json');
 if (missing.length || absent.length) {
   console.error('KHÔNG ĐỒNG BỘ. Thiếu tệp:', missing.join(', ') || 'không');
   console.error('Thiếu thành phần:', absent.join(', ') || 'không');

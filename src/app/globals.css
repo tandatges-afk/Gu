@@ -782,3 +782,61 @@ html,body{background:var(--paper);color:var(--ink)}
 
 /* Cloudinary-only admin resource panel */
 .gu-system-grid.gu-system-cloudinary-only{grid-template-columns:minmax(0,1fr);max-width:920px}
+
+/* GU v5 Beta 9: shared desktop workspace, staff PC, and isolated staff_mobile layouts */
+@media(min-width:851px){
+ .gu-main-bottom-nav,.gu-staff-bottom-nav{display:none!important}
+ .shell .sidebar{display:flex;flex-direction:column;overflow-y:auto;overscroll-behavior:contain}
+ .shell .navigation{display:grid;gap:10px;align-content:start}
+ .shell .gu-nav-section{min-width:0}
+ .shell .nav-link{width:100%;min-height:42px;gap:12px;border-radius:11px;text-align:left}
+ .shell .content{max-width:1630px;margin-inline:auto;width:100%;min-width:0}
+ .shell .page-intro{display:flex;align-items:flex-start;justify-content:space-between;gap:22px}
+ .shell .page-intro .action-row{display:flex;gap:9px;flex-wrap:wrap;justify-content:flex-end}
+ .shell .page-intro .btn{min-height:43px}
+ .shell .gu-v5-review-layout{grid-template-columns:minmax(230px,300px) minmax(0,1fr)}
+ .shell .gu-v5-review-detail{min-width:0;overflow:hidden}
+}
+.shell .gu-nav-section-title{margin:15px 12px 7px;font-size:10px;letter-spacing:.1em;font-weight:800}
+.shell .nav-link:focus-visible,.gu-v5-mobile button:focus-visible{outline:3px solid #27877f;outline-offset:2px}
+.shell .page-intro h1{line-height:1.2}
+.shell .panel,.shell .gu-v5-review-detail,.shell .gu-inline-box{min-width:0}
+.shell .filter-toolbar{display:flex;gap:12px;align-items:center}
+.shell .table-wrap{max-width:100%;overflow-x:auto}
+.shell .modal .form-grid{gap:14px}
+.shell .modal .form-field{min-width:0}
+.shell .modal input,.shell .modal select,.shell .modal textarea{max-width:100%}
+.shell .modal .modal-actions{gap:10px}
+.gu-v5-mobile.gu-mobile-new{isolation:isolate;overflow-x:clip;min-height:100dvh}
+.gu-v5-mobile .gu-mobile-content{width:min(100%,960px);margin-inline:auto;min-width:0}
+.gu-v5-mobile .gu-mobile-jobs,.gu-v5-mobile .gu-mobile-workspace{min-width:0}
+.gu-v5-mobile .gu-mobile-item,.gu-v5-mobile .gu-mobile-angle{min-width:0}
+.gu-v5-mobile .gu-mobile-angle img{max-width:100%;object-fit:contain}
+.gu-v5-mobile .gu-mobile-job-card{width:100%;min-width:0;overflow:hidden}
+.gu-v5-mobile .gu-mobile-job-text{min-width:0;overflow-wrap:anywhere}
+@media(max-width:850px){
+ .shell .content{padding-bottom:calc(105px + env(safe-area-inset-bottom))}
+ .shell .gu-main-bottom-nav{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));visibility:visible}
+ .shell .gu-main-bottom-nav button{min-height:54px}
+ .shell .sidebar:not(.sidebar-open){pointer-events:none}
+ .shell .sidebar.sidebar-open{pointer-events:auto}
+ .shell .page-intro .action-row{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+ .shell .modal{min-width:0}
+ .gu-v5-mobile .gu-staff-bottom-nav{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));width:100%}
+ .gu-v5-mobile.gu-mobile-new .gu-mobile-content{padding-bottom:calc(110px + env(safe-area-inset-bottom))}
+}
+@media(min-width:851px){.gu-v5-mobile.gu-mobile-new .gu-staff-top-tabs{display:flex}.gu-v5-mobile.gu-mobile-new .gu-staff-bottom-nav{display:none!important}}
+@media(max-width:480px){
+ .shell .page-intro .action-row .btn{white-space:normal;overflow-wrap:anywhere;min-width:0}
+ .gu-v5-mobile.gu-mobile-new .gu-mobile-order-details{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+ .gu-v5-mobile.gu-mobile-new .gu-mobile-compare{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .gu-v5-mobile.gu-mobile-new .gu-mobile-condition>div{grid-template-columns:repeat(3,minmax(0,1fr))}
+ .gu-v5-mobile.gu-mobile-new .gu-mobile-condition button{min-width:0;overflow-wrap:anywhere}
+}
+
+/* Beta 9 visual declutter: sidebar groups replace duplicate workspace labels. */
+.shell .sidebar .workspace,.shell .sidebar .nav-heading{display:none}
+.shell .navigation{padding-top:10px}
+.shell .page-intro .eyebrow{display:none}
+.shell .page-intro h1{margin-top:0}
+.gu-v5-mobile.gu-mobile-new .gu-mobile-section-heading .gu-mobile-eyebrow{display:none}

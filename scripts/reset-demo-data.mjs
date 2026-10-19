@@ -25,7 +25,7 @@ if(!getApps().length) initializeApp({credential:cert({projectId,clientEmail:emai
 const db=getFirestore();
 // Keep employee access intact. Every collection not in these two lists aborts the reset.
 const PRESERVED = new Set(['staff']);
-const CLEAR = new Set(['items','customers','orders','categories','auditLogs','rentalSlots','skuIndex','phoneIndex','inventoryCounters','debtLedger','cashDaily','cashHistoryDaily','inspectionCleanup','inspectionEvidence','mobileJobs','proofUploads','cameraSerialIndex','systemMigrations','v5DayIntervals']);
+const CLEAR = new Set(['items','customers','orders','categories','auditLogs','rentalSlots','skuIndex','phoneIndex','productNameIndex','inventoryCounters','debtLedger','cashDaily','cashHistoryDaily','inspectionCleanup','inspectionEvidence','mobileJobs','proofUploads','cameraSerialIndex','systemMigrations','v5DayIntervals']);
 const MAX_DOCS=3000; // prevent accidentally resetting a mature production system
 
 function serialize(value){

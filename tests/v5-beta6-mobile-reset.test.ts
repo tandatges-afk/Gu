@@ -31,5 +31,5 @@ test('reset covers all operational data (not only customers/orders/items)',()=>{
  for(const collection of ['rentalSlots','v5DayIntervals','mobileJobs','proofUploads','inspectionCleanup','inspectionEvidence','debtLedger','cashDaily','cameraSerialIndex','skuIndex','inventoryCounters','auditLogs']) assert.match(script,new RegExp("'"+collection+"'"));
 });
 test('PWA public asset cache is bumped for refreshed mobile UI',()=>{
- assert.match(read('public/gu-sw.js'),/gu-static-v5-0-beta8/);
+ assert.match(read('public/gu-sw.js'),/gu-static-v5-0-beta9/);
 });

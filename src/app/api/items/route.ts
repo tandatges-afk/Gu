@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import {normalizeProductName,productNameIndexId,PRODUCT_NAME_INDEX_MIGRATION} from '@/lib/product-name';
 import { db } from '@/lib/firebase-admin';
 import { staffUser,handleError,jsonBody,ApiError } from '@/lib/http';
 import { assertText,positiveVnd } from '@/lib/rental';
@@ -16,6 +17,8 @@ export async function POST(req:NextRequest) {
     const me=await staffUser(req);
     const b=await jsonBody(req);
     const name=assertText(b.name,'Tên sản phẩm',120);
+    const nameKey=normalizeProductName(name);
+    if(!nameKey)throw new ApiError(400,'Tên sản phẩm không hợp lệ.');
     // SKU is an internal immutable identifier. Employees never enter it.
     const ref=db().collection('items').doc();
     const sku='GU-'+ref.id.slice(0,12).toUpperCase();
@@ -36,20 +39,24 @@ export async function POST(req:NextRequest) {
     const replacementValue=me.role==='admin'?positiveVnd(b.replacementValue,'Giá trị đền bù'):0;
     const skuRef=db().collection('skuIndex').doc(encodeURIComponent(sku));
     const counterRef=db().collection('inventoryCounters').doc(HANGER_COUNTER_DOC);
+    const nameRef=db().collection('productNameIndex').doc(productNameIndexId(name));
+    const migrationRef=db().collection('systemMigrations').doc(PRODUCT_NAME_INDEX_MIGRATION);
     const now=new Date().toISOString();
     const inspectionAngles=me.role==='admin'&&Array.isArray(b.inspectionAngles)&&b.inspectionAngles.length?normalizedAngles(b.inspectionAngles):[];
     const referenceShots=me.role==='admin'&&b.referenceShots&&typeof b.referenceShots==='object'&&!Array.isArray(b.referenceShots)?b.referenceShots as Record<string,unknown>:{};
     if(Object.entries(referenceShots).some(([angle,url])=>!inspectionAngles.includes(angle)||!validProductImageUrl(url,me.uid,process.env.CLOUDINARY_CLOUD_NAME||'')))throw new ApiError(400,'Ảnh chi tiết phải nằm trong góc chụp và được tải lên từ tài khoản Admin.');
-    const item={name,sku,size,color,category,...(camera?{cameraModel,cameraSerial}:{}),inspectionAngles,referenceShots,dailyRate,bufferDays:0,requiresLaundry,replacementValue,imagePaths:b.imagePaths as string[],status:'AVAILABLE',createdAt:now,createdBy:me.uid};
+    const item={name,nameKey,sku,size,color,category,...(camera?{cameraModel,cameraSerial}:{}),inspectionAngles,referenceShots,dailyRate,bufferDays:0,requiresLaundry,replacementValue,imagePaths:b.imagePaths as string[],status:'AVAILABLE',createdAt:now,createdBy:me.uid};
     const hangerCode=await db().runTransaction(async tx=>{
       // All reads precede all writes; increment is atomic even when two employees create simultaneously.
-      const [exists,counter,serial]=await Promise.all([tx.get(skuRef),tx.get(counterRef),serialRef?tx.get(serialRef):Promise.resolve(null)]);
+      const [exists,counter,serial,index,migration]=await Promise.all([tx.get(skuRef),tx.get(counterRef),serialRef?tx.get(serialRef):Promise.resolve(null),tx.get(nameRef),tx.get(migrationRef)]);
+      if(migration.data()?.completed!==true)throw new ApiError(409,'Cần hoàn tất đồng bộ tên sản phẩm trước khi nhập kho.');
+      if(index.exists)throw new ApiError(409,'Tên sản phẩm đã tồn tại.');
       if(exists.exists)throw new ApiError(409,'Sản phẩm đã tồn tại.');
       if(serial?.exists)throw new ApiError(409,'Serial máy ảnh đã được đăng ký cho sản phẩm khác.');
       const sequence=nextHangerSequence(counter.data()?.value);
       const code=formatHangerCode(sequence);
       tx.set(counterRef,{value:sequence,updatedAt:now});
-      tx.create(skuRef,{itemId:ref.id});if(serialRef)tx.create(serialRef,{itemId:ref.id,model:cameraModel});tx.create(ref,{...item,hangerCode:code});
+      tx.create(nameRef,{key:nameKey,name,owners:[ref.id],updatedAt:now});tx.create(skuRef,{itemId:ref.id});if(serialRef)tx.create(serialRef,{itemId:ref.id,model:cameraModel});tx.create(ref,{...item,hangerCode:code});
       auditInTransaction(tx,me,'ITEM_CREATE','item',ref.id,`${code} - ${name}, ${item.imagePaths.length} ảnh`,now);
       return code;
     });
