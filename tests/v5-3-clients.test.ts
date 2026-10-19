@@ -32,7 +32,7 @@ test('legacy and hourly locks checked together',()=>{
 });
 test('mobile receives jobs and Admin compares both photo sets',()=>{
  const mobile=read('src/app/mobile/page.tsx');const review=read('src/components/GuV5Review.tsx');
- assert.match(mobile,/gu-v5-job-popup/);assert.match(mobile,/Giao & nhận đồ/);assert.match(mobile,/Tìm bằng ảnh/);
+ assert.match(mobile,/gu-mobile-dialog/);assert.match(mobile,/Giao & nhận đồ/);assert.match(mobile,/Tìm bằng ảnh/);
  assert.match(review,/order\.handoverProof/);assert.match(review,/order\.returnProof/);assert.match(review,/APPROVE_RETURN/);
 });
 test('actual mobile handover is the clock origin for final 24h settlement',()=>{
