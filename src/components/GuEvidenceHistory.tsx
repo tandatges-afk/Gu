@@ -1,5 +1,5 @@
+'use client';
 import {formatVNDateTime} from '@/lib/vn-datetime';
- 'use client';
 import {useEffect,useState} from 'react';
 import type {ApiCall} from './GuExtras';
 import type {InventoryItem,RentalOrder} from '@/lib/types';

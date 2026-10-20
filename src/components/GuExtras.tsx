@@ -1,5 +1,5 @@
-import {formatVNDateTime} from '@/lib/vn-datetime';
 'use client';
+import {formatVNDateTime} from '@/lib/vn-datetime';
 import {useEffect,useState, type FormEvent} from 'react';
 import {clientAuth} from '@/lib/firebase-client';
 import {money} from '@/lib/rental';
