@@ -1,11 +1,11 @@
 {
   "name": "gu-thue-do-xinh",
-  "version": "5.3.5-beta.1",
+  "version": "5.3.5-beta.3",
   "private": true,
   "type": "module",
   "scripts": {
     "dev": "next dev",
-    "build": "node scripts/check-local-imports.mjs && node scripts/check-client-directives.mjs && next build",
+    "build": "node scripts/check-local-imports.mjs && node scripts/check-client-directives.mjs && node scripts/check-lucide-icons.mjs && next build",
     "start": "next start",
     "typecheck": "tsc --noEmit",
     "test": "node --experimental-strip-types --test tests/*.test.ts",
@@ -20,7 +20,8 @@
     "staff:unify-apply": "node --env-file=.env.local scripts/migrate-staff-unified.mjs --execute --confirm=UNIFY-gugu-547e3",
     "verify:imports": "node scripts/check-local-imports.mjs && node scripts/check-client-directives.mjs",
     "verify:client": "node scripts/check-client-directives.mjs",
-    "data:phone-index-plan": "node --experimental-strip-types --env-file=.env.local scripts/migrate-customer-phone-index.mjs --plan"
+    "data:phone-index-plan": "node --experimental-strip-types --env-file=.env.local scripts/migrate-customer-phone-index.mjs --plan",
+    "verify:icons": "node scripts/check-lucide-icons.mjs"
   },
   "dependencies": {
     "firebase": "^12.0.0",

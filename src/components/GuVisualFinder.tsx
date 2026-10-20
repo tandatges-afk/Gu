@@ -1,6 +1,6 @@
 'use client';
 import {useEffect,useRef,useState} from 'react';
-import {RefreshCcw,ImageSearch,Database,AlertCircle} from 'lucide-react';
+import {RefreshCcw,Search,Database,AlertCircle} from 'lucide-react';
 import {imageSignature} from '@/lib/visual-image';
 import {rankVisualItems,type VisualSignature} from '@/lib/visual-index';
 import {ProductImage,type ApiCall} from './GuExtras';
@@ -85,7 +85,7 @@ export function GuVisualFinder({api,onChoose,active=true,isAdmin=false}:{api:Api
   finally{if(seq===token.current)setLoading(false);}
  };
  return <section className={styles.finder} aria-label="Tìm sản phẩm bằng ảnh">
-  <div className={styles.heading}><ImageSearch size={23}/><div><h3>Tìm sản phẩm bằng hình ảnh</h3><p>So khớp màu, bố cục và đường nét trong chỉ mục. Kết quả gần đúng để nhân viên đối chiếu, không cam kết nhận dạng 100%.</p></div></div>
+  <div className={styles.heading}><Search size={23}/><div><h3>Tìm sản phẩm bằng hình ảnh</h3><p>So khớp màu, bố cục và đường nét trong chỉ mục. Kết quả gần đúng để nhân viên đối chiếu, không cam kết nhận dạng 100%.</p></div></div>
   <div className={styles.actions}><label className="btn btn-white">Chọn ảnh<input hidden type="file" accept="image/*" onChange={e=>setFile(e.target.files?.[0]||null)}/></label>
    <label className="btn btn-white">Chụp ảnh<input hidden type="file" accept="image/*" capture="environment" onChange={e=>setFile(e.target.files?.[0]||null)}/></label>
    <button type="button" className="btn btn-white" onClick={()=>void pasteFile()}>Dán ảnh</button>

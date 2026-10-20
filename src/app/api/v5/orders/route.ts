@@ -34,7 +34,13 @@ export async function POST(req:NextRequest){
   const phoneRef=quick?db().collection('phoneIndex').doc(encodeURIComponent(quickPhone)):null;
   const legacyMatches=quick?await Promise.all([quickPhone,'+84'+quickPhone.slice(1),'84'+quickPhone.slice(1)].map(phone=>db().collection('customers').where('phone','==',phone).limit(1).get())):[];
   const legacyId=legacyMatches.flatMap(snap=>snap.docs.map(doc=>doc.id))[0]||null;
-  const customerRef=db().collection('customers').doc(quick?(legacyId||undefined):String(b.customerId));
+  // Firestore .doc() may create a new ID, but .doc(undefined) is invalid.
+  // Keep the historical matching customer where possible; otherwise generate
+  // a new document reference now, so a failed order transaction creates no customer.
+  const customersCollection=db().collection('customers');
+  const customerRef=quick
+    ? (legacyId?customersCollection.doc(legacyId):customersCollection.doc())
+    : customersCollection.doc(String(b.customerId));
 
   const itemRefs=(ids as string[]).map(x=>db().collection('items').doc(x));
   const orderRef=db().collection('orders').doc();const jobRef=db().collection('mobileJobs').doc(orderRef.id);
@@ -50,7 +56,9 @@ export async function POST(req:NextRequest){
   if(prepay&&b.confirmPaid!==true)throw new ApiError(400,'Nhân viên cần xác nhận đã thu đủ tiền thuê trước khi giữ lịch.');
   const result=await db().runTransaction(async tx=>{
    const [indexedCustomer,...itemSnaps]=await Promise.all([phoneRef?tx.get(phoneRef):Promise.resolve(null),...itemRefs.map(x=>tx.get(x))]);
-   const resolvedCustomerRef=phoneRef&&indexedCustomer?.exists?db().collection('customers').doc(String(indexedCustomer.data()?.customerId||'')):customerRef;
+   const indexedCustomerId=phoneRef&&indexedCustomer?.exists?String(indexedCustomer.data()?.customerId||''):'';
+   if(indexedCustomer?.exists&&!simpleId(indexedCustomerId))throw new ApiError(409,'Chỉ mục khách hàng bị thiếu thông tin. Liên hệ Admin để kiểm tra.');
+   const resolvedCustomerRef=indexedCustomerId?customersCollection.doc(indexedCustomerId):customerRef;
    const customerSnap=await tx.get(resolvedCustomerRef);
    if((!quick&&!customerSnap.exists)||(phoneRef&&indexedCustomer?.exists&&!customerSnap.exists)||itemSnaps.some(x=>!x.exists))throw new ApiError(404,'Không tìm thấy khách hoặc sản phẩm.');
    const customer:Customer=customerSnap.exists?{id:customerSnap.id,...customerSnap.data()} as Customer:
