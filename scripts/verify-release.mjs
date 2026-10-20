@@ -31,6 +31,7 @@ const required = [
   'docs/GU-v5-BETA10-INDEX-AND-UI.md',
   'src/lib/product-name.ts',
   'src/lib/product-search.ts',
+  'src/lib/catalog-code-search.ts',
   'src/lib/return-risk.ts',
   'scripts/migrate-staff-unified.mjs',
   'src/app/api/v5/return-risk/route.ts',
@@ -147,9 +148,12 @@ checks.push(['lọc lịch thiết kế riêng', /gu-calendar-controls-v532/, 's
 checks.push(['cache trong phiên không reload tab', /tabCacheRef/, 'src/app/page.tsx']);
 checks.push(['đồng hồ VN 24h', /formatVNDateTime/, 'src/lib/vn-datetime.ts']);
 checks.push(['đối soát thu thừa', /overpaid/, 'src/lib/payment-review.ts']);
+checks.push(['tìm mã sản phẩm theo chuỗi không mất 0', /inventoryCodeNeedle/, 'src/app/api/catalog/route.ts']);
+checks.push(['thống kê kho bỏ sản phẩm lưu trữ', /archivedByStatus/, 'src/app/api/bootstrap/route.ts']);
+checks.push(['nhập lại mã xóa lỗi cũ', /setQuery\(e.target.value\);setErr\(''\);setCatalogData\(null\)/, 'src/app/page.tsx']);
 const absent = checks.filter(([name,pattern,file]) => missing.includes(file) || !pattern.test(read(file))).map(([name])=>name);
 const pkg = JSON.parse(read('package.json'));
-if (pkg.version !== '5.3.3-beta.2') absent.push('phiên bản 5.3.3-beta.2 trong package.json');
+if (pkg.version !== '5.3.4-beta.1') absent.push('phiên bản 5.3.4-beta.1 trong package.json');
 if (missing.length || absent.length) {
   console.error('KHÔNG ĐỒNG BỘ. Thiếu tệp:', missing.join(', ') || 'không');
   console.error('Thiếu thành phần:', absent.join(', ') || 'không');

@@ -3,16 +3,9 @@ import {type Query} from 'firebase-admin/firestore';
 import {db} from '@/lib/firebase-admin';
 import {staffUser,handleError,ApiError} from '@/lib/http';
 import {productSearchText,matchesProductSearch} from '@/lib/product-search';
-import {formatHangerCode} from '@/lib/hanger-code';
+import {isInventoryCodeQuery,inventoryCodeNeedle,matchesInventoryCode} from '@/lib/catalog-code-search';
 export const runtime='nodejs';
 export const preferredRegion='sin1';
-const looksLikeShortProductCode=(value:string)=>/^(?:GU[- ]?)?\d{1,5}$/i.test(value.trim());
-const normalizedProductCode=(value:string)=>{
-  const raw=value.trim().toUpperCase();
-  if(/^GU-\d{5}$/.test(raw))return raw;
-  const digits=raw.replace(/\D/g,'');
-  return digits&&digits.length<=5?formatHangerCode(Number(digits)):raw;
-};
 export async function GET(req:NextRequest){
  try{
   const me=await staffUser(req);const u=new URL(req.url);
@@ -32,11 +25,48 @@ export async function GET(req:NextRequest){
   const mode=u.searchParams.get('field')||'';
   const token=String(u.searchParams.get('cursor')||'');
   let collection:Query=db().collection(kind),field=kind==='orders'?'createdAt':kind==='customers'?'name':'name';
+  // Indexed code values cannot perform substring searches with Firestore startAt.
+  // Scan an ordered, bounded page of codes and carry a cursor for the last scanned doc.
+  // This supports "00", "00002", "234" and full GU codes without Number("00") -> 0.
+  if(kind==='items'&&term&&(mode==='code'||isInventoryCodeQuery(term))){
+    if(!isInventoryCodeQuery(term))throw new ApiError(400,'Mã tìm kiếm phải chứa từ 1 đến 5 chữ số.');
+    const needle=inventoryCodeNeedle(term);
+    let codeQuery:Query=db().collection('items').orderBy('hangerCode');
+    if(token){
+      let parsed:unknown;
+      try{parsed=JSON.parse(Buffer.from(token,'base64url').toString('utf8'));}catch{throw new ApiError(400,'Trang tìm kiếm mã không hợp lệ.');}
+      if(!Array.isArray(parsed)||parsed.length!==3||parsed[0]!=='code'||parsed[1]!==needle||typeof parsed[2]!=='string'||!/^[\w-]{10,128}$/.test(parsed[2]))throw new ApiError(400,'Trang tìm kiếm mã không hợp lệ.');
+      const last=await db().collection('items').doc(parsed[2]).get();
+      if(!last.exists)throw new ApiError(409,'Danh sách mã đã thay đổi, vui lòng tìm lại.');
+      codeQuery=codeQuery.startAfter(last);
+    }
+    const matches:Array<{id:string;[key:string]:unknown}>=[];
+    let lastId:string|null=null;
+    let hasMore=false;
+    for(let page=0;page<12;page++){
+      const snap=await codeQuery.limit(100).get();
+      if(snap.empty){hasMore=false;break;}
+      for(const doc of snap.docs){
+        lastId=doc.id;
+        const entry=doc.data();
+        if(!entry.archivedAt&&matchesInventoryCode(String(entry.hangerCode||''),term)){
+          matches.push({id:doc.id,...entry});
+          if(matches.length>=take)break;
+        }
+      }
+      hasMore=snap.size===100;
+      if(matches.length>=take||!hasMore)break;
+      codeQuery=codeQuery.startAfter(snap.docs[snap.docs.length-1]);
+    }
+    const cursor=hasMore&&lastId?Buffer.from(JSON.stringify(['code',needle,lastId])).toString('base64url'):null;
+    return NextResponse.json({kind,results:matches,cursor,hasMore:Boolean(cursor),pageSize:take,
+      searchNote:'Tìm mọi vị trí trong mã sản phẩm, không phân biệt các số 0 đầu.'},{headers:{'Cache-Control':'private,no-store'}});
+  }
   // Single-char and anywhere-in-name lookup use one-character and two-character
   // indexes. Existing inventory needs `data:apply-names` after this release.
   // Cursor points to the last *scanned* row, not the last matching row, so
   // filters cannot silently skip results between pages.
-  if(kind==='items'&&term&&mode!=='code'&&!looksLikeShortProductCode(term)&&!/^GU[-\d]/i.test(term)){
+  if(kind==='items'&&term&&mode!=='code'){
    const normalized=productSearchText(term);
    if(!normalized)return NextResponse.json({kind,results:[],cursor:null,hasMore:false,pageSize:take});
    const indexKey=normalized.length===1?normalized:normalized.slice(0,2);
@@ -72,7 +102,7 @@ export async function GET(req:NextRequest){
   }
   // Phone / product-code searches remain indexed prefix queries.
   if(term){
-   if(kind==='items')field=mode==='code'||looksLikeShortProductCode(term)||/^GU[-\d]/i.test(term)?'hangerCode':'name';
+   if(kind==='items')field=mode==='code'?'hangerCode':'name';
    else if(kind==='customers')field=mode==='phone'||/^[+\d]/.test(term)?'phone':'name';
    else field=mode==='phone'?'customerPhone':mode==='customer'?'customerName':'code';
   }
@@ -84,7 +114,7 @@ export async function GET(req:NextRequest){
   collection=collection.orderBy(field,descending?'desc':'asc');
   if(term){
    // Legacy GU names are case sensitive in Firestore. Code and phone searches remain exact-prefix.
-   const value=field==='hangerCode'?normalizedProductCode(term):term;
+   const value=field==='hangerCode'?term.toUpperCase():term;
    collection=collection.startAt(value).endAt(value+'\uf8ff');
   }
   if(token){
@@ -101,8 +131,31 @@ export async function GET(req:NextRequest){
       throw new ApiError(409,'Danh sách đã thay đổi. Vui lòng tải lại.');
     collection=collection.startAfter(lastDoc);
   }
+  if(kind==='items'){
+    // Fetch enough ACTIVE products for one page, regardless of how many archived
+    // documents sort before them. The cursor is the last scanned document.
+    const matches:Array<{id:string;[key:string]:unknown}>=[];
+    let lastId:string|null=null;let lastValue='';let hasMore=false;
+    for(let page=0;page<12;page++){
+      const snap=await collection.limit(100).get();
+      if(snap.empty){hasMore=false;break;}
+      for(const doc of snap.docs){
+        lastId=doc.id;lastValue=String(doc.get(field)||'');
+        if(!doc.data().archivedAt){matches.push({id:doc.id,...doc.data()});if(matches.length>=take)break;}
+      }
+      hasMore=snap.size===100;
+      if(matches.length>=take||!hasMore)break;
+      collection=collection.startAfter(snap.docs[snap.docs.length-1]);
+    }
+    const cursor=hasMore&&lastId?Buffer.from(JSON.stringify([lastValue,lastId])).toString('base64url'):null;
+    return NextResponse.json({kind,results:matches,cursor,hasMore:Boolean(cursor),pageSize:take},
+      {headers:{'Cache-Control':'private,no-store'}});
+  }
   const snapshot=await collection.limit(take+1).get();
   let docs=snapshot.docs.slice(0,take);
+  // Archived stock retains its original AVAILABLE status in historical Firestore
+  // documents. Exclude it before reporting the number of visible results.
+  if(kind==='items')docs=docs.filter(d=>!d.data().archivedAt);
   if(kind==='orders'&&me.role!=='admin')docs=docs.filter(d=>!['RETURNED','CANCELLED','VOIDED'].includes(String(d.data().status)));
   const last=snapshot.docs.slice(0,take).at(-1);
   const cursor=snapshot.size>take&&last?Buffer.from(JSON.stringify([String(last.get(field)||''),last.id])).toString('base64url'):null;
