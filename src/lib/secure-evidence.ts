@@ -6,8 +6,9 @@ import type {Transaction} from 'firebase-admin/firestore';
 export type EvidencePurpose='reservation'|'deposit';
 export const validEvidenceId=(s:unknown):s is string=>typeof s==='string'&&/^[a-f0-9-]{36}$/.test(s);
 export const evidenceBucket=()=>{
- const name=process.env.FIREBASE_STORAGE_BUCKET;
- if(!name)throw new ApiError(503,'Cần cấu hình FIREBASE_STORAGE_BUCKET (bucket riêng tư) để chụp CCCD/chứng từ cọc.');
+ const name=(process.env.FIREBASE_STORAGE_BUCKET||'').trim();
+ if(!name)throw new ApiError(503,'Chưa cấu hình FIREBASE_STORAGE_BUCKET trên môi trường đang chạy (Vercel/Codespaces).');
+ if(name.startsWith('gs://')||name.includes('/')||!/^[a-z0-9._-]+$/.test(name))throw new ApiError(503,'FIREBASE_STORAGE_BUCKET chỉ được là tên bucket, không nhập gs:// hoặc đường dẫn.');
  return getStorage().bucket(name);
 };
 export async function readVerifiedEvidence(tx:Transaction,id:string,uid:string,purpose:EvidencePurpose,draftId:string){

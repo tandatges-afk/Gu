@@ -2,7 +2,7 @@ import {NextRequest,NextResponse} from 'next/server';
 import {db} from '@/lib/firebase-admin';
 import {staffUser,handleError,jsonBody,ApiError,requirePcStaff} from '@/lib/http';
 import {localDateTimeToISO,billableBlocks,vnDayKey} from '@/lib/hourly-pricing';
-import {rentalCharge,cameraPackageSnapshot,isCameraCategory,isCameraModel} from '@/lib/camera-rental';
+import {rentalCharge,chosenCameraPackageSnapshot,isCameraCategory,isCameraModel} from '@/lib/camera-rental';
 import {intervalRefs,checkIntervalAvailability,createIntervalWrites,simpleId} from '@/lib/v5-server';
 import {normalizedAngles} from '@/lib/inspection-proof';
 import {auditInTransaction} from '@/lib/audit';
@@ -49,11 +49,7 @@ export async function POST(req:NextRequest){
   const prepay=requiresFullPrepayment(pickupAt,now,b.bookingKind==='RESERVE');
   const paymentProofId=String(b.reservationPaymentProofId||'');
   const paymentDraftId=String(b.paymentDraftId||'');
-  const paymentMethod=String(b.paymentMethod||'CASH');
-  const paymentReference=String(b.paymentReference||'').trim().slice(0,100);
-  if(prepay&&(!['CASH','TRANSFER'].includes(paymentMethod)||(paymentMethod==='TRANSFER'&&paymentReference.length<4)))throw new ApiError(400,'Cần phương thức và mã giao dịch thanh toán hợp lệ.');
   if(prepay&&!paymentProofId)throw new ApiError(400,'Đặt lịch trước phải thu đủ 100% tiền thuê và chụp ảnh thanh toán.');
-  if(prepay&&b.confirmPaid!==true)throw new ApiError(400,'Nhân viên cần xác nhận đã thu đủ tiền thuê trước khi giữ lịch.');
   const result=await db().runTransaction(async tx=>{
    const [indexedCustomer,...itemSnaps]=await Promise.all([phoneRef?tx.get(phoneRef):Promise.resolve(null),...itemRefs.map(x=>tx.get(x))]);
    const indexedCustomerId=phoneRef&&indexedCustomer?.exists?String(indexedCustomer.data()?.customerId||''):'';
@@ -67,9 +63,18 @@ export async function POST(req:NextRequest){
    const items=itemSnaps.map(s=>({id:s.id,...s.data()} as InventoryItem));
    if(items.some(i=>i.archivedAt||['MAINTENANCE','MISSING'].includes(i.status)))throw new ApiError(409,'Có sản phẩm đã ngưng sử dụng hoặc thất lạc.');
    if(items.some(i=>!Array.isArray(i.inspectionAngles)||!i.inspectionAngles.length))throw new ApiError(409,'Admin cần thêm góc ảnh giao/nhận cho từng sản phẩm trước khi tạo đơn.');
+   const cameraItems=items.filter(i=>isCameraCategory(i.category));
+   if(cameraItems.length&&(!cameraItems.every(i=>isCameraModel(i.cameraModel))))throw new ApiError(409,'Máy ảnh chưa được Admin cấu hình đúng mẫu máy.');
+   let chosenCamera:ReturnType<typeof chosenCameraPackageSnapshot>|null=null;
+   if(cameraItems.length){
+    try{chosenCamera=chosenCameraPackageSnapshot(cameraItems[0].cameraModel!,pickupAt,returnAt,b.cameraPackageHours);}catch(e){throw new ApiError(400,e instanceof Error?e.message:'Gói máy ảnh không hợp lệ.');}
+   }
    const snapshots=await checkIntervalAvailability(tx,slots);
    const paymentEvidence=prepay?await readVerifiedEvidence(tx,paymentProofId,me.uid,'reservation',paymentDraftId):null;
-   const lines:RentalLine[]=items.map(i=>({itemId:i.id,name:i.name,sku:i.sku,hangerCode:i.hangerCode,size:i.size,category:i.category,cameraModel:i.cameraModel,cameraSerial:i.cameraSerial,...(isCameraCategory(i.category)&&isCameraModel(i.cameraModel)?cameraPackageSnapshot(i.cameraModel,pickupAt,returnAt):{}),dailyRate:i.dailyRate,bufferDays:0,replacementValue:i.replacementValue,lineTotal:rentalCharge(i,pickupAt,returnAt),startDate:vnDayKey(pickupAt),startAt:pickupAt}));
+   const lines:RentalLine[]=items.map(i=>{
+    const cameraSnapshot=isCameraCategory(i.category)&&chosenCamera&&isCameraModel(i.cameraModel)?chosenCameraPackageSnapshot(i.cameraModel,pickupAt,returnAt,b.cameraPackageHours):{};
+    return {itemId:i.id,name:i.name,sku:i.sku,hangerCode:i.hangerCode,size:i.size,category:i.category,cameraModel:i.cameraModel,cameraSerial:i.cameraSerial,...cameraSnapshot,dailyRate:i.dailyRate,bufferDays:0,replacementValue:i.replacementValue,lineTotal:rentalCharge({...i,...cameraSnapshot},pickupAt,returnAt),startDate:vnDayKey(pickupAt),startAt:pickupAt};
+   });
    const total=lines.reduce((s,l)=>s+l.lineTotal,0);
    const code='TH-'+now.slice(2,10).replace(/-/g,'')+'-'+orderRef.id.slice(0,5).toUpperCase();
    // Snapshot only validated/normalized angle labels. InventoryItem.inspectionAngles is optional
@@ -89,7 +94,7 @@ export async function POST(req:NextRequest){
 
    if(paymentEvidence){
     tx.update(paymentEvidence.ref,{consumedOrderId:orderRef.id,consumedAt:now});
-    tx.create(orderRef.collection('cashMovements').doc(),{orderId:orderRef.id,kind:'PAYMENT',amount:total,method:paymentMethod,reference:paymentReference||paymentProofId,actorUid:me.uid,actorName:me.name,createdAt:now,description:'Thu đủ 100% tiền thuê khi đặt lịch, có ảnh đối chiếu'});
+    tx.create(orderRef.collection('cashMovements').doc(),{orderId:orderRef.id,kind:'PAYMENT',amount:total,method:'PHOTO_PROOF',reference:'',actorUid:me.uid,actorName:me.name,createdAt:now,description:'Nhân viên lập đơn xác nhận đã thu đủ tiền qua ảnh cọc, không phân loại phương thức'});
     tx.set(db().collection('cashDaily').doc(vnDayKey(now)),{amount:FieldValue.increment(total),payments:FieldValue.increment(1),updatedAt:now},{merge:true});
    }
    tx.create(jobRef,{orderId:orderRef.id,code,customerName:customer.name,pickupAt,returnAt,stage:'HANDOVER',createdAt:now,updatedAt:now,creatorName:me.name});

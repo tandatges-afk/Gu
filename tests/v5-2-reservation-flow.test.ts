@@ -53,7 +53,7 @@ test('Payment popup remains after return and offers auto-collection',()=>{
 test('Sensitive collateral images only use private bucket, authenticated GET',()=>{
  const route=read('src/app/api/v5/secure-photo/route.ts');
  assert.match(route,/await staffUser\(req\)/);
- assert.match(route,/evidenceBucket\(\)\.file\(path\)\.save/);
+ assert.match(route,/evidenceBucket\(\)\.file\(path\)/);assert.match(route,/object\.save/);
  assert.match(route,/Cache-Control':'private,no-store/);
  assert.doesNotMatch(route,/res\.cloudinary/);
 });

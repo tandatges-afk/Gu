@@ -95,7 +95,10 @@ const required = [
   'docs/GU-v5.3.5-IMAGE-INDEX-INVENTORY-CUSTOMER-PAYMENT.md',
   'docs/GU-v5.3.6-LATE-PICKUP-STORAGE.md',
   'scripts/diagnose-storage.mjs',
-  'tests/v536-late-pickup-storage.test.ts'
+  'tests/v536-late-pickup-storage.test.ts',
+  'src/lib/secure-storage-errors.ts',
+  'tests/gu-v537-cameras-deposits.test.ts',
+  'docs/GU-v5.3.7-CAMERA-DEPOSIT-STORAGE.md'
 ];
 const missing = required.filter(p => !existsSync(join(root,p)));
 const read = p => readFileSync(join(root,p),'utf8');
@@ -150,7 +153,7 @@ checks.push(['màn đăng ký ca', /GuStaffShifts/, 'src/app/page.tsx']);
 checks.push(['đăng xuất theo ca 20 giây', /20_000/, 'src/app/page.tsx']);
 checks.push(['đặt trước thu đủ tiền thuê có bằng chứng', /readVerifiedEvidence\(tx,paymentProofId/, 'src/app/api/v5/orders/route.ts']);
 checks.push(['sổ quỹ đặt trước', /kind:'PAYMENT',amount:total/, 'src/app/api/v5/orders/route.ts']);
-checks.push(['ảnh cọc lưu private', /evidenceBucket\(\)\.file\(path\)\.save/, 'src/app/api/v5/secure-photo/route.ts']);
+checks.push(['ảnh cọc lưu private', /const object=evidenceBucket\(\)\.file\(path\)/, 'src/app/api/v5/secure-photo/route.ts']);
 checks.push(['nhận trả không cần Admin giải phóng kho', /status:'RETURNED' as const/, 'src/app/api/v5/orders/[id]/route.ts']);
 checks.push(['admin chỉ kiểm tra ảnh', /action==='REVIEW_PHOTOS'/, 'src/app/api/v5/orders/[id]/route.ts']);
 checks.push(['nhân viên xác nhận hoàn vật cọc', /action==='RETURN_COLLATERAL'/, 'src/app/api/v5/orders/[id]/route.ts']);
@@ -169,9 +172,12 @@ checks.push(['bộ lọc kho riêng và xóa lỗi cũ', /clearError\(\);/, 'src
 checks.push(['nhắc khách quá giờ nhận ở backend', /overduePickupNotices\(reservations,now\)/, 'src/app/api/v5/return-risk/route.ts']);
 checks.push(['thông báo khách quá giờ nhận', /gu-late-pickup-banner/, 'src/app/page.tsx']);
 checks.push(['chẩn đoán bucket private', /diagnose:storage/, 'package.json']);
+checks.push(['gói máy ảnh được chọn chủ động', /chosenCameraPackageSnapshot/, 'src/app/api/v5/orders/route.ts']);
+checks.push(['chụp ảnh cọc không chọn phương thức', /method:'PHOTO_PROOF'/, 'src/app/api/v5/orders/route.ts']);
+checks.push(['lỗi upload Storage được phân loại', /classifyStorageFailure/, 'src/app/api/v5/secure-photo/route.ts']);
 const absent = checks.filter(([name,pattern,file]) => missing.includes(file) || !pattern.test(read(file))).map(([name])=>name);
 const pkg = JSON.parse(read('package.json'));
-if (pkg.version !== '5.3.6-beta.1') absent.push('phiên bản 5.3.6-beta.1 trong package.json');
+if (pkg.version !== '5.3.7-beta.1') absent.push('phiên bản 5.3.7-beta.1 trong package.json');
 if (missing.length || absent.length) {
   console.error('KHÔNG ĐỒNG BỘ. Thiếu tệp:', missing.join(', ') || 'không');
   console.error('Thiếu thành phần:', absent.join(', ') || 'không');

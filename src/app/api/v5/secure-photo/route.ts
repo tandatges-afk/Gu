@@ -3,6 +3,7 @@ import {randomUUID} from 'node:crypto';
 import {db} from '@/lib/firebase-admin';
 import {staffUser,handleError,ApiError} from '@/lib/http';
 import {evidenceBucket,validEvidenceId} from '@/lib/secure-evidence';
+import {classifyStorageFailure} from '@/lib/secure-storage-errors';
 export const runtime='nodejs';export const preferredRegion='sin1';
 const limits={reservation:3*1024*1024,deposit:3*1024*1024};
 export async function POST(req:NextRequest){
@@ -20,8 +21,15 @@ export async function POST(req:NextRequest){
   if(!(f.type==='image/jpeg'&&isJpg||f.type==='image/png'&&isPng||f.type==='image/webp'&&isWebp))throw new ApiError(400,'Dữ liệu ảnh không đúng định dạng.');
   const id=randomUUID();const ext=isJpg?'jpg':isPng?'png':'webp';const path=`gu/secure-evidence/${me.uid}/${id}.${ext}`;
   // Firebase Storage is private. Never issue public download tokens for CCCD, receipts or deposits.
-  await evidenceBucket().file(path).save(bytes,{resumable:false,metadata:{contentType:f.type,cacheControl:'private,no-store'}});
-  await db().collection('secureEvidenceUploads').doc(id).create({ownerUid:me.uid,purpose,draftId,path,contentType:f.type,createdAt:new Date().toISOString(),consumedOrderId:null});
+  const object=evidenceBucket().file(path);
+  try{await object.save(bytes,{resumable:false,metadata:{contentType:f.type,cacheControl:'private,no-store'}});}
+  catch(error){const issue=classifyStorageFailure(error);if(issue)throw new ApiError(issue.status,issue.message,{code:issue.code});throw error;}
+  try{await db().collection('secureEvidenceUploads').doc(id).create({ownerUid:me.uid,purpose,draftId,path,contentType:f.type,createdAt:new Date().toISOString(),consumedOrderId:null});}
+  catch(error){
+   // No Firestore reference was recorded. Remove an otherwise orphaned private upload.
+   try{await object.delete({ignoreNotFound:true});}catch{console.error('[GU_STORAGE_ORPHAN_CLEANUP]',id);}
+   throw error;
+  }
   return NextResponse.json({id},{status:201,headers:{'Cache-Control':'no-store'}});
  }catch(e){return handleError(e,'POST /api/v5/secure-photo');}
 }
@@ -33,7 +41,8 @@ export async function GET(req:NextRequest){
   if(!doc.exists||!doc.data()?.consumedOrderId)throw new ApiError(404,'Ảnh chưa thuộc đơn đã xác nhận.');
   const info=doc.data()!;const order=await db().collection('orders').doc(info.consumedOrderId).get();
   if(!order.exists)throw new ApiError(404,'Không tìm thấy đơn của ảnh.');
-  const [bytes]=await evidenceBucket().file(info.path).download();
+  let bytes:Buffer;try{[bytes]=await evidenceBucket().file(info.path).download();}
+  catch(error){const issue=classifyStorageFailure(error);if(issue)throw new ApiError(issue.status,issue.message,{code:issue.code});throw error;}
   return new NextResponse(new Uint8Array(bytes),{headers:{'Content-Type':info.contentType,'Cache-Control':'private,no-store','X-Content-Type-Options':'nosniff','Content-Security-Policy':"default-src 'none'; sandbox"}});
  }catch(e){return handleError(e,'GET /api/v5/secure-photo');}
 }

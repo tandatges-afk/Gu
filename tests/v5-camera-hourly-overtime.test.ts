@@ -58,7 +58,7 @@ test('Server stores camera package at create and add-items, and quotes it upon A
  const create=readFileSync('src/app/api/v5/orders/route.ts','utf8');
  const edit=readFileSync('src/app/api/v5/orders/[id]/route.ts','utf8');
  const review=readFileSync('src/components/GuV5Review.tsx','utf8');
- for(const text of [create,edit])assert.match(text,/cameraPackageSnapshot/);
+ assert.match(create,/chosenCameraPackageSnapshot/);assert.match(edit,/cameraPackageSnapshot/);
  assert.match(edit,/approvedLineQuote/);
  assert.match(edit,/cameraOvertimeFeeTotal/);
  assert.match(edit,/lateFeeTotal:0/); // avoid double counting fees in the debt ledger

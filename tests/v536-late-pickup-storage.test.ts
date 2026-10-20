@@ -43,6 +43,7 @@ test('Storage cấu hình từ biến server và có kiểm tra bucket sẵn có
  const packageJson=JSON.parse(readFileSync('package.json','utf8'));
  assert.match(script,/FIREBASE_STORAGE_BUCKET/);
  assert.match(script,/getMetadata/);
- assert.doesNotMatch(script,/\.save\(|\.delete\(/);
+ assert.match(script,/if\(process\.argv\.includes\('--write-test'\)\)/);
+ assert.match(script,/bucket\.getMetadata\(\)/);
  assert.ok(packageJson.scripts['diagnose:storage']);
 });

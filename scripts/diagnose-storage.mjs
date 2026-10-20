@@ -15,11 +15,25 @@ if(name.startsWith('gs://')||name.includes('/')||!/^[a-z0-9._-]+$/.test(name)){
 const instance=initializeApp({credential:cert({projectId,clientEmail:email,privateKey:key})},'gu-storage-diagnostic');
 try{
  const bucket=getStorage(instance).bucket(name);
- const [metadata]=await bucket.getMetadata();
- console.log('Kết nối Firebase Storage thành công.');
- console.log('Bucket:',metadata.name,'| Location:',metadata.location,'| Project:',projectId);
- console.log('Không ghi, không đọc và không xóa ảnh.');
- console.log('Hãy thử tải 1 ảnh chứng từ trên Vercel Preview để kiểm chứng quyền ghi object.');
+ if(process.argv.includes('--write-test')){
+  const {randomUUID}=await import('node:crypto');
+  const filename=`gu/diagnostics/${randomUUID()}.txt`;
+  const object=bucket.file(filename);
+  try{
+   await object.save(Buffer.from('gu-storage-probe'),{resumable:false,metadata:{contentType:'text/plain',cacheControl:'private,no-store'}});
+   console.log('Ghi thử object vào bucket thành công.');
+  }finally{
+   try{await object.delete({ignoreNotFound:true});console.log('Đã dọn object kiểm thử.');}
+   catch(e){console.error('Không xóa được object kiểm thử; kiểm tra quyền storage.objects.delete.');throw e;}
+  }
+  console.log('Quyền ghi/xóa Firebase Storage hoạt động, không sử dụng ảnh khách.');
+ }else{
+  const [metadata]=await bucket.getMetadata();
+  console.log('Kết nối Firebase Storage thành công.');
+  console.log('Bucket:',metadata.name,'| Location:',metadata.location,'| Project:',projectId);
+  console.log('Không ghi, không đọc và không xóa ảnh.');
+  console.log('Muốn kiểm tra thực quyền ghi/xóa mà không đụng dữ liệu khách: npm run diagnose:storage -- --write-test');
+ }
 }catch(err){
  const code=typeof err==='object'&&err!==null&&'code' in err?String(err.code):'';
  const message=String(err?.message||'');
