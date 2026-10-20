@@ -109,6 +109,7 @@ export default function Home() {
   const [selectedOrder,setSelectedOrder]=useState<RentalOrder|null>(null);
   const [captureId,setCaptureId]=useState<string|null>(null);
   const [remoteRisks,setRemoteRisks]=useState<Array<{itemId:string;heldOrderId:string;nextOrderId:string}>>([]);
+  const [dismissedRiskSignature,setDismissedRiskSignature]=useState('');
   const [evidenceItem,setEvidenceItem]=useState<InventoryItem|null>(null);
   const [busy,setBusy]=useState(false);
   const [debtSummary,setDebtSummary]=useState<DebtSummary|null>(null);
@@ -135,12 +136,6 @@ export default function Home() {
   const [calendarQuery,setCalendarQuery]=useState('');
   const [calendarReload,setCalendarReload]=useState(0);
   const [calendarOrderRows,setCalendarOrderRows]=useState<RentalOrder[]|null>(null);
-  const [smartStart,setSmartStart]=useState(vietnamToday());
-  const [smartEnd,setSmartEnd]=useState(vietnamToday());
-  const [smartStartHour,setSmartStartHour]=useState('09:00');
-  const [smartEndHour,setSmartEndHour]=useState('09:00');
-  const [smartLoading,setSmartLoading]=useState(false);
-  const [smartResult,setSmartResult]=useState<{availableIds:string[];products?:InventoryItem[];pickupDate:string;returnDate:string;checkedAt:string;hasMore?:boolean}|null>(null);
   const [nearestLoading,setNearestLoading]=useState<string|null>(null);
   const [nearestResult,setNearestResult]=useState<{itemId:string;nextPickupDate:string|null;nextReturnDate:string|null;reason:string}|null>(null);
   const [taskView,setTaskView]=useState<'ALL'|'PICKUP_TODAY'|'RETURN_TODAY'|'OVERDUE'>('ALL');
@@ -299,6 +294,7 @@ export default function Home() {
   const {hour:vnHour}=vnCurrentTime(new Date());
   const riskRows=vnHour>=17?[...tomorrowReturnRisk(orders,new Date()),...remoteRisks]:[];
   const riskIds=new Set(riskRows.map(r=>r.itemId));
+  const riskSignature=today+'|'+[...riskIds].sort().join('|');
 
   const liveOrders=orders.filter(o=>o.status!=='CANCELLED');
   const active=liveOrders.filter(o=>o.status==='RESERVED'||o.status==='PICKED_UP');
@@ -373,23 +369,12 @@ export default function Home() {
     (calendarCreator==='ALL'||calendarActive.some(o=>o.createdBy===calendarCreator&&o.lines.some(l=>l.itemId===i.id)&&o.pickupDate<=calendarDays[6]&&o.returnDate>=calendarStart))&&
     (calendarStatus==='ALL'||calendarItemState(i,calendarActive,calendarStart,7,today)===calendarStatus)&&
     matchesCalendarSearch(i,calendarActive,calendarQuery));
-  const quickMatches=items.filter(i=>(calendarCategory==='ALL'||i.category===calendarCategory)&&matchesCalendarSearch(i,[],calendarQuery));
-  const availableMatches=smartResult&&smartResult.pickupDate===smartStart&&smartResult.returnDate===smartEnd?
-    (smartResult.products||quickMatches.filter(i=>smartResult.availableIds.includes(i.id))).filter(i=>(calendarCategory==='ALL'||i.category===calendarCategory)&&matchesCalendarSearch(i,[],calendarQuery)):[];
-  const findAvailable=async()=>{
-    setSmartLoading(true);setNearestResult(null);setSmartResult(null);
-    try {
-      const result=await api<{availableIds:string[];products?:InventoryItem[];pickupDate:string;returnDate:string;checkedAt:string;hasMore?:boolean}>('smart-calendar',{
-        method:'POST',body:JSON.stringify({mode:'FIND_AVAILABLE',pickupDate:smartStart,returnDate:smartEnd,startHour:smartStartHour,endHour:smartEndHour,query:calendarQuery})});
-      setSmartResult(result);
-    }catch(e){setErr(e instanceof Error?e.message:'Không thể tra cứu lịch trống.');}
-    finally{setSmartLoading(false);}
-  };
   const findNearest=async(itemId:string)=>{
     setNearestLoading(itemId);setNearestResult(null);
     try {
+      const requestedDay=calendarStart<today?today:calendarStart;
       const result=await api<{itemId:string;nextPickupDate:string|null;nextReturnDate:string|null;reason:string}>('smart-calendar',{
-        method:'POST',body:JSON.stringify({mode:'NEXT_AVAILABLE',itemId,pickupDate:smartStart,returnDate:smartEnd,startHour:smartStartHour,endHour:smartEndHour})});
+        method:'POST',body:JSON.stringify({mode:'NEXT_AVAILABLE',itemId,pickupDate:requestedDay,returnDate:requestedDay,startHour:'09:00',endHour:'09:00'})});
       setNearestResult(result);
     }catch(e){setErr(e instanceof Error?e.message:'Không thể tìm ngày trống tiếp theo.');}
     finally{setNearestLoading(null);}
@@ -461,7 +446,7 @@ export default function Home() {
       <GuPwaSetup/>
       <header className="topbar"><div className="topbar-left"><button className="mobile-toggle icon-btn" onClick={()=>setMobileNav(true)} aria-label="Mở menu"><Menu/></button><span className="gu-mobile-brand">GU<span>.</span></span><span className="crumb">Workspace</span><ChevronRight size={14} color="#b5ada4"/><span className="crumb-current">{nav.find(n=>n.id===page)?.label}</span></div><div className="topbar-right"><span className="today"><CalendarDays size={16}/>{prettyDay(today)}</span><button className="icon-btn refresh-button" title="Tải lại dữ liệu" aria-label="Tải lại dữ liệu" onClick={()=>void refresh()}><RefreshCcw size={17} className={loading?'spin':''}/></button><div className="avatar top-avatar">{initials(data?.me.name||user.email||'A')}</div></div></header>
       <div className="content">
-    {riskIds.size>0&&<div role="status" className="gu-next-day-risk-banner"><BellRing size={19}/><div><strong>{riskIds.size} sản phẩm cần kiểm tra trước ca thuê ngày mai</strong><span>Sau 17:00: đồ chưa trả nhưng đã có lịch cho khách khác vào ngày mai. Liên hệ khách và chuẩn bị phương án thay thế.</span></div><button type="button" className="btn btn-white" onClick={()=>{setPage('calendar');setCalendarStart(today);}}>Xem lịch</button></div>}
+    {riskIds.size>0&&dismissedRiskSignature!==riskSignature&&<div role="status" className="gu-next-day-risk-banner"><BellRing size={20}/><div><strong>{riskIds.size} sản phẩm cần kiểm tra trước ca thuê ngày mai</strong><span>Sau 17:00: đồ chưa trả nhưng đã có lịch cho khách khác vào ngày mai. Liên hệ khách và chuẩn bị phương án thay thế.</span></div><button type="button" className="btn btn-white gu-risk-view" onClick={()=>{setPage('calendar');setCalendarStart(today);}}>Xem lịch</button><button type="button" className="gu-risk-dismiss" aria-label="Đóng cảnh báo 17 giờ" title="Đóng thông báo" onClick={()=>setDismissedRiskSignature(riskSignature)}><X size={19}/></button></div>}
         {overdueOrders.length>0&&<div className="overdue-banner"><BellRing size={22}/><div><strong>KHẨN: {overdueOrders.length} đơn chưa trả đúng hạn</strong><p>{overdueOrders.slice(0,3).map(o=>o.code+' · '+o.customerName+' (hẹn '+prettyDay(o.returnDate)+')').join(' • ')}</p></div><button type="button" className="btn btn-white" onClick={()=>{setPage('orders');setOrderStatus('PICKED_UP');}}>Xem đơn trễ</button>{!notificationsEnabled&&<button type="button" className="btn btn-white" onClick={()=>void enableNotifications()}>Bật thông báo</button>}</div>}
         {err&&<div className="inline-alert danger-alert global-alert"><AlertCircle size={18}/><span>{err}</span><button className="icon-btn" onClick={()=>setErr('')} aria-label="Đóng thông báo"><X size={16}/></button></div>}
         {toast&&<div className="toast"><CheckCircle2 size={18}/>{toast}<button aria-label="Đóng" onClick={()=>setToast('')}><X size={15}/></button></div>}
@@ -487,34 +472,21 @@ export default function Home() {
         </>}
         {page==='calendar'&&<>
           <div className="page-intro"><div><div className="eyebrow">LỊCH THEO NGÀY / THÁNG / NĂM</div><h1>Lịch cho thuê</h1></div><div className="action-row"><button className="btn btn-white" onClick={()=>openBooking('RESERVE')}><CalendarDays size={17}/> Đặt lịch trước</button><button className="btn btn-dark" onClick={()=>openBooking('PICKUP')}><Plus size={18}/> Giao ngay</button></div></div>
-          <section className="panel gu-smart-calendar" aria-label="Tra cứu lịch trống nhanh">
-            <div className="gu-smart-heading"><div><h3><CalendarSearch size={20}/> Tìm đồ còn trống</h3></div></div>
-            <div className="gu-smart-controls">
-              <label>Từ ngày<input className="input" type="date" lang="vi-VN" min={today} value={smartStart} onChange={e=>{const v=e.target.value;setSmartStart(v);if(v>smartEnd)setSmartEnd(v);setSmartResult(null);setNearestResult(null);}}/></label>
-              <label>Đến ngày thuê<input className="input" type="date" lang="vi-VN" min={smartStart} value={smartEnd} onChange={e=>{setSmartEnd(e.target.value);setSmartResult(null);setNearestResult(null);}}/></label>
-              <label>Giờ nhận<input aria-label="Giờ bắt đầu thuê" className="input" type="time" value={smartStartHour} onChange={e=>{setSmartStartHour(e.target.value);setSmartResult(null);}}/></label>
-              <label>Giờ trả (ngày hôm sau ngày cuối)<input aria-label="Giờ trả thuê" className="input" type="time" value={smartEndHour} onChange={e=>{setSmartEndHour(e.target.value);setSmartResult(null);}}/></label>
-              <button type="button" className="btn btn-dark" disabled={smartLoading||!smartStart||!smartEnd||smartEnd<smartStart} onClick={()=>void findAvailable()}>{smartLoading?<LoaderCircle size={16} className="spin"/>:<Search size={16}/>} Tìm đồ trống</button>
-            </div>
-            {smartResult&&smartResult.pickupDate===smartStart&&smartResult.returnDate===smartEnd&&<div className="gu-smart-result" aria-live="polite"><div className="gu-smart-result-title"><strong>{availableMatches.length} món trống trong trang tìm kiếm</strong><small>{prettyDay(smartStart)} {smartStartHour} – hết {prettyDay(smartEnd)}, trả hôm sau lúc {smartEndHour}</small></div>
-              <div className="gu-smart-items">{availableMatches.slice(0,24).map(i=><div className="gu-smart-product" key={i.id}><ProductImage paths={i.imagePaths}/><div><strong>{i.name}</strong><small>{getProductCode(i)||"Chưa có mã sản phẩm"} · {money(i.dailyRate)}/ngày</small></div><button className="btn btn-white" onClick={()=>openBooking(smartStart===today?'PICKUP':'RESERVE',i.id,smartStart,smartEnd,smartStartHour,smartEndHour)}>Chọn đồ <Plus size={15}/></button></div>)}
-              {!availableMatches.length&&<div className="gu-smart-no-results">Không tìm thấy đồ trống theo bộ lọc hiện tại. Thử món khác hoặc bấm <strong>Ngày trống gần nhất</strong> trong lịch bên dưới.</div>}
-              {availableMatches.length>24&&<small className="gu-smart-overflow">Hiển thị 24/{availableMatches.length} sản phẩm</small>}</div></div>}
-            
-          </section>
           <div className="gu-catalog-pager"><div className="gu-search-wrap"><Search size={15}/><input className="input" value={calendarQuery} onChange={e=>setCalendarQuery(e.target.value)} placeholder="Tìm tên sản phẩm, mã GU-00234 / 234, khách đang thuê hoặc SĐT…"/></div><button type="button" className="btn btn-white" disabled={!calendarNext} onClick={()=>setCalendarPageCursor(calendarNext)}>25 món tiếp theo <ChevronRight size={14}/></button><button type="button" className="btn btn-white" disabled={!calendarPageCursor} onClick={()=>setCalendarPageCursor(null)}>Đầu danh sách</button></div>
-          <p className="gu-calendar-search-note">Ô tìm kiếm này dùng chung cho lịch thuê và tìm đồ trống. Có thể gõ <b>234</b> để ra mã <b>GU-00234</b>, hoặc tìm theo tên khách / SĐT của đơn đang giữ đồ. Tìm theo khách chỉ áp dụng ở trang lịch, không áp dụng trong form tạo đơn hay đặt lịch.</p>
-          <section className="panel calendar-panel"><div className="calendar-toolbar"><div><h3>Lịch sản phẩm</h3><div className="legend">{data.me.role==='admin'&&<span className="overdue-label"><i className="legend-dot maintenance"/>Chớp đỏ: trả trễ</span>}<span><i className="legend-dot reserved"/>Đã giữ</span><span><i className="legend-dot picked"/>Đã lấy</span><span><i className="legend-dot free"/>Còn trống</span></div></div><div className="calendar-controls">
-            <select className="input gu-calendar-cat" value={calendarCategory} onChange={e=>setCalendarCategory(e.target.value)}><option value="ALL">Tất cả danh mục</option>{Array.from(new Set(items.map(i=>i.category))).sort().map(c=><option value={c} key={c}>{c}</option>)}</select>
-            <select className="input gu-calendar-status" aria-label="Lọc lịch theo tình trạng" value={calendarStatus} onChange={e=>setCalendarStatus(e.target.value as CalendarFilter)}>
-              <option value="ALL">Mọi trạng thái</option><option value="FREE">Còn trống</option><option value="RESERVED">Đã giữ</option><option value="PICKED_UP">Đã giao</option><option value="OVERDUE">Trả trễ</option><option value="LAUNDRY">Đang giặt</option><option value="MAINTENANCE">Bảo trì</option><option value="MISSING">Thất lạc</option><option value="UNPRICED">Chưa duyệt giá</option>
-            </select>
-            {data.me.role==='admin'&&<select className="input gu-calendar-creator" aria-label="Lọc theo nhân viên tạo đơn" value={calendarCreator} onChange={e=>setCalendarCreator(e.target.value)}><option value="ALL">Mọi nhân viên tạo</option>{calendarCreators.map(([uid,name])=><option key={uid} value={uid}>{name}</option>)}</select>}
-            <button className="icon-btn boxed" title="Lùi 1 ngày" onClick={()=>setCalendarStart(addDays(calendarStart,-1))}><ChevronLeft size={18}/></button>
-            <input className="input gu-date-nav" type="date" lang="vi-VN" aria-label="Chọn ngày bắt đầu" value={calendarStart} onChange={e=>{if(e.target.value)setCalendarStart(e.target.value);}}/>
-            <button className="btn btn-white" onClick={()=>setCalendarStart(today)}>Hôm nay</button>
-            <button className="icon-btn boxed" title="Tiến 1 ngày" onClick={()=>setCalendarStart(addDays(calendarStart,1))}><ChevronRight size={18}/></button>
-          </div></div>
+          <p className="gu-calendar-search-note">Tìm trong lịch cho thuê. Có thể gõ <b>234</b> để ra mã <b>GU-00234</b>, hoặc tìm theo tên khách / SĐT của đơn đang giữ đồ. Tìm theo khách chỉ áp dụng ở trang lịch, không áp dụng trong form tạo đơn hay đặt lịch.</p>
+          <section className="panel calendar-panel"><div className="calendar-toolbar gu-calendar-toolbar-v532">
+            <div className="gu-calendar-toolbar-title"><div><h3>Lịch sản phẩm</h3><p>Chọn bộ lọc và di chuyển từng ngày để xem lịch thuê.</p></div><div className="legend">{data.me.role==='admin'&&<span className="overdue-label"><i className="legend-dot maintenance"/>Trả trễ</span>}<span><i className="legend-dot reserved"/>Đã giữ</span><span><i className="legend-dot picked"/>Đã lấy</span><span><i className="legend-dot free"/>Còn trống</span><span className="gu-risk-legend"><i className="legend-dot gu-risk-dot"/>Cảnh báo sau 17h</span></div></div>
+            <div className="calendar-controls gu-calendar-controls-v532">
+              <div className="gu-calendar-filter-fields">
+                <label><span>Danh mục</span><select className="input gu-calendar-cat" aria-label="Lọc danh mục sản phẩm" value={calendarCategory} onChange={e=>setCalendarCategory(e.target.value)}><option value="ALL">Tất cả danh mục</option>{Array.from(new Set(items.map(i=>i.category))).sort().map(c=><option value={c} key={c}>{c}</option>)}</select></label>
+                <label><span>Tình trạng</span><select className="input gu-calendar-status" aria-label="Lọc lịch theo tình trạng" value={calendarStatus} onChange={e=>setCalendarStatus(e.target.value as CalendarFilter)}>
+                  <option value="ALL">Mọi trạng thái</option><option value="FREE">Còn trống</option><option value="RESERVED">Đã giữ</option><option value="PICKED_UP">Đã giao</option><option value="OVERDUE">Trả trễ</option><option value="LAUNDRY">Đang giặt</option><option value="MAINTENANCE">Bảo trì</option><option value="MISSING">Thất lạc</option><option value="UNPRICED">Chưa duyệt giá</option>
+                </select></label>
+                {data.me.role==='admin'&&<label><span>Nhân viên tạo đơn</span><select className="input gu-calendar-creator" aria-label="Lọc theo nhân viên tạo đơn" value={calendarCreator} onChange={e=>setCalendarCreator(e.target.value)}><option value="ALL">Mọi nhân viên tạo</option>{calendarCreators.map(([uid,name])=><option key={uid} value={uid}>{name}</option>)}</select></label>}
+              </div>
+              <div className="gu-calendar-date-group"><span className="gu-calendar-date-label">Ngày bắt đầu</span><div className="gu-calendar-date-actions"><button type="button" className="icon-btn boxed" title="Lùi 1 ngày" aria-label="Lùi lịch một ngày" onClick={()=>setCalendarStart(addDays(calendarStart,-1))}><ChevronLeft size={18}/></button><input className="input gu-date-nav" type="date" lang="vi-VN" aria-label="Chọn ngày bắt đầu" value={calendarStart} onChange={e=>{if(e.target.value)setCalendarStart(e.target.value);}}/><button type="button" className="btn btn-white gu-calendar-today" onClick={()=>setCalendarStart(today)}>Hôm nay</button><button type="button" className="icon-btn boxed" title="Tiến 1 ngày" aria-label="Tiến lịch một ngày" onClick={()=>setCalendarStart(addDays(calendarStart,1))}><ChevronRight size={18}/></button></div></div>
+            </div>
+          </div>
           <div className="calendar-scroll gu-calendar-desktop"><div className="calendar-grid"><div className="calendar-corner">SẢN PHẨM / NGÀY</div>
             {calendarDays.map(d=><div key={d} className={'calendar-day '+(d===today?'calendar-today':'')}><span>{new Date(d+'T00:00:00Z').toLocaleDateString('vi-VN',{weekday:'short',timeZone:'UTC'})}</span><strong>{prettyDay(d)}</strong></div>)}
             {calendarItems.map(item=><div className={'calendar-row '+(calendarOverdue.some(o=>o.lines.some(l=>l.itemId===item.id))?'overdue-row':'')} key={item.id}>
@@ -530,7 +502,7 @@ export default function Home() {
             </article>)}
             {!calendarItems.length&&<div className="calendar-no-items">Không có sản phẩm trong danh mục đang chọn.</div>}
           </div>
-          {nearestResult&&<div className="gu-nearest-result" aria-live="polite"><CalendarSearch size={19}/><div><strong>{items.find(i=>i.id===nearestResult.itemId)?.name||'Sản phẩm'}:</strong> {nearestResult.nextPickupDate?`trống từ ${prettyDay(nearestResult.nextPickupDate)} đến ${prettyDay(nearestResult.nextReturnDate!)}`:nearestResult.reason}</div>{nearestResult.nextPickupDate&&<button className="btn btn-dark" onClick={()=>openBooking(nearestResult.nextPickupDate===today?'PICKUP':'RESERVE',nearestResult.itemId,nearestResult.nextPickupDate!,nearestResult.nextReturnDate!,smartStartHour,smartEndHour)}>Đặt ngày này</button>}<button className="icon-btn" title="Đóng" aria-label="Đóng kết quả" onClick={()=>setNearestResult(null)}><X size={16}/></button></div>}
+          {nearestResult&&<div className="gu-nearest-result" aria-live="polite"><CalendarSearch size={19}/><div><strong>{items.find(i=>i.id===nearestResult.itemId)?.name||'Sản phẩm'}:</strong> {nearestResult.nextPickupDate?`trống từ ${prettyDay(nearestResult.nextPickupDate)} đến ${prettyDay(nearestResult.nextReturnDate!)}`:nearestResult.reason}</div>{nearestResult.nextPickupDate&&<button className="btn btn-dark" onClick={()=>openBooking(nearestResult.nextPickupDate===today?'PICKUP':'RESERVE',nearestResult.itemId,nearestResult.nextPickupDate!,nearestResult.nextReturnDate!,'09:00','09:00')}>Đặt ngày này</button>}<button className="icon-btn" title="Đóng" aria-label="Đóng kết quả" onClick={()=>setNearestResult(null)}><X size={16}/></button></div>}
           </section>
         </>}
         {['inventory','customers','orders'].includes(page)&&<div className="gu-catalog-pager" aria-live="polite"><span>{catalogLoading?'Đang tải…':catalogData?`${catalogData.results?.length ?? 0} kết quả`: ''}</span><button className="btn btn-white" type="button" disabled={catalogLoading||!catalogData?.hasMore} onClick={()=>setCatalogCursor(catalogData?.cursor||null)}>Trang kế tiếp <ChevronRight size={14}/></button><button className="btn btn-white" type="button" disabled={catalogLoading||!catalogCursor} onClick={()=>setCatalogCursor(null)}>Về trang đầu</button></div>}

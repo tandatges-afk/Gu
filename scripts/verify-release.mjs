@@ -73,7 +73,10 @@ const required = [
   'src/lib/secure-evidence.ts',
   'src/lib/shift-schedule.ts',
   'src/app/api/shifts/route.ts',
-  'src/components/GuStaffShifts.tsx'
+  'src/components/GuStaffShifts.tsx',
+  'src/app/api/v5/visual-availability/route.ts',
+  'src/lib/visual-availability.ts',
+  'src/components/GuVisualFinder.tsx'
 ];
 const missing = required.filter(p => !existsSync(join(root,p)));
 const read = p => readFileSync(join(root,p),'utf8');
@@ -135,9 +138,12 @@ checks.push(['nhân viên xác nhận hoàn vật cọc', /action==='RETURN_COLL
 checks.push(['thu đủ tự động sau nhận trả', /Thu đủ \{money\(due\)\}/, 'src/components/GuOrderCapture.tsx']);
 checks.push(['gợi ý SĐT nổi dưới ô nhập', /\.gu-v11-customer-results\{position:absolute/, 'src/app/globals.css']);
 checks.push(['hiển thị giờ giao và giờ nhận', /gu-calendar-cell-time/, 'src/app/page.tsx']);
+checks.push(['tìm ảnh kèm trạng thái và lịch 7 ngày', /visual-availability/, 'src/components/GuVisualFinder.tsx']);
+checks.push(['cảnh báo đóng được', /setDismissedRiskSignature\(riskSignature\)/, 'src/app/page.tsx']);
+checks.push(['lọc lịch thiết kế riêng', /gu-calendar-controls-v532/, 'src/app/page.tsx']);
 const absent = checks.filter(([name,pattern,file]) => missing.includes(file) || !pattern.test(read(file))).map(([name])=>name);
 const pkg = JSON.parse(read('package.json'));
-if (pkg.version !== '5.3.1-beta.2') absent.push('phiên bản 5.3.1-beta.2 trong package.json');
+if (pkg.version !== '5.3.2-beta.1') absent.push('phiên bản 5.3.2-beta.1 trong package.json');
 if (missing.length || absent.length) {
   console.error('KHÔNG ĐỒNG BỘ. Thiếu tệp:', missing.join(', ') || 'không');
   console.error('Thiếu thành phần:', absent.join(', ') || 'không');
