@@ -1,6 +1,6 @@
 {
   "name": "gu-thue-do-xinh",
-  "version": "5.3.4-beta.1",
+  "version": "5.3.5-beta.1",
   "private": true,
   "type": "module",
   "scripts": {
@@ -19,7 +19,8 @@
     "staff:unify-plan": "node --env-file=.env.local scripts/migrate-staff-unified.mjs",
     "staff:unify-apply": "node --env-file=.env.local scripts/migrate-staff-unified.mjs --execute --confirm=UNIFY-gugu-547e3",
     "verify:imports": "node scripts/check-local-imports.mjs && node scripts/check-client-directives.mjs",
-    "verify:client": "node scripts/check-client-directives.mjs"
+    "verify:client": "node scripts/check-client-directives.mjs",
+    "data:phone-index-plan": "node --experimental-strip-types --env-file=.env.local scripts/migrate-customer-phone-index.mjs --plan"
   },
   "dependencies": {
     "firebase": "^12.0.0",

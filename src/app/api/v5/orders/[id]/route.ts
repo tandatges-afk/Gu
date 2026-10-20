@@ -264,12 +264,25 @@ export async function PATCH(req:NextRequest,ctx:{params:Promise<{id:string}>}){
    }else if(action==='PAY'){
     if(order.cameraLateFeePending)throw new ApiError(409,'Đơn máy ảnh cũ chưa đối soát tự động; Admin bấm Tính lại phí máy ảnh trước khi thu.');
     const amount=Number(b.amount||0);if(!Number.isSafeInteger(amount)||amount<=0||amount>100_000_000)throw new ApiError(400,'Số tiền thu phải lớn hơn 0.');
+    const method=String(b.method||'CASH');
+    if(!['CASH','TRANSFER'].includes(method))throw new ApiError(400,'Chọn thanh toán tiền mặt hoặc chuyển khoản.');
+    const reference=String(b.reference||'').trim().slice(0,100);
+    if(method==='TRANSFER'&&reference.length<4)throw new ApiError(400,'Chuyển khoản cần mã giao dịch hoặc nội dung đối chiếu.');
+    const requestId=String(b.requestId||'');
+    if(!/^[a-f0-9-]{36}$/.test(requestId))throw new ApiError(400,'Phiên thu tiền không hợp lệ. Vui lòng thử lại.');
+    const movement=ref.collection('cashMovements').doc(requestId);
+    const previously=await tx.get(movement);
+    if(previously.exists){
+     if(previously.data()?.kind!=='PAYMENT'||previously.data()?.actorUid!==me.uid||previously.data()?.amount!==amount||previously.data()?.method!==method||previously.data()?.reference!==reference)
+      throw new ApiError(409,'Mã thu tiền đã dùng cho giao dịch khác.');
+     return;
+    }
     const allowed=order.total+(order.compensationTotal||0)+(order.otherFeeTotal||0)+(order.lateFeeTotal||0)-(order.paid||0);
     if(amount>allowed)throw new ApiError(409,'Số tiền thu vượt số còn phải thu.');
     const revised={...order,paid:order.paid+amount,updatedAt:now};syncDebtIndex(tx,db(),revised);
-    const day=vnDayKey(now);tx.set(db().collection('cashDaily').doc(day),{amount:FieldValue.increment(amount),payments:FieldValue.increment(1),updatedAt:now},{merge:true});
-    tx.create(ref.collection('cashMovements').doc(),{orderId:id,kind:'PAYMENT',amount,method:'UNSPECIFIED',reference:'',actorUid:me.uid,actorName:me.name,createdAt:now,description:'Thu tiền trên đơn v5'});
-    tx.update(ref,{paid:order.paid+amount,updatedAt:now,history:[...order.history,{action:'PAY',by:me.uid,at:now,amount,detail:'Thu tiền theo bảng giá giờ'}]});
+    tx.set(db().collection('cashDaily').doc(vnDayKey(now)),{amount:FieldValue.increment(amount),payments:FieldValue.increment(1),updatedAt:now},{merge:true});
+    tx.create(movement,{orderId:id,kind:'PAYMENT',amount,method,reference,actorUid:me.uid,actorName:me.name,createdAt:now,description:'Thu tiền đơn v5, chống ghi trùng bằng requestId'});
+    tx.update(ref,{paid:order.paid+amount,updatedAt:now,history:[...order.history,{action:'PAY',by:me.uid,at:now,amount,detail:`Đã nhận tiền qua ${method} (${reference||'tiền mặt'})`}]});
    }else if(action==='ADD_ITEMS'){
     if(!order.pickupAt||!order.returnAt||order.returnStage==='AWAITING_ADMIN'||order.pendingExtraItemIds?.length)throw new ApiError(409,'Đơn đang chờ chụp bổ sung hoặc nhận trả.');
     const ids=b.itemIds;
@@ -284,12 +297,23 @@ export async function PATCH(req:NextRequest,ctx:{params:Promise<{id:string}>}){
     const prior=await checkIntervalAvailability(tx,slots);
     const extra=snaps.map(s=>{const i={id:s.id,...s.data()} as InventoryItem;const blocks=billableBlocks(start,order.returnAt!);return {itemId:i.id,name:i.name,sku:i.sku,hangerCode:i.hangerCode,size:i.size,category:i.category,cameraModel:i.cameraModel,cameraSerial:i.cameraSerial,...(isCameraCategory(i.category)&&isCameraModel(i.cameraModel)?cameraPackageSnapshot(i.cameraModel,start,order.returnAt!):{}),dailyRate:i.dailyRate,bufferDays:0,replacementValue:i.replacementValue,startAt:start,startDate:vnDayKey(start),lineTotal:rentalCharge(i,start,order.returnAt!)};});
     const nextLines=[...order.lines,...extra];const total=nextLines.reduce((sum,l)=>sum+l.lineTotal,0);
-    if(order.bookingKind==='RESERVE'&&order.status==='RESERVED'&&total>order.paid)throw new ApiError(409,'Đơn đặt trước phải thu đủ 100% trước khi bổ sung sản phẩm.');
+    const topup=order.bookingKind==='RESERVE'&&order.status==='RESERVED'?Math.max(0,total-order.paid):0;
+    let paidAfter=order.paid;
+    if(topup>0){
+      const paymentMethod=String(b.paymentMethod||'CASH');const paymentReference=String(b.paymentReference||'').trim().slice(0,100);
+      if(!['CASH','TRANSFER'].includes(paymentMethod)||(paymentMethod==='TRANSFER'&&paymentReference.length<4))throw new ApiError(400,'Thiếu phương thức/mã đối soát thanh toán bổ sung.');
+      if(b.confirmPaid!==true||Number(b.expectedTopup)!==topup)throw new ApiError(409,`Đơn đặt trước cần thu thêm ${topup.toLocaleString('vi-VN')}đ. Xem lại báo giá rồi xác nhận.`);
+      const proof=await readVerifiedEvidence(tx,String(b.paymentProofId||''),me.uid,'reservation',String(b.paymentDraftId||''));
+      tx.update(proof.ref,{consumedOrderId:id,consumedAt:now});
+      tx.create(ref.collection('cashMovements').doc(String(b.paymentProofId)),{orderId:id,kind:'PAYMENT',amount:topup,method:paymentMethod,reference:paymentReference||String(b.paymentProofId),actorUid:me.uid,actorName:me.name,createdAt:now,description:'Thu tiền bổ sung khi thêm đồ vào đơn đặt trước'});
+      tx.set(db().collection('cashDaily').doc(vnDayKey(now)),{amount:FieldValue.increment(topup),payments:FieldValue.increment(1),updatedAt:now},{merge:true});
+      paidAfter+=topup;
+    }
     createIntervalWrites(tx,slots,prior,id);
     const pending=order.status==='PICKED_UP'?[...ids]:[];
-    tx.update(ref,{lines:nextLines,total,pendingExtraItemIds:pending,referencePhotos:{...order.referencePhotos,...Object.fromEntries(snaps.map(s=>[s.id,s.data()?.referenceShots||{}]))},photoTemplates:{...requiredTemplates(order),...Object.fromEntries(snaps.map(s=>[s.id,(s.data()?.inspectionAngles as string[]|undefined)||[]]))},updatedAt:now,history:[...order.history,{action:'ADD_ITEMS',at:now,by:me.uid,detail:`Thêm ${ids.length} món; ${pending.length?'chờ chụp ảnh giao':'chờ chụp ảnh khi giao đơn'}`} ]});
+    tx.update(ref,{lines:nextLines,total,bookedRentTotal:order.bookingKind==='RESERVE'?total:order.bookedRentTotal||order.total,paid:paidAfter,prepaidRentTotal:order.bookingKind==='RESERVE'&&order.status==='RESERVED'?paidAfter:order.prepaidRentTotal||0,pendingExtraItemIds:pending,referencePhotos:{...order.referencePhotos,...Object.fromEntries(snaps.map(s=>[s.id,s.data()?.referenceShots||{}]))},photoTemplates:{...requiredTemplates(order),...Object.fromEntries(snaps.map(s=>[s.id,(s.data()?.inspectionAngles as string[]|undefined)||[]]))},updatedAt:now,history:[...order.history,{action:'ADD_ITEMS',at:now,by:me.uid,detail:`Thêm ${ids.length} món; ${pending.length?'chờ chụp ảnh giao':'chờ chụp ảnh khi giao đơn'}`} ]});
     if(pending.length)tx.set(job,{stage:'HANDOVER',updatedAt:now},{merge:true});
-    syncDebtIndex(tx,db(),{...order,lines:nextLines,total,updatedAt:now});
+    syncDebtIndex(tx,db(),{...order,lines:nextLines,total,paid:paidAfter,updatedAt:now});
    }else if(action==='EXTEND'){
     if(!order.pickupAt||!order.returnAt||order.returnStage==='AWAITING_ADMIN')throw new ApiError(409,'Không thể gia hạn khi chờ nhận đồ.');
     const candidate=String(b.returnAt||'');if(!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(candidate))throw new ApiError(400,'Chọn giờ trả mới.');
@@ -300,10 +324,21 @@ export async function PATCH(req:NextRequest,ctx:{params:Promise<{id:string}>}){
     const itemSnaps=await Promise.all(itemRefs.map(r=>tx.get(r)));
     const lines=order.lines.map((l,i)=>({...l,lineTotal:rentalCharge(l,l.startAt||order.pickupAt!,next)}));
     const total=lines.reduce((sum,l)=>sum+l.lineTotal,0);
-    if(order.bookingKind==='RESERVE'&&order.status==='RESERVED'&&total>order.paid)throw new ApiError(409,'Đặt trước phải thanh toán bổ sung 100% tiền thuê trước khi gia hạn.');
+    const topup=order.bookingKind==='RESERVE'&&order.status==='RESERVED'?Math.max(0,total-order.paid):0;
+    let paidAfter=order.paid;
+    if(topup>0){
+      const paymentMethod=String(b.paymentMethod||'CASH');const paymentReference=String(b.paymentReference||'').trim().slice(0,100);
+      if(!['CASH','TRANSFER'].includes(paymentMethod)||(paymentMethod==='TRANSFER'&&paymentReference.length<4))throw new ApiError(400,'Thiếu phương thức/mã đối soát thanh toán bổ sung.');
+      if(b.confirmPaid!==true||Number(b.expectedTopup)!==topup)throw new ApiError(409,`Gia hạn cần thu thêm ${topup.toLocaleString('vi-VN')}đ. Kiểm tra lại giá thuê.`);
+      const proof=await readVerifiedEvidence(tx,String(b.paymentProofId||''),me.uid,'reservation',String(b.paymentDraftId||''));
+      tx.update(proof.ref,{consumedOrderId:id,consumedAt:now});
+      tx.create(ref.collection('cashMovements').doc(String(b.paymentProofId)),{orderId:id,kind:'PAYMENT',amount:topup,method:paymentMethod,reference:paymentReference||String(b.paymentProofId),actorUid:me.uid,actorName:me.name,createdAt:now,description:'Thu bổ sung 100% khi gia hạn đơn đặt trước'});
+      tx.set(db().collection('cashDaily').doc(vnDayKey(now)),{amount:FieldValue.increment(topup),payments:FieldValue.increment(1),updatedAt:now},{merge:true});
+      paidAfter+=topup;
+    }
     createIntervalWrites(tx,more,prior,id);
-    tx.update(ref,{returnAt:next,returnDate:vnDayKey(next),rentalDays:blocks,lines,total,updatedAt:now,history:[...order.history,{action:'EXTEND',at:now,by:me.uid,amount:total-order.total,detail:'Gia hạn theo chu kỳ 24 giờ'}]});
-    tx.set(job,{returnAt:next,updatedAt:now},{merge:true});syncDebtIndex(tx,db(),{...order,returnAt:next,returnDate:vnDayKey(next),rentalDays:blocks,lines,total,updatedAt:now});
+    tx.update(ref,{returnAt:next,returnDate:vnDayKey(next),rentalDays:blocks,lines,total,bookedRentTotal:order.bookingKind==='RESERVE'?total:order.bookedRentTotal||order.total,paid:paidAfter,prepaidRentTotal:order.bookingKind==='RESERVE'&&order.status==='RESERVED'?paidAfter:order.prepaidRentTotal||0,updatedAt:now,history:[...order.history,{action:'EXTEND',at:now,by:me.uid,amount:total-order.total,detail:'Gia hạn theo chu kỳ 24 giờ'}]});
+    tx.set(job,{returnAt:next,updatedAt:now},{merge:true});syncDebtIndex(tx,db(),{...order,returnAt:next,returnDate:vnDayKey(next),rentalDays:blocks,lines,total,paid:paidAfter,updatedAt:now});
    }
    auditInTransaction(tx,me,'V5_'+action,'order',id,`${order.code} / ${me.name}`);
   });

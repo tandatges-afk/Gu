@@ -44,7 +44,9 @@ test('Rental return releases inventory now; photo review later does not mutate i
 test('Payment popup remains after return and offers auto-collection',()=>{
  const capture=read('src/components/GuOrderCapture.tsx');
  assert.match(capture,/if\(phase==='RETURN'\)\{setSettling\(true\)/);
- assert.match(capture,/Thu đủ \{money\(due\)\}/);
+ assert.match(capture,/GuOrderPaymentPanel/);
+ const payment=read('src/components/GuOrderPaymentPanel.tsx');
+ assert.match(payment,/Thu đủ \$\{money\(due\)\}/);
  assert.match(capture,/APPLY_SURCHARGE/);
  assert.match(capture,/GuSecurePhoto id=\{order\.handoverDepositProofId\}/);
 });

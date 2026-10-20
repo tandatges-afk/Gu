@@ -24,6 +24,10 @@ export async function GET(req:NextRequest){
   const term=String(u.searchParams.get('q')||'').trim().slice(0,80);
   const mode=u.searchParams.get('field')||'';
   const token=String(u.searchParams.get('cursor')||'');
+  const requestedStatus=kind==='items'?String(u.searchParams.get('status')||'ALL'):'ALL';
+  const requestedCategory=kind==='items'?String(u.searchParams.get('category')||'ALL'):'ALL';
+  if(!['ALL','AVAILABLE','RENTED','LAUNDRY','MAINTENANCE','MISSING'].includes(requestedStatus)||requestedCategory.length>50)throw new ApiError(400,'Bộ lọc kho không hợp lệ.');
+  const inventoryMatches=(entry:Record<string,unknown>)=>!entry.archivedAt&&(requestedStatus==='ALL'||entry.status===requestedStatus)&&(requestedCategory==='ALL'||entry.category===requestedCategory);
   let collection:Query=db().collection(kind),field=kind==='orders'?'createdAt':kind==='customers'?'name':'name';
   // Indexed code values cannot perform substring searches with Firestore startAt.
   // Scan an ordered, bounded page of codes and carry a cursor for the last scanned doc.
@@ -46,15 +50,15 @@ export async function GET(req:NextRequest){
     for(let page=0;page<12;page++){
       const snap=await codeQuery.limit(100).get();
       if(snap.empty){hasMore=false;break;}
-      for(const doc of snap.docs){
+      for(const [idx,doc] of snap.docs.entries()){
         lastId=doc.id;
         const entry=doc.data();
-        if(!entry.archivedAt&&matchesInventoryCode(String(entry.hangerCode||''),term)){
+        if(inventoryMatches(entry)&&matchesInventoryCode(String(entry.hangerCode||''),term)){
           matches.push({id:doc.id,...entry});
-          if(matches.length>=take)break;
+          if(matches.length>=take){hasMore=idx<snap.docs.length-1||snap.size===100;break;}
         }
       }
-      hasMore=snap.size===100;
+      if(matches.length<take)hasMore=snap.size===100;
       if(matches.length>=take||!hasMore)break;
       codeQuery=codeQuery.startAfter(snap.docs[snap.docs.length-1]);
     }
@@ -84,15 +88,15 @@ export async function GET(req:NextRequest){
    for(let page=0;page<12;page++){
     const snap=await collection.limit(100).get();
     if(snap.empty){hasMore=false;break;}
-    for(const doc of snap.docs){
+    for(const [idx,doc] of snap.docs.entries()){
      lastId=doc.id;
      const data=doc.data();
-     if(!data.archivedAt&&matchesProductSearch([String(data.name||''),String(data.hangerCode||''),String(data.category||'')].join(' '),term)){
+     if(inventoryMatches(data)&&matchesProductSearch([String(data.name||''),String(data.hangerCode||''),String(data.category||'')].join(' '),term)){
       matches.push({id:doc.id,...data});
-      if(matches.length>=take)break;
+      if(matches.length>=take){hasMore=idx<snap.docs.length-1||snap.size===100;break;}
      }
     }
-    hasMore=snap.size===100;
+    if(matches.length<take)hasMore=snap.size===100;
     if(matches.length>=take||!hasMore)break;
     collection=collection.startAfter(snap.docs[snap.docs.length-1]);
    }
@@ -139,11 +143,11 @@ export async function GET(req:NextRequest){
     for(let page=0;page<12;page++){
       const snap=await collection.limit(100).get();
       if(snap.empty){hasMore=false;break;}
-      for(const doc of snap.docs){
+      for(const [idx,doc] of snap.docs.entries()){
         lastId=doc.id;lastValue=String(doc.get(field)||'');
-        if(!doc.data().archivedAt){matches.push({id:doc.id,...doc.data()});if(matches.length>=take)break;}
+        if(inventoryMatches(doc.data())){matches.push({id:doc.id,...doc.data()});if(matches.length>=take){hasMore=idx<snap.docs.length-1||snap.size===100;break;}}
       }
-      hasMore=snap.size===100;
+      if(matches.length<take)hasMore=snap.size===100;
       if(matches.length>=take||!hasMore)break;
       collection=collection.startAfter(snap.docs[snap.docs.length-1]);
     }

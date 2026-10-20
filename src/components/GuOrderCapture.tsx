@@ -5,6 +5,7 @@ import {clientAuth} from '@/lib/firebase-client';
 import {preparePhonePhoto} from '@/lib/mobile-images';
 import {ProductImage,type ApiCall} from './GuExtras';
 import {GuSecureUpload} from './GuSecureUpload';
+import {GuOrderPaymentPanel} from './GuOrderPaymentPanel';
 import {GuSecurePhoto} from './GuSecurePhoto';
 import {GuMoneyInput} from './GuMoneyInput';
 import {money} from '@/lib/rental';
@@ -30,7 +31,6 @@ export function GuOrderCapture({orderId,api,onClose,onDone}:{orderId:string;api:
  const [depositProofId,setDepositProofId]=useState('');
  const [depositKind,setDepositKind]=useState<'CCCD'|'CASH'|'OTHER'>('CCCD');
  const [settling,setSettling]=useState(false);
- const [payAmount,setPayAmount]=useState('');
  const [surcharge,setSurcharge]=useState('');
  const [surchargeReason,setSurchargeReason]=useState('');
  useEffect(()=>{let live=true;setOrder(null);setPictures({});setConditions({});setNotes({});setError('');
@@ -66,7 +66,7 @@ export function GuOrderCapture({orderId,api,onClose,onDone}:{orderId:string;api:
   }catch(e){setError(e instanceof Error?e.message:'Không hoàn thành kiểm nhận.');}finally{setBusy(false);}
  };
  const confirmCollateral=async()=>{if(!order||!confirm('Bạn đã TRẢ vật cọc trực tiếp cho khách?'))return;setBusy(true);setError('');try{await api('v5/orders/'+order.id,{method:'PATCH',body:JSON.stringify({action:'RETURN_COLLATERAL',confirmReturned:true})});setOrder((await api<{order:RentalOrder}>('v5/orders/'+order.id)).order);await onDone();}catch(e){setError(e instanceof Error?e.message:'Không ghi nhận được vật cọc.');}finally{setBusy(false);}};
- const saveMoney=async(action:'PAY'|'APPLY_SURCHARGE',value:number,reason='')=>{if(!order)return;setBusy(true);setError('');try{await api('v5/orders/'+order.id,{method:'PATCH',body:JSON.stringify(action==='PAY'?{action,amount:value}:{action,amount:value,reason})});const fresh=await api<{order:RentalOrder}>('v5/orders/'+order.id);setOrder(fresh.order);setPayAmount('');setSurcharge('');setSurchargeReason('');await onDone();}catch(e){setError(e instanceof Error?e.message:'Không lưu được tiền.');}finally{setBusy(false);}};
+ const saveSurcharge=async(value:number,reason:string)=>{if(!order)return;setBusy(true);setError('');try{await api('v5/orders/'+order.id,{method:'PATCH',body:JSON.stringify({action:'APPLY_SURCHARGE',amount:value,reason})});const fresh=await api<{order:RentalOrder}>('v5/orders/'+order.id);setOrder(fresh.order);setSurcharge('');setSurchargeReason('');await onDone();}catch(e){setError(e instanceof Error?e.message:'Không thêm được phụ thu.');}finally{setBusy(false);}};
  return <div className="gu-capture-overlay" role="presentation"><section role="dialog" aria-modal="true" aria-label="Chụp ảnh giao nhận đơn" className="gu-capture-dialog">
   <header className="gu-capture-header"><div><span className="gu-capture-kicker">Ảnh kiểm nhận · PC & Điện thoại</span><h2>{phase==='RETURN'?'Nhận trả':phase==='HANDOVER_EXTRA'?'Giao thêm đồ':'Bàn giao sản phẩm'}</h2><p>{order?.code||'Đang tải đơn…'} · {order?.customerName||''}</p></div><button type="button" className="icon-btn" aria-label="Đóng kiểm nhận" onClick={onClose}><X/></button></header>
   {error&&<div role="alert" className="inline-alert danger-alert">{error}</div>}
@@ -83,11 +83,11 @@ export function GuOrderCapture({orderId,api,onClose,onDone}:{orderId:string;api:
    <footer className="gu-capture-footer"><button type="button" className="btn btn-white" onClick={onClose}>Để sau</button><button type="button" className="btn btn-dark" disabled={!canSend} onClick={()=>void submit()}><CheckCircle2 size={18}/>{busy?'Đang lưu…':phase==='RETURN'?'Nhận đồ · mở thanh toán':'Xác nhận giao hàng'}</button></footer>
   </>}
   {order&&settling&&<section className="gu-v52-settlement"><h3>Nhận hàng thành công · Đối soát tại quầy</h3><p>Hàng đã chuyển sang kho/giặt ngay, Admin chỉ xem ảnh sau; không treo đồ.</p><div className="booking-total"><span>Tiền thuê / phụ thu / đền bù</span><b>{money(order.total+(order.otherFeeTotal||0)+(order.compensationTotal||0))}</b></div><div className="booking-total"><span>Đã thu tiền thuê</span><b>{money(order.paid)}</b></div><div className="booking-total"><strong>Còn phải thu</strong><strong>{money(due)}</strong></div>
-   {due>0&&<><div className="gu-v52-settlement-actions"><GuMoneyInput value={payAmount} onValueChange={setPayAmount} placeholder="Nhập nếu khách trả một phần" className="input"/><button className="btn btn-white" disabled={busy||Number(payAmount)<=0||Number(payAmount)>due} onClick={()=>void saveMoney('PAY',Number(payAmount))}>Thu tiền</button><button className="btn btn-dark" disabled={busy} onClick={()=>void saveMoney('PAY',due)}>Thu đủ {money(due)}</button></div></>}
+   <GuOrderPaymentPanel order={order} api={api} onPaid={async()=>{const fresh=await api<{order:RentalOrder}>('v5/orders/'+order.id);setOrder(fresh.order);await onDone();}}/>
    {due===0&&<div className="inline-alert">Đã thu đủ tiền thuê. Nếu không có khoản phát sinh, nhân viên chỉ cần bàn giao vật cọc và đóng cửa sổ.</div>}
    {order.handoverDepositProofId&&<div className="gu-v52-deposit-panel"><strong>Hoàn lại vật cọc cho khách</strong><p>Nhận lúc giao: {order.handoverDepositKind||'Khác'}. Nhân viên trao trả trực tiếp, không cần chụp ảnh lần thứ hai.</p><GuSecurePhoto id={order.handoverDepositProofId} alt="Vật cọc cần hoàn"/>{order.collateralReturnedAt?<p>✓ Đã xác nhận trả vật cọc.</p>:<button className="btn btn-white" disabled={busy} onClick={()=>void confirmCollateral()}>Xác nhận đã hoàn vật cọc</button>}</div>}
    {(order.refundPending||0)>0&&<div className="inline-alert danger-alert">Đã thu thừa {money(order.refundPending||0)}. Admin cần đối soát và ghi nhận hoàn tiền thực tế; hàng vẫn đã nhận về.</div>}
-   <details><summary>Thêm phụ thu khi có phát sinh</summary><div className="form-grid"><label className="form-field">Số tiền phụ thu<GuMoneyInput className="input" placeholder="Tiền phát sinh" value={surcharge} onValueChange={setSurcharge}/></label><label className="form-field">Lý do phụ thu<input className="input" value={surchargeReason} onChange={e=>setSurchargeReason(e.target.value)} placeholder="VD: Hỏng phụ kiện"/></label></div><button className="btn btn-white" disabled={busy||!(Number(surcharge)>0)||surchargeReason.trim().length<3} onClick={()=>void saveMoney('APPLY_SURCHARGE',Number(surcharge),surchargeReason)}>Cộng phụ thu vào đơn</button></details>
+   <details><summary>Thêm phụ thu khi có phát sinh</summary><div className="form-grid"><label className="form-field">Số tiền phụ thu<GuMoneyInput className="input" placeholder="Tiền phát sinh" value={surcharge} onValueChange={setSurcharge}/></label><label className="form-field">Lý do phụ thu<input className="input" value={surchargeReason} onChange={e=>setSurchargeReason(e.target.value)} placeholder="VD: Hỏng phụ kiện"/></label></div><button className="btn btn-white" disabled={busy||!(Number(surcharge)>0)||surchargeReason.trim().length<3} onClick={()=>void saveSurcharge(Number(surcharge),surchargeReason)}>Cộng phụ thu vào đơn</button></details>
    <footer className="gu-v52-settlement-actions"><button className="btn btn-dark" disabled={busy} onClick={onClose}>Hoàn thành · Đóng</button></footer>
   </section>}
  </section></div>;

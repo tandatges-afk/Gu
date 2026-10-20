@@ -23,8 +23,8 @@ test('catalog scans codes as strings, filters archived products and paginates fr
  assert.match(api,/isInventoryCodeQuery\(term\)/);
  assert.match(api,/matchesInventoryCode\(String\(entry.hangerCode\|\|''\),term\)/);
  assert.match(api,/codeQuery=codeQuery.startAfter/);
- assert.match(api,/if\(!entry.archivedAt/);
- assert.match(api,/if\(!doc.data\(\).archivedAt/);
+ assert.match(api,/inventoryMatches\(entry\)/);
+ assert.match(api,/inventoryMatches\(doc.data\(\)\)/);
  assert.doesNotMatch(api,/formatHangerCode\(Number\(/);
 });
 test('dashboard counters exclude archived stock in every inventory status',()=>{
@@ -35,7 +35,9 @@ test('dashboard counters exclude archived stock in every inventory status',()=>{
 });
 test('editing inventory query clears stale global error; success clears the previous request error',()=>{
  const ui=read('src/app/page.tsx');
- assert.match(ui,/setQuery\(e.target.value\);setErr\(''\);setCatalogData\(null\)/);
+ assert.match(ui,/GuInventoryFilters/);
+ const filters=read('src/components/GuInventoryFilters.tsx');
+ assert.match(filters,/clearError\(\)/);
  assert.match(ui,/if\(!cancelled\)\{setCatalogData\(result\);setErr\(''\);\}/);
  assert.match(ui,/matchesInventoryCode\(i.hangerCode,query\)/);
 });

@@ -31,6 +31,8 @@ export function GuV5Booking({items,customers,api,initial,onClose,onSuccess,onCus
  const [paymentDraftId]=useState(()=>crypto.randomUUID());
  const [reservationProofId,setReservationProofId]=useState('');
  const [confirmPaid,setConfirmPaid]=useState(false);
+ const [paymentMethod,setPaymentMethod]=useState<'CASH'|'TRANSFER'>('CASH');
+ const [paymentReference,setPaymentReference]=useState('');
  const available=[...new Map([...items,...searched,...selectedRecords].map(i=>[i.id,i])).values()];
  useEffect(()=>{const missing=selected.filter(id=>![...items,...searched,...selectedRecords].some(i=>i.id===id));
   if(!missing.length)return;let cancelled=false;
@@ -47,15 +49,15 @@ export function GuV5Booking({items,customers,api,initial,onClose,onSuccess,onCus
  const quoteError=selected.some(id=>{const item=available.find(x=>x.id===id);if(!item||!blocks)return false;try{rentalCharge(item,localDateTimeToISO(pickupAt),localDateTimeToISO(returnAt));return false;}catch{return true;}});
  const total=selected.reduce((sum,id)=>{const item=available.find(x=>x.id===id);try{return sum+(item&&blocks?rentalCharge(item,localDateTimeToISO(pickupAt),localDateTimeToISO(returnAt)):0);}catch{return sum;}},0);
  const needsPrepay=pickupAt.slice(0,10)>vietnamToday()||mode==='RESERVE';
- const incomplete=(!customerId&&!quickCustomer)?'Chưa chọn khách hàng.':quickCustomer&&(!name.trim()||digits(phone).length<9)?'Cần nhập tên và số điện thoại hợp lệ cho khách mới.':!selected.length?'Chưa chọn sản phẩm.':selected.some(id=>!available.some(item=>item.id===id))?'Đang tải thông tin sản phẩm đã chọn.':!blocks?'Ngày giờ thuê chưa hợp lệ.':quoteError?'Không thể tính giá của ít nhất một sản phẩm.':needsPrepay&&!confirmPaid?'Chưa xác nhận đã thu đủ 100% tiền thuê.':needsPrepay&&!reservationProofId?'Chưa tải ảnh chứng từ thanh toán thành công.':'';
+ const incomplete=(!customerId&&!quickCustomer)?'Chưa chọn khách hàng.':quickCustomer&&(!name.trim()||digits(phone).length<9)?'Cần nhập tên và số điện thoại hợp lệ cho khách mới.':!selected.length?'Chưa chọn sản phẩm.':selected.some(id=>!available.some(item=>item.id===id))?'Đang tải thông tin sản phẩm đã chọn.':!blocks?'Ngày giờ thuê chưa hợp lệ.':quoteError?'Không thể tính giá của ít nhất một sản phẩm.':needsPrepay&&!confirmPaid?'Chưa xác nhận đã thu đủ 100% tiền thuê.':needsPrepay&&!reservationProofId?'Chưa tải ảnh chứng từ thanh toán thành công.':needsPrepay&&paymentMethod==='TRANSFER'&&paymentReference.trim().length<4?'Cần nhập mã giao dịch chuyển khoản để đối soát.':'';
  const submit=async(e:FormEvent)=>{e.preventDefault();if(busy)return;setError('');
   const fields=Array.from((e.currentTarget as HTMLFormElement).querySelectorAll('.gu-vn-datetime'));
   if(fields.some(group=>{const inputs=group.querySelectorAll<HTMLInputElement>('input[type="text"]');return inputs.length!==2||!isoDayFromVN(inputs[0].value)||!isValidHHMM(inputs[1].value);})){setError('Ngày và giờ chưa hợp lệ. Nhập theo DD/MM/YYYY và giờ 24h HH:MM (00:00–23:59).');return;}
   if(incomplete){setError(incomplete);return;}setBusy(true);try{let cid=customerId;
-   if(quickCustomer){const c=await api<Customer>('customers',{method:'POST',body:JSON.stringify({name,phone,note:''})});cid=c.id;await onCustomerCreated();}
+   if(quickCustomer)cid='QUICK_CUSTOMER';
    if(!cid||!selected.length||!blocks)throw Error('Chọn khách, sản phẩm và ngày giờ hợp lệ.');
    if(needsPrepay&&(!reservationProofId||!confirmPaid))throw Error('Đặt trước phải thu đủ 100% tiền thuê và lưu ảnh thanh toán.');
-   const r=await api<RentalOrder>('v5/orders',{method:'POST',body:JSON.stringify({customerId:cid,itemIds:selected,pickupAt,returnAt,note,bookingKind:needsPrepay?'RESERVE':'WALK_IN',reservationPaymentProofId:reservationProofId,paymentDraftId,confirmPaid})});
+   const r=await api<RentalOrder>('v5/orders',{method:'POST',body:JSON.stringify({customerId:cid,itemIds:selected,pickupAt,returnAt,note,bookingKind:needsPrepay?'RESERVE':'WALK_IN',reservationPaymentProofId:reservationProofId,paymentDraftId,confirmPaid,paymentMethod,paymentReference,...(quickCustomer?{quickCustomer:{name:name.trim(),phone:digits(phone)}}:{})})});
    await onSuccess(`Đã tạo đơn ${r.code}.`);onCreated?.(r.id);
  }catch(e){setError(e instanceof Error?e.message:'Tạo đơn thất bại.');}finally{setBusy(false);}};
  return <form className="modal-body" noValidate onSubmit={e=>void submit(e)}>
@@ -72,7 +74,9 @@ export function GuV5Booking({items,customers,api,initial,onClose,onSuccess,onCus
   {selected.map(id=>{const item=available.find(i=>i.id===id);if(!item||!isCameraCategory(item.category)||!isCameraModel(item.cameraModel)||!blocks)return null;try{const pkg=cameraPackageSnapshot(item.cameraModel,localDateTimeToISO(pickupAt),localDateTimeToISO(returnAt));return <p key={id} className="gu-camera-package-preview">{item.name} · {item.hangerCode||item.cameraSerial} · Gói {pkg.cameraPackageHours}h: {money(pkg.cameraPackageBasePrice)}. Trả quá giờ: +10.000đ mỗi giờ trễ bắt đầu.</p>;}catch{return null;}})}
   {quoteError&&<div className="inline-alert danger-alert">Có sản phẩm không đủ thông tin để tính giá. Kiểm tra mẫu máy ảnh hoặc khoảng giờ thuê.</div>}
   <div className="booking-total"><div><b>{selected.length} sản phẩm · {blocks||'—'} chu kỳ 24 giờ</b></div><strong>{money(total)}</strong></div>
-  {needsPrepay&&<section className="gu-v52-prepay"><strong>ĐẶT LỊCH TRƯỚC · THU ĐỦ 100% TIỀN THUÊ</strong><p>Phải thu và lưu ảnh tiền mặt hoặc chuyển khoản trước khi tạo lịch. Không cần chụp đồ hoặc CCCD lúc này.</p><div className="booking-total"><span>Khách cần thanh toán ngay</span><strong>{money(total)}</strong></div><GuSecureUpload purpose="reservation" draftId={paymentDraftId} onUploaded={setReservationProofId} label="Chụp ảnh tiền cọc / ảnh chuyển khoản"/><label className="gu-refund-confirm"><input type="checkbox" checked={confirmPaid} onChange={e=>setConfirmPaid(e.target.checked)}/> Tôi xác nhận đã thực nhận đủ {money(total)} tiền thuê</label></section>}
+  {needsPrepay&&<section className="gu-v52-prepay"><strong>ĐẶT LỊCH TRƯỚC · THU ĐỦ 100% TIỀN THUÊ</strong><p>Phải thu và lưu ảnh tiền mặt hoặc chuyển khoản trước khi tạo lịch. Không cần chụp đồ hoặc CCCD lúc này.</p><div className="booking-total"><span>Khách cần thanh toán ngay</span><strong>{money(total)}</strong></div><div className="form-grid"><label className="form-field"><span>Phương thức</span><select className="input" value={paymentMethod} onChange={e=>setPaymentMethod(e.target.value as 'CASH'|'TRANSFER')}><option value="CASH">Tiền mặt</option><option value="TRANSFER">Chuyển khoản</option></select></label>
+{paymentMethod==='TRANSFER'&&<label className="form-field"><span>Mã / nội dung giao dịch</span><input className="input" value={paymentReference} onChange={e=>setPaymentReference(e.target.value)} placeholder="Nhập mã giao dịch ngân hàng"/></label>}</div>
+<GuSecureUpload purpose="reservation" draftId={paymentDraftId} onUploaded={setReservationProofId} label="Chụp ảnh tiền cọc / ảnh chuyển khoản"/><label className="gu-refund-confirm"><input type="checkbox" checked={confirmPaid} onChange={e=>setConfirmPaid(e.target.checked)}/> Tôi xác nhận đã thực nhận đủ {money(total)} tiền thuê</label></section>}
   <label className="form-field"><span>Ghi chú đơn</span><input className="input" value={note} onChange={e=>setNote(e.target.value)}/></label>
   {incomplete&&<p className="gu-booking-blockers" role="status">{incomplete} Bạn vẫn có thể bấm Tạo đơn để xem chi tiết lỗi.</p>}
   <div className="modal-actions"><button type="button" className="btn btn-white" onClick={onClose}>Đóng</button><button type="submit" className="btn btn-dark" disabled={busy}>{busy?'Đang tạo…':needsPrepay?'Xác nhận đã thu đủ & giữ lịch':'Tạo đơn giao ngay'}</button></div>

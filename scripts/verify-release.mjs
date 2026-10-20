@@ -80,7 +80,19 @@ const required = [
   'src/lib/vn-datetime.ts',
   'src/lib/payment-review.ts',
   'src/components/GuVNDateTimeInput.tsx',
-  'src/components/GuVisualFinder.tsx'
+  'src/components/GuVisualFinder.tsx',
+  'src/lib/visual-index.ts',
+  'src/lib/visual-image.ts',
+  'src/components/GuVisualFinder.module.css',
+  'src/components/GuOrderPaymentPanel.tsx',
+  'src/components/GuOrderPaymentPanel.module.css',
+  'src/components/GuPrepaidAdjustment.tsx',
+  'src/components/GuInventoryFilters.tsx',
+  'src/components/GuInventoryFilters.module.css',
+  'src/components/GuInventoryTable.module.css',
+  'src/app/api/v5/visual-catalog/route.ts',
+  'scripts/migrate-customer-phone-index.mjs',
+  'docs/GU-v5.3.5-IMAGE-INDEX-INVENTORY-CUSTOMER-PAYMENT.md'
 ];
 const missing = required.filter(p => !existsSync(join(root,p)));
 const read = p => readFileSync(join(root,p),'utf8');
@@ -139,7 +151,7 @@ checks.push(['ảnh cọc lưu private', /evidenceBucket\(\)\.file\(path\)\.save
 checks.push(['nhận trả không cần Admin giải phóng kho', /status:'RETURNED' as const/, 'src/app/api/v5/orders/[id]/route.ts']);
 checks.push(['admin chỉ kiểm tra ảnh', /action==='REVIEW_PHOTOS'/, 'src/app/api/v5/orders/[id]/route.ts']);
 checks.push(['nhân viên xác nhận hoàn vật cọc', /action==='RETURN_COLLATERAL'/, 'src/app/api/v5/orders/[id]/route.ts']);
-checks.push(['thu đủ tự động sau nhận trả', /Thu đủ \{money\(due\)\}/, 'src/components/GuOrderCapture.tsx']);
+checks.push(['thu đủ tự động sau nhận trả', /Thu đủ \$\{money\(due\)\}/, 'src/components/GuOrderPaymentPanel.tsx']);
 checks.push(['gợi ý SĐT nổi dưới ô nhập', /\.gu-v11-customer-results\{position:absolute/, 'src/app/globals.css']);
 checks.push(['hiển thị giờ giao và giờ nhận', /gu-calendar-cell-time/, 'src/app/page.tsx']);
 checks.push(['tìm ảnh kèm trạng thái và lịch 7 ngày', /visual-availability/, 'src/components/GuVisualFinder.tsx']);
@@ -150,10 +162,10 @@ checks.push(['đồng hồ VN 24h', /formatVNDateTime/, 'src/lib/vn-datetime.ts'
 checks.push(['đối soát thu thừa', /overpaid/, 'src/lib/payment-review.ts']);
 checks.push(['tìm mã sản phẩm theo chuỗi không mất 0', /inventoryCodeNeedle/, 'src/app/api/catalog/route.ts']);
 checks.push(['thống kê kho bỏ sản phẩm lưu trữ', /archivedByStatus/, 'src/app/api/bootstrap/route.ts']);
-checks.push(['nhập lại mã xóa lỗi cũ', /setQuery\(e.target.value\);setErr\(''\);setCatalogData\(null\)/, 'src/app/page.tsx']);
+checks.push(['bộ lọc kho riêng và xóa lỗi cũ', /clearError\(\);/, 'src/components/GuInventoryFilters.tsx']);
 const absent = checks.filter(([name,pattern,file]) => missing.includes(file) || !pattern.test(read(file))).map(([name])=>name);
 const pkg = JSON.parse(read('package.json'));
-if (pkg.version !== '5.3.4-beta.1') absent.push('phiên bản 5.3.4-beta.1 trong package.json');
+if (pkg.version !== '5.3.5-beta.1') absent.push('phiên bản 5.3.5-beta.1 trong package.json');
 if (missing.length || absent.length) {
   console.error('KHÔNG ĐỒNG BỘ. Thiếu tệp:', missing.join(', ') || 'không');
   console.error('Thiếu thành phần:', absent.join(', ') || 'không');
