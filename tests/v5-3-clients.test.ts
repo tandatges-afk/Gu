@@ -1,6 +1,8 @@
 import {test} from 'node:test';import assert from 'node:assert/strict';import {readFileSync} from 'node:fs';
 import {rentForBlocks,billableBlocks,overlap,splitIntoVietnamDays,localDateTimeToISO} from '../src/lib/hourly-pricing.ts';
 import {normalizedAngles} from '../src/lib/inspection-proof.ts';
+import {handoverBillingStart,finalRent} from '../src/lib/gu-v52-workflow.ts';
+import {rentalCharge} from '../src/lib/camera-rental.ts';
 const read=(f:string)=>readFileSync(f,'utf8');
 test('tiered 24-hour price is cumulative for day 1, 5, 10, 30',()=>{
  for(const [kind,price] of [['CLOTHING',[50000,130000,220000,580000]],['ACCESSORY',[20000,70000,130000,370000]]] as const){
@@ -35,9 +37,22 @@ test('single capture workflow supports handover/return; Admin reviews after staf
  assert.match(capture,/HANDOVER_EXTRA/);assert.match(capture,/RECEIVE/);assert.match(capture,/preparePhonePhoto/);
  assert.match(review,/order\.handoverProof/);assert.match(review,/order\.returnProof/);assert.match(review,/REVIEW_PHOTOS/);
 });
-test('actual mobile handover is the clock origin for final 24h settlement',()=>{
+test('reserved rental keeps its 14:00 booking time when handover occurs at 15:00 or 17:00',()=>{
+ const scheduled='2026-10-22T07:00:00.000Z'; // 14:00 in Vietnam
+ const deadline='2026-10-23T07:00:00.000Z';
+ const clothing={category:'Áo dài'};
+ const bookedRent=rentalCharge(clothing,scheduled,deadline);
+ for(const arrived of ['2026-10-22T08:00:00.000Z','2026-10-22T10:00:00.000Z']){
+  const start=handoverBillingStart({bookingKind:'RESERVE',pickupAt:scheduled,actualHandoverAt:arrived});
+  assert.equal(start,scheduled);
+  assert.equal(rentalCharge(clothing,start,deadline),bookedRent);
+  assert.equal(finalRent({bookedRent,quotedRent:bookedRent,prepaid:true,scheduledReturn:deadline,actualReturn:deadline}),bookedRent);
+ }
+ // A walk-in still begins when the product is actually handed over.
+ assert.equal(handoverBillingStart({bookingKind:'WALK_IN',pickupAt:scheduled,actualHandoverAt:'2026-10-22T08:00:00.000Z'}),'2026-10-22T08:00:00.000Z');
  const route=read('src/app/api/v5/orders/[id]/route.ts');
- assert.match(route,/startAt:now,lineTotal:rentalCharge/);
- assert.match(route,/billableBlocks\(order\.handoverProof\?\.at\|\|order\.pickupAt,order\.returnProof\.at\)/);
+ assert.match(route,/handoverBillingStart\(\{bookingKind:order\.bookingKind/);
+ assert.match(route,/order\.bookingKind==='RESERVE'\?\(l\.startAt\|\|billingStart\):billingStart/);
+ assert.match(route,/handoverProof:\{status:'SUBMITTED',by:me\.uid,byName:me\.name,at:now/);
  assert.match(route,/syncDebtIndex\(tx,db\(\),\{\.\.\.order,lines:actualLines,total:actualTotal,status:'PICKED_UP'/);
 });

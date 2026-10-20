@@ -7,8 +7,8 @@ export const MIN_WORK_DAYS = 5;
 export const SHIFT_GRACE_MINUTES = 15;
 export const SHIFT_DEFS = [
   {id:'S1', label:'Ca sáng', start:'08:00', end:'13:00'},
-  {id:'S2', label:'Ca chiều', start:'13:00', end:'18:00'},
-  {id:'S3', label:'Ca tối', start:'18:00', end:'22:00'},
+  {id:'S2', label:'Ca trưa', start:'13:00', end:'17:00'},
+  {id:'S3', label:'Ca tối', start:'17:00', end:'22:00'},
 ] as const;
 export type ShiftId = typeof SHIFT_DEFS[number]['id'];
 export type ShiftSeat = {uid:string;name:string;registeredAt:string};

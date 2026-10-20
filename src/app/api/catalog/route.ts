@@ -3,8 +3,16 @@ import {type Query} from 'firebase-admin/firestore';
 import {db} from '@/lib/firebase-admin';
 import {staffUser,handleError,ApiError} from '@/lib/http';
 import {productSearchText,matchesProductSearch} from '@/lib/product-search';
+import {formatHangerCode} from '@/lib/hanger-code';
 export const runtime='nodejs';
 export const preferredRegion='sin1';
+const looksLikeShortProductCode=(value:string)=>/^(?:GU[- ]?)?\d{1,5}$/i.test(value.trim());
+const normalizedProductCode=(value:string)=>{
+  const raw=value.trim().toUpperCase();
+  if(/^GU-\d{5}$/.test(raw))return raw;
+  const digits=raw.replace(/\D/g,'');
+  return digits&&digits.length<=5?formatHangerCode(Number(digits)):raw;
+};
 export async function GET(req:NextRequest){
  try{
   const me=await staffUser(req);const u=new URL(req.url);
@@ -28,7 +36,7 @@ export async function GET(req:NextRequest){
   // indexes. Existing inventory needs `data:apply-names` after this release.
   // Cursor points to the last *scanned* row, not the last matching row, so
   // filters cannot silently skip results between pages.
-  if(kind==='items'&&term&&mode!=='code'&&!/^GU[-\d]/i.test(term)){
+  if(kind==='items'&&term&&mode!=='code'&&!looksLikeShortProductCode(term)&&!/^GU[-\d]/i.test(term)){
    const normalized=productSearchText(term);
    if(!normalized)return NextResponse.json({kind,results:[],cursor:null,hasMore:false,pageSize:take});
    const indexKey=normalized.length===1?normalized:normalized.slice(0,2);
@@ -64,7 +72,7 @@ export async function GET(req:NextRequest){
   }
   // Phone / product-code searches remain indexed prefix queries.
   if(term){
-   if(kind==='items')field=mode==='code'||/^GU[-\d]/i.test(term)?'hangerCode':'name';
+   if(kind==='items')field=mode==='code'||looksLikeShortProductCode(term)||/^GU[-\d]/i.test(term)?'hangerCode':'name';
    else if(kind==='customers')field=mode==='phone'||/^[+\d]/.test(term)?'phone':'name';
    else field=mode==='phone'?'customerPhone':mode==='customer'?'customerName':'code';
   }
@@ -76,7 +84,7 @@ export async function GET(req:NextRequest){
   collection=collection.orderBy(field,descending?'desc':'asc');
   if(term){
    // Legacy GU names are case sensitive in Firestore. Code and phone searches remain exact-prefix.
-   const value=field==='hangerCode'?term.toUpperCase():term;
+   const value=field==='hangerCode'?normalizedProductCode(term):term;
    collection=collection.startAt(value).endAt(value+'\uf8ff');
   }
   if(token){

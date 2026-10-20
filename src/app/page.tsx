@@ -67,6 +67,24 @@ const prettyDay=(iso:string)=>{try{return new Date(iso+'T00:00:00Z').toLocaleDat
 const initials=(s:string)=>s.trim().split(/\s+/).slice(-2).map(x=>x[0]||'').join('').toUpperCase();
 const fmtShort=(iso:string)=>new Date(iso+'T00:00:00Z').toLocaleDateString('vi-VN',{day:'2-digit',month:'short',timeZone:'UTC'});
 const shortMoney=(n:number)=>n>=1_000_000?(n/1_000_000).toLocaleString('vi-VN',{maximumFractionDigits:1})+'tr':n>=1000?Math.round(n/1000)+'k':String(n);
+const digitsOnly=(value:string)=>value.replace(/\D/g,'');
+const trailingCodeDigits=(value:string)=>digitsOnly(value).replace(/^0+/,'');
+const calendarCellTime=(order:RentalOrder)=>{
+  const pickup=vnDisplayHour(order.pickupAt);
+  const returnHour=vnDisplayHour(order.returnAt);
+  const hasShortCameraPackage=order.lines.some(line=>line.cameraPackageHours===3||line.cameraPackageHours===6);
+  return pickup===returnHour&&!hasShortCameraPackage?pickup:`${pickup} → ${returnHour}`;
+};
+const matchesCalendarSearch=(item:InventoryItem,orders:RentalOrder[],rawQuery:string)=>{
+  const query=rawQuery.trim();
+  if(!query)return true;
+  const productText=[item.name,item.category,item.color,getProductCode(item)||'',item.hangerCode||'',item.sku||''].join(' ');
+  const relatedOrders=orders.filter(order=>order.lines.some(line=>line.itemId===item.id));
+  const customerText=relatedOrders.map(order=>[order.customerName,order.customerPhone,order.code].join(' ')).join(' ');
+  const queryDigits=digitsOnly(query);
+  const codeDigits=trailingCodeDigits(getProductCode(item)||item.hangerCode||item.sku||'');
+  return matchesProductSearch(productText,query)||Boolean(queryDigits&&codeDigits.endsWith(queryDigits))||Boolean(customerText&&matchesProductSearch(customerText,query))||Boolean(queryDigits&&digitsOnly(customerText).includes(queryDigits));
+};
 
 export default function Home() {
   const [user,setUser]=useState<User|null>(null);
@@ -117,7 +135,6 @@ export default function Home() {
   const [calendarQuery,setCalendarQuery]=useState('');
   const [calendarReload,setCalendarReload]=useState(0);
   const [calendarOrderRows,setCalendarOrderRows]=useState<RentalOrder[]|null>(null);
-  const [smartQuery,setSmartQuery]=useState('');
   const [smartStart,setSmartStart]=useState(vietnamToday());
   const [smartEnd,setSmartEnd]=useState(vietnamToday());
   const [smartStartHour,setSmartStartHour]=useState('09:00');
@@ -350,18 +367,20 @@ export default function Home() {
   const calendarOverdue=calendarActive.filter(o=>o.status==='PICKED_UP'&&o.returnDate<today);
   const calendarCreators=Array.from(new Map(calendarActive.filter(o=>Boolean(o.createdBy)).map(o=>[o.createdBy,orderCreatorName(o,data?.staffNames)] as const)).entries()).sort((a,b)=>a[1].localeCompare(b[1],'vi'));
   const creatorName=(o:RentalOrder)=>orderCreatorName(o,data?.staffNames);
-  const calendarItems=(calendarLoaded?calendarRemote:items.slice(0,25)).filter(i=>(calendarCategory==='ALL'||i.category===calendarCategory)&&
+  const calendarBaseItems=calendarLoaded?calendarRemote:items.slice(0,25);
+  const calendarSearchPool=calendarQuery.trim()?[...new Map([...calendarBaseItems,...items].map(item=>[item.id,item] as const)).values()]:calendarBaseItems;
+  const calendarItems=calendarSearchPool.filter(i=>(calendarCategory==='ALL'||i.category===calendarCategory)&&
     (calendarCreator==='ALL'||calendarActive.some(o=>o.createdBy===calendarCreator&&o.lines.some(l=>l.itemId===i.id)&&o.pickupDate<=calendarDays[6]&&o.returnDate>=calendarStart))&&
-    (calendarStatus==='ALL'||calendarItemState(i,calendarActive,calendarStart,7,today)===calendarStatus));
-  const quickMatches=items.filter(i=>(calendarCategory==='ALL'||i.category===calendarCategory)&&
-    (!smartQuery||[i.name,i.category,i.color].some(v=>matchesProductSearch(v,smartQuery.trim()))));
+    (calendarStatus==='ALL'||calendarItemState(i,calendarActive,calendarStart,7,today)===calendarStatus)&&
+    matchesCalendarSearch(i,calendarActive,calendarQuery));
+  const quickMatches=items.filter(i=>(calendarCategory==='ALL'||i.category===calendarCategory)&&matchesCalendarSearch(i,[],calendarQuery));
   const availableMatches=smartResult&&smartResult.pickupDate===smartStart&&smartResult.returnDate===smartEnd?
-    (smartResult.products||quickMatches.filter(i=>smartResult.availableIds.includes(i.id))).filter(i=>(calendarCategory==='ALL'||i.category===calendarCategory)&&(!smartQuery||[i.name,i.category,i.color].some(v=>matchesProductSearch(v,smartQuery.trim())))):[];
+    (smartResult.products||quickMatches.filter(i=>smartResult.availableIds.includes(i.id))).filter(i=>(calendarCategory==='ALL'||i.category===calendarCategory)&&matchesCalendarSearch(i,[],calendarQuery)):[];
   const findAvailable=async()=>{
     setSmartLoading(true);setNearestResult(null);setSmartResult(null);
     try {
       const result=await api<{availableIds:string[];products?:InventoryItem[];pickupDate:string;returnDate:string;checkedAt:string;hasMore?:boolean}>('smart-calendar',{
-        method:'POST',body:JSON.stringify({mode:'FIND_AVAILABLE',pickupDate:smartStart,returnDate:smartEnd,startHour:smartStartHour,endHour:smartEndHour,query:smartQuery})});
+        method:'POST',body:JSON.stringify({mode:'FIND_AVAILABLE',pickupDate:smartStart,returnDate:smartEnd,startHour:smartStartHour,endHour:smartEndHour,query:calendarQuery})});
       setSmartResult(result);
     }catch(e){setErr(e instanceof Error?e.message:'Không thể tra cứu lịch trống.');}
     finally{setSmartLoading(false);}
@@ -392,7 +411,7 @@ export default function Home() {
     return <button key={day} type="button" title={title} aria-label={`${prettyDay(day)}: ${title}`} className={'calendar-cell '+(mobile?'gu-calendar-mobile-cell ':'')+(day===today?'gu-calendar-cell-today ':'')+(nextDayRisk?'gu-next-day-risk ':late?'late-flash ':shown?(shown.status==='PICKED_UP'?'occupied-picked':'occupied-reserved'):blocked?'cell-blocked':'cell-free')} disabled={!shown&&(blocked||isPast)} onClick={()=>matching.length>1?setCalendarMatches(matching):shown?openDetail(shown):openBooking(day===today?'PICKUP':'RESERVE',item.id,day)}>
       {mobile&&<span className="gu-calendar-cell-date"><strong>{week}</strong><small>{day.slice(8,10)}/{day.slice(5,7)}</small></span>}
       <span className="gu-calendar-cell-result">{shown?<>{nextDayRisk?'⏰ ':late?'⚠ ':''}{matching.length>1?matching.length+' lượt':shown.customerName.split(' ').slice(-1)[0]}</>:blocked?'—':isPast?'·':'+'}</span>
-      {shown&&<span className="gu-calendar-cell-time" title={'Giờ giao: '+vnDisplayHour(shown.pickupAt)+' · Giờ nhận: '+vnDisplayHour(shown.returnAt)}>{vnDisplayHour(shown.pickupAt)} → {vnDisplayHour(shown.returnAt)}</span>}
+      {shown&&<span className="gu-calendar-cell-time" title={'Giờ nhận: '+vnDisplayHour(shown.pickupAt)+' · Giờ trả: '+vnDisplayHour(shown.returnAt)}>{calendarCellTime(shown)}</span>}
       {shown&&<span className="gu-calendar-cell-creator" title={'Tạo bởi: '+creatorName(shown)}>NV: {creatorName(shown).split(/\s+/).slice(-1)[0]}</span>}
     </button>;
   };
@@ -475,7 +494,6 @@ export default function Home() {
               <label>Đến ngày thuê<input className="input" type="date" lang="vi-VN" min={smartStart} value={smartEnd} onChange={e=>{setSmartEnd(e.target.value);setSmartResult(null);setNearestResult(null);}}/></label>
               <label>Giờ nhận<input aria-label="Giờ bắt đầu thuê" className="input" type="time" value={smartStartHour} onChange={e=>{setSmartStartHour(e.target.value);setSmartResult(null);}}/></label>
               <label>Giờ trả (ngày hôm sau ngày cuối)<input aria-label="Giờ trả thuê" className="input" type="time" value={smartEndHour} onChange={e=>{setSmartEndHour(e.target.value);setSmartResult(null);}}/></label>
-              <label>Tên / màu<input className="input" type="search" value={smartQuery} onChange={e=>setSmartQuery(e.target.value)} placeholder="Tìm theo tên hoặc mã sản phẩm…"/></label>
               <button type="button" className="btn btn-dark" disabled={smartLoading||!smartStart||!smartEnd||smartEnd<smartStart} onClick={()=>void findAvailable()}>{smartLoading?<LoaderCircle size={16} className="spin"/>:<Search size={16}/>} Tìm đồ trống</button>
             </div>
             {smartResult&&smartResult.pickupDate===smartStart&&smartResult.returnDate===smartEnd&&<div className="gu-smart-result" aria-live="polite"><div className="gu-smart-result-title"><strong>{availableMatches.length} món trống trong trang tìm kiếm</strong><small>{prettyDay(smartStart)} {smartStartHour} – hết {prettyDay(smartEnd)}, trả hôm sau lúc {smartEndHour}</small></div>
@@ -484,7 +502,8 @@ export default function Home() {
               {availableMatches.length>24&&<small className="gu-smart-overflow">Hiển thị 24/{availableMatches.length} sản phẩm</small>}</div></div>}
             
           </section>
-          <div className="gu-catalog-pager"><div className="gu-search-wrap"><Search size={15}/><input className="input" value={calendarQuery} onChange={e=>setCalendarQuery(e.target.value)} placeholder="Tìm mã sản phẩm hoặc tên trên lịch…"/></div><button type="button" className="btn btn-white" disabled={!calendarNext} onClick={()=>setCalendarPageCursor(calendarNext)}>25 món tiếp theo <ChevronRight size={14}/></button><button type="button" className="btn btn-white" disabled={!calendarPageCursor} onClick={()=>setCalendarPageCursor(null)}>Đầu danh sách</button></div>
+          <div className="gu-catalog-pager"><div className="gu-search-wrap"><Search size={15}/><input className="input" value={calendarQuery} onChange={e=>setCalendarQuery(e.target.value)} placeholder="Tìm tên sản phẩm, mã GU-00234 / 234, khách đang thuê hoặc SĐT…"/></div><button type="button" className="btn btn-white" disabled={!calendarNext} onClick={()=>setCalendarPageCursor(calendarNext)}>25 món tiếp theo <ChevronRight size={14}/></button><button type="button" className="btn btn-white" disabled={!calendarPageCursor} onClick={()=>setCalendarPageCursor(null)}>Đầu danh sách</button></div>
+          <p className="gu-calendar-search-note">Ô tìm kiếm này dùng chung cho lịch thuê và tìm đồ trống. Có thể gõ <b>234</b> để ra mã <b>GU-00234</b>, hoặc tìm theo tên khách / SĐT của đơn đang giữ đồ. Tìm theo khách chỉ áp dụng ở trang lịch, không áp dụng trong form tạo đơn hay đặt lịch.</p>
           <section className="panel calendar-panel"><div className="calendar-toolbar"><div><h3>Lịch sản phẩm</h3><div className="legend">{data.me.role==='admin'&&<span className="overdue-label"><i className="legend-dot maintenance"/>Chớp đỏ: trả trễ</span>}<span><i className="legend-dot reserved"/>Đã giữ</span><span><i className="legend-dot picked"/>Đã lấy</span><span><i className="legend-dot free"/>Còn trống</span></div></div><div className="calendar-controls">
             <select className="input gu-calendar-cat" value={calendarCategory} onChange={e=>setCalendarCategory(e.target.value)}><option value="ALL">Tất cả danh mục</option>{Array.from(new Set(items.map(i=>i.category))).sort().map(c=><option value={c} key={c}>{c}</option>)}</select>
             <select className="input gu-calendar-status" aria-label="Lọc lịch theo tình trạng" value={calendarStatus} onChange={e=>setCalendarStatus(e.target.value as CalendarFilter)}>

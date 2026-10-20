@@ -971,3 +971,54 @@ html,body{background:var(--paper);color:var(--ink)}
 @media(max-width:700px){.gu-shifts-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.gu-shifts-slot{min-height:114px;padding:10px}.gu-shifts-header{flex-wrap:wrap}.gu-shifts-info{align-items:flex-start}.gu-shifts-footer{align-items:flex-start;flex-direction:column}.gu-shifts-footer button{width:100%}}
 @media(max-width:360px){.gu-shifts-grid{grid-template-columns:1fr}}
 .gu-shifts-header-buttons{display:flex;flex-wrap:wrap;align-items:center;gap:6px}
+
+/* GU v5.3.1 UI polish — calendar/search/shift cleanup */
+.gu-calendar-search-note{margin:10px 0 16px;color:#657283;font-size:12px;line-height:1.65}
+.gu-calendar-search-note b{color:#16314b}
+.gu-smart-calendar{overflow:hidden}
+.gu-smart-controls{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;align-items:end}
+.gu-smart-controls label{min-width:0}
+.gu-smart-controls>.btn{grid-column:1/-1;min-height:46px;width:100%}
+.gu-catalog-pager{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:10px;align-items:center}
+.gu-catalog-pager .gu-search-wrap{min-width:0}
+.gu-catalog-pager .btn{min-height:44px}
+.calendar-toolbar{gap:16px}
+.calendar-toolbar>div:first-child{min-width:0}
+.calendar-controls{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;align-items:center;min-width:0}
+.calendar-controls .boxed,.calendar-controls .btn,.calendar-controls .gu-date-nav,.calendar-controls select{width:100%;min-width:0}
+.calendar-item{display:flex;align-items:flex-start;gap:12px;padding-right:8px}
+.calendar-item .gu-calendar-photo,.gu-mobile-calendar-product .gu-calendar-photo{width:72px;height:94px;object-fit:cover;border-radius:12px;flex:none;background:#f2f4f7}
+.calendar-item>div{display:grid;gap:6px;min-width:0}
+.calendar-item strong,.gu-mobile-calendar-product-info strong{font-size:15px;line-height:1.35;color:#162c45}
+.calendar-item span,.gu-mobile-calendar-product-info span{font-size:12px;line-height:1.45;color:#687483}
+.gu-calendar-cell-time,.gu-calendar-cell-creator{max-width:100%;overflow:hidden;text-overflow:ellipsis}
+
+@media (max-width: 1100px){
+  .calendar-controls{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .gu-catalog-pager{grid-template-columns:1fr 1fr}
+  .gu-catalog-pager .gu-search-wrap{grid-column:1/-1}
+}
+@media (max-width: 850px){
+  .gu-smart-controls{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+  .gu-mobile-calendar{display:grid;gap:12px}
+  .gu-mobile-calendar-card{padding:14px;border:1px solid #e6ebf0;border-radius:16px;background:#fff;box-shadow:0 4px 14px #16314b0a}
+  .gu-mobile-calendar-product{display:flex;align-items:flex-start;gap:12px}
+  .gu-mobile-calendar-product-info{min-width:0;display:grid;gap:6px}
+  .gu-mobile-days-scroll{overflow-x:auto;padding-bottom:2px}
+  .gu-mobile-days-grid{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(108px,1fr);gap:10px}
+  .gu-calendar-mobile-cell{min-height:132px;padding:12px 10px;align-items:flex-start;justify-content:flex-start;gap:7px;border-radius:14px}
+  .gu-calendar-cell-date{display:grid;gap:2px}
+  .gu-calendar-cell-date strong{font-size:13px}
+  .gu-calendar-cell-date small{font-size:11px;color:#6b7682}
+  .gu-calendar-cell-result{font-size:15px;font-weight:800}
+  .gu-calendar-cell-time,.gu-calendar-cell-creator{font-size:11px;white-space:normal;line-height:1.4;overflow:visible;text-overflow:clip}
+  .gu-calendar-desktop{display:none}
+}
+@media (min-width: 851px){
+  .gu-mobile-calendar{display:none}
+}
+@media (max-width: 560px){
+  .gu-smart-controls,.calendar-controls,.gu-catalog-pager{grid-template-columns:1fr}
+  .gu-catalog-pager .btn,.calendar-controls .btn,.calendar-controls .boxed{width:100%}
+  .gu-smart-controls>.btn{grid-column:auto}
+}

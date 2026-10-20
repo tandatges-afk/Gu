@@ -1,4 +1,13 @@
 /** Rental policy shared by client previews and all V5 server actions. */
+/**
+ * A pre-booked rental starts at the time the customer agreed to, even if the
+ * handover photos are taken hours later. A walk-in begins at actual handover.
+ * The actual handover remains available separately as handoverProof.at.
+ */
+export function handoverBillingStart(input:{bookingKind?:string;scheduledPickupAt?:string|null;pickupAt?:string|null;actualHandoverAt:string}):string{
+ if(input.bookingKind!=='RESERVE')return input.actualHandoverAt;
+ return input.scheduledPickupAt||input.pickupAt||input.actualHandoverAt;
+}
 export function requiresFullPrepayment(pickupAt:string, createdAt:string, requestedReserve=false){
  const localDay=(s:string)=>new Date(s).toLocaleDateString('en-CA',{timeZone:'Asia/Ho_Chi_Minh'});
  return requestedReserve || localDay(pickupAt)>localDay(createdAt);

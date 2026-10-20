@@ -48,8 +48,8 @@ test('valid working shift; grace for 15 min; no session between split shifts',()
  assert.equal(currentStaffAccess(at('2026-10-26T01:00:00Z'),'a',record).canWork,true);
  assert.equal(currentStaffAccess(at('2026-10-26T06:10:00Z'),'a',record).grace,true);
  assert.equal(currentStaffAccess(at('2026-10-26T06:15:00Z'),'a',record).canWork,false);
- assert.equal(currentStaffAccess(at('2026-10-26T10:59:00Z'),'a',record).canWork,false);
- assert.equal(currentStaffAccess(at('2026-10-26T11:00:00Z'),'a',record).canWork,true);
+ assert.equal(currentStaffAccess(at('2026-10-26T09:59:00Z'),'a',record).canWork,false);
+ assert.equal(currentStaffAccess(at('2026-10-26T10:00:00Z'),'a',record).canWork,true);
  assert.equal(currentStaffAccess(at('2026-10-26T15:15:00Z'),'a',record).canWork,false);
  assert.equal(currentStaffAccess(at('2026-10-26T02:00:00Z'),'b',record).canWork,false);
 });
@@ -58,6 +58,6 @@ test('back-to-back shifts continuously grant access without forced logout',()=>{
  const record={weekStart:monday,seats:{[slots[0].key]:[{uid:'a',name:'A',registeredAt:'x'}],[slots[1].key]:[{uid:'a',name:'A',registeredAt:'x'}]}} as ShiftWeekRecord;
  assert.equal(currentStaffAccess(at('2026-10-26T05:59:59Z'),'a',record).canWork,true);
  assert.equal(currentStaffAccess(at('2026-10-26T06:00:00Z'),'a',record).canWork,true);
- assert.equal(currentStaffAccess(at('2026-10-26T11:14:59Z'),'a',record).canWork,true);
- assert.equal(currentStaffAccess(at('2026-10-26T11:15:00Z'),'a',record).canWork,false);
+ assert.equal(currentStaffAccess(at('2026-10-26T10:14:59Z'),'a',record).canWork,true);
+ assert.equal(currentStaffAccess(at('2026-10-26T10:15:00Z'),'a',record).canWork,false);
 });

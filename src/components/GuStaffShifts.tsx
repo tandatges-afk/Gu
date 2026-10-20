@@ -47,10 +47,10 @@ export function GuStaffShifts({api,isAdmin=false,registrationOnly=false}: {api:C
  };
  return <section className="gu-shifts-panel">
   <div className="gu-shifts-header"><div><div className="eyebrow">LỊCH LÀM VIỆC</div><h2><CalendarClock size={24}/> Đăng ký ca tuần</h2>
-   <p>Ba ca/ngày: <b>08:00–13:00</b>, <b>13:00–18:00</b>, <b>18:00–22:00</b>. Mỗi ca tối đa {SHIFT_MAX_STAFF} nhân viên, không giới hạn số ca một người làm trong ngày.</p></div>
+   <p>Ba ca/ngày: <b>08:00–13:00</b>, <b>13:00–17:00</b>, <b>17:00–22:00</b>. Mỗi ca tối đa {SHIFT_MAX_STAFF} nhân viên, không giới hạn số ca một người làm trong ngày.</p></div>
    <div className="gu-shifts-header-buttons">
     {!registrationOnly&&<><button className={'btn '+(view==='current'?'btn-dark':'btn-white')} type="button" onClick={()=>setView('current')}>Tuần này</button>
-    <button className={'btn '+(view==='next'?'btn-dark':'btn-white')} type="button" onClick={()=>setView('next')}>Tuần đăng ký</button></>}
+    <button className={'btn '+(view==='next'?'btn-dark':'btn-white')} type="button" onClick={()=>setView('next')}>Tuần sau</button></>}
     <button className="btn btn-white" type="button" onClick={()=>void load()} disabled={loading} aria-label="Tải lại lịch ca"><RefreshCcw size={16}/> Làm mới</button>
    </div></div>
   {loading&&!week&&<div className="center-screen"><LoaderCircle className="spin"/> Đang tải lịch…</div>}

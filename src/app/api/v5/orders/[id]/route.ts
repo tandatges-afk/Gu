@@ -12,7 +12,7 @@ import {auditInTransaction} from '@/lib/audit';
 import {FieldValue,type Transaction} from 'firebase-admin/firestore';
 import {addCompletedRound,type InspectionRound} from '@/lib/evidence-retention-rules';
 import {runEvidenceCleanup} from '@/lib/evidence-retention';
-import {finalRent} from '@/lib/gu-v52-workflow';
+import {finalRent,handoverBillingStart} from '@/lib/gu-v52-workflow';
 import {readVerifiedEvidence} from '@/lib/secure-evidence';
 import type {RentalOrder,InventoryItem} from '@/lib/types';
 export const runtime='nodejs';
@@ -90,15 +90,16 @@ export async function PATCH(req:NextRequest,ctx:{params:Promise<{id:string}>}){
     if(depositProofId&&!['CCCD','CASH','OTHER'].includes(depositKind))throw new ApiError(400,'Chọn loại vật cọc đã nhận.');
     const depositEvidence=depositProofId?await readVerifiedEvidence(tx,depositProofId,me.uid,'deposit',String(b.depositDraftId||'')):null;
     if(snaps.some(s=>!s.exists||s.data()?.status!=='AVAILABLE'))throw new ApiError(409,'Có món đang cho thuê hoặc chưa giặt.');
-    // Every 24-hour rental block starts from the actual mobile handover time,
-    // not the planned pickup timestamp from the PC order.
+    // Reserved rentals keep their original scheduled pickup time for pricing and timeline
+    // even when the customer comes later, so the planned slot remains authoritative.
     if(Date.parse(now)>=Date.parse(order.returnAt||''))throw new ApiError(409,'Giờ trả dự kiến đã qua; PC cần cập nhật lịch trước khi giao.');
-    const actualLines=order.lines.map(l=>({...l,startAt:now,lineTotal:rentalCharge(l,now,order.returnAt!)}));
+    const billingStart=handoverBillingStart({bookingKind:order.bookingKind,scheduledPickupAt:order.scheduledPickupAt,pickupAt:order.pickupAt,actualHandoverAt:now});
+    const actualLines=order.lines.map(l=>{const startAt=order.bookingKind==='RESERVE'?(l.startAt||billingStart):billingStart;return {...l,startAt,lineTotal:rentalCharge(l,startAt,order.returnAt!)};});
     const computedTotal=actualLines.reduce((sum,l)=>sum+Number(l.lineTotal||0),0);
     const actualTotal=order.bookingKind==='RESERVE'?Math.max(order.bookedRentTotal||order.total,computedTotal):computedTotal;
     if(earlySlots.length)createIntervalWrites(tx,earlySlots,earlyPrior,id);
     if(depositEvidence)tx.update(depositEvidence.ref,{consumedOrderId:id,consumedAt:now});
-    tx.update(ref,{status:'PICKED_UP',scheduledPickupAt:order.scheduledPickupAt||order.pickupAt,...(earlyHandover?{pickupAt:now,pickupDate:vnDayKey(now),rentalDays:billableBlocks(now,order.returnAt!)}:{}),lines:actualLines,total:actualTotal,...(depositEvidence?{handoverDepositProofId:depositProofId,handoverDepositKind:depositKind}:{}),handoverProof:{status:'SUBMITTED',by:me.uid,byName:me.name,at:now,items:proofs},updatedAt:now,history:[...order.history,{action:'HANDOVER_PHOTOS',by:me.uid,at:now,detail:`Nhân viên ${me.name} đã chụp ${proofs.length} sản phẩm, bắt đầu tính 24 giờ từ lúc giao thực tế`}]});
+    tx.update(ref,{status:'PICKED_UP',scheduledPickupAt:order.scheduledPickupAt||order.pickupAt,lines:actualLines,total:actualTotal,...(depositEvidence?{handoverDepositProofId:depositProofId,handoverDepositKind:depositKind}:{}),handoverProof:{status:'SUBMITTED',by:me.uid,byName:me.name,at:now,items:proofs},updatedAt:now,history:[...order.history,{action:'HANDOVER_PHOTOS',by:me.uid,at:now,detail:`Nhân viên ${me.name} đã chụp ${proofs.length} sản phẩm và giữ nguyên giờ thuê theo lịch hẹn`} ]});
     itemRefs.forEach(r=>tx.update(r,{status:'RENTED',currentOrderId:id,expectedReturnDate:order.returnDate}));
     tx.set(job,{stage:'OUT',code:order.code,orderId:id,customerName:order.customerName,returnAt:order.returnAt,updatedAt:now},{merge:true});
     syncDebtIndex(tx,db(),{...order,lines:actualLines,total:actualTotal,status:'PICKED_UP',updatedAt:now});
