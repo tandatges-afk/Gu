@@ -1118,3 +1118,23 @@ html,body{background:var(--paper);color:var(--ink)}
 .gu-booking-blockers{padding:10px 13px;border:1px solid #e6d5ad;background:#fffaf0;color:#78572a;border-radius:10px;line-height:1.5;font-size:12px}
 .gu-payment-warning{padding:10px 12px;background:#fff4e6;border:1px solid #f0cfa8;border-radius:8px;color:#854a1e;font-size:12px;line-height:1.5}
 .gu-tab-panel[hidden]{display:none!important}
+
+/* GU v5.3.6: customer missed a scheduled pickup. Distinct from red overdue returns,
+   purple tomorrow-return risks and yellow reserved status. */
+.gu-late-pickup-banner{position:relative;display:flex;align-items:flex-start;gap:12px;margin:12px 0 18px;padding:16px 52px 16px 17px;background:#e8f5fb;border:1px solid #65a9cf;border-left:5px solid #2378ac;border-radius:14px;color:#134868;box-shadow:0 4px 15px #164b7614}
+.gu-late-pickup-banner>svg{color:#177eae;flex-shrink:0;margin-top:2px}
+.gu-late-pickup-body{flex:1;min-width:0;display:grid;gap:8px}
+.gu-late-pickup-body>strong{font-size:14px;line-height:1.4}
+.gu-late-pickup-body>p{font-size:12px;line-height:1.5;margin:0;color:#32617b}
+.gu-late-pickup-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:7px;max-height:290px;overflow:auto}
+.gu-late-pickup-list>button{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:3px 8px;border:1px solid #b5d8e8;background:#fff;color:#174a67;text-align:left;border-radius:9px;padding:10px;cursor:pointer;min-width:0}
+.gu-late-pickup-list>button>strong{font-size:12px}
+.gu-late-pickup-list>button>span{font-size:12px;overflow-wrap:anywhere}
+.gu-late-pickup-list>button>small{grid-column:1/3;font-size:11px;color:#476c7f}
+.gu-late-pickup-list>button>svg{grid-column:3;grid-row:1/3}
+.gu-late-pickup-more{justify-self:start;background:transparent;border:0;color:#075889;text-decoration:underline;cursor:pointer;font-weight:750;font-size:12px;padding:4px 0}
+.gu-late-pickup-dismiss{position:absolute;right:12px;top:12px;width:33px;height:33px;display:grid;place-items:center;background:#d7ebf6;color:#165a80;border:1px solid transparent;border-radius:9px;cursor:pointer}
+.gu-late-pickup-dismiss:hover{background:#c1e0f0}
+.gu-late-pickup-dismiss:focus-visible,.gu-late-pickup-list>button:focus-visible{outline:2px solid #2378ac;outline-offset:2px}
+.gu-late-pickup-badge{background:#d9f0fb!important;color:#0b5f86!important;border:1px solid #69accc!important}
+@media(max-width:650px){.gu-late-pickup-banner{padding:14px 48px 14px 12px;gap:8px}.gu-late-pickup-list{grid-template-columns:1fr;max-height:280px}}

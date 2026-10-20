@@ -13,3 +13,27 @@ export function tomorrowReturnRisk(orders:RentalOrder[],now:Date):{itemId:string
  const next=orders.filter(o=>o.status==='RESERVED'&&o.pickupDate===tomorrow);
  return held.flatMap(h=>h.lines.flatMap(line=>next.filter(n=>n.id!==h.id&&n.lines.some(l=>l.itemId===line.itemId)).map(n=>({itemId:line.itemId,heldOrderId:h.id,nextOrderId:n.id}))));
 }
+
+/** Customers who have not arrived after their agreed pickup time.
+ * Missing clock times on legacy orders are NOT treated as midnight pickups.
+ * Instead, notify only when their scheduled calendar day has fully passed.
+ * Called on the server for the complete set of open reservations.
+ */
+export type LatePickupAlert={orderId:string;code:string;customerName:string;scheduledAt:string|null;pickupDate:string};
+export function overduePickupNotice(order:RentalOrder,now:Date):LatePickupAlert|null{
+ if(order.status!=='RESERVED')return null;
+ const planned=order.scheduledPickupAt||order.pickupAt;
+ if(planned && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(planned) && /(?:Z|[+-]\d{2}:?\d{2})$/i.test(planned)){
+  const at=Date.parse(planned);
+  if(Number.isFinite(at))return now.getTime()>at?{orderId:order.id,code:order.code,customerName:order.customerName,scheduledAt:planned,pickupDate:order.pickupDate}:null;
+ }
+ // Legacy date-only orders: not enough information to call them late during their pickup day.
+ if(/^\d{4}-\d{2}-\d{2}$/.test(order.pickupDate||'') && order.pickupDate<vnClock(now).today){
+  return {orderId:order.id,code:order.code,customerName:order.customerName,scheduledAt:null,pickupDate:order.pickupDate};
+ }
+ return null;
+}
+export function overduePickupNotices(orders:RentalOrder[],now:Date):LatePickupAlert[]{
+ return orders.map(o=>overduePickupNotice(o,now)).filter((row):row is LatePickupAlert=>row!==null)
+  .sort((a,b)=>(a.scheduledAt||a.pickupDate).localeCompare(b.scheduledAt||b.pickupDate)||a.orderId.localeCompare(b.orderId));
+}

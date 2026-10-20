@@ -1,6 +1,6 @@
 {
   "name": "gu-thue-do-xinh",
-  "version": "5.3.5-beta.3",
+  "version": "5.3.6-beta.1",
   "private": true,
   "type": "module",
   "scripts": {
@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit",
     "test": "node --experimental-strip-types --test tests/*.test.ts",
     "diagnose:firebase": "node --env-file=.env.local scripts/diagnose-firebase.mjs",
+    "diagnose:storage": "node --env-file=.env.local scripts/diagnose-storage.mjs",
     "verify:release": "node scripts/verify-release.mjs && node scripts/check-local-imports.mjs && node scripts/check-client-directives.mjs",
     "data:plan": "node --env-file=.env.local scripts/reset-demo-data.mjs --plan",
     "data:backup": "node --env-file=.env.local scripts/reset-demo-data.mjs --backup",

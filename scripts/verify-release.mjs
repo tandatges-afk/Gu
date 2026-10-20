@@ -92,7 +92,10 @@ const required = [
   'src/components/GuInventoryTable.module.css',
   'src/app/api/v5/visual-catalog/route.ts',
   'scripts/migrate-customer-phone-index.mjs',
-  'docs/GU-v5.3.5-IMAGE-INDEX-INVENTORY-CUSTOMER-PAYMENT.md'
+  'docs/GU-v5.3.5-IMAGE-INDEX-INVENTORY-CUSTOMER-PAYMENT.md',
+  'docs/GU-v5.3.6-LATE-PICKUP-STORAGE.md',
+  'scripts/diagnose-storage.mjs',
+  'tests/v536-late-pickup-storage.test.ts'
 ];
 const missing = required.filter(p => !existsSync(join(root,p)));
 const read = p => readFileSync(join(root,p),'utf8');
@@ -163,9 +166,12 @@ checks.push(['đối soát thu thừa', /overpaid/, 'src/lib/payment-review.ts']
 checks.push(['tìm mã sản phẩm theo chuỗi không mất 0', /inventoryCodeNeedle/, 'src/app/api/catalog/route.ts']);
 checks.push(['thống kê kho bỏ sản phẩm lưu trữ', /archivedByStatus/, 'src/app/api/bootstrap/route.ts']);
 checks.push(['bộ lọc kho riêng và xóa lỗi cũ', /clearError\(\);/, 'src/components/GuInventoryFilters.tsx']);
+checks.push(['nhắc khách quá giờ nhận ở backend', /overduePickupNotices\(reservations,now\)/, 'src/app/api/v5/return-risk/route.ts']);
+checks.push(['thông báo khách quá giờ nhận', /gu-late-pickup-banner/, 'src/app/page.tsx']);
+checks.push(['chẩn đoán bucket private', /diagnose:storage/, 'package.json']);
 const absent = checks.filter(([name,pattern,file]) => missing.includes(file) || !pattern.test(read(file))).map(([name])=>name);
 const pkg = JSON.parse(read('package.json'));
-if (pkg.version !== '5.3.5-beta.3') absent.push('phiên bản 5.3.5-beta.3 trong package.json');
+if (pkg.version !== '5.3.6-beta.1') absent.push('phiên bản 5.3.6-beta.1 trong package.json');
 if (missing.length || absent.length) {
   console.error('KHÔNG ĐỒNG BỘ. Thiếu tệp:', missing.join(', ') || 'không');
   console.error('Thiếu thành phần:', absent.join(', ') || 'không');

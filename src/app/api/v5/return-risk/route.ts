@@ -1,7 +1,7 @@
 import {NextRequest,NextResponse} from 'next/server';
 import {staffUser,handleError,ApiError} from '@/lib/http';
 import {db} from '@/lib/firebase-admin';
-import {nextDay,tomorrowReturnRisk,vnClock} from '@/lib/return-risk';
+import {nextDay,tomorrowReturnRisk,vnClock,overduePickupNotices} from '@/lib/return-risk';
 import type {RentalOrder} from '@/lib/types';
 export const runtime='nodejs';
 export async function GET(req:NextRequest){try{
@@ -19,8 +19,14 @@ export async function GET(req:NextRequest){try{
   }
   throw new ApiError(503,'Vượt 5.000 đơn trong cảnh báo; cần triển khai hàng đợi cảnh báo theo ngày.');
  }
- const [held,booked]=await Promise.all([loadAll('status','PICKED_UP'),loadAll('pickupDate',tomorrow)]);
+ // Even before 17:00, overdue pickups must be checked throughout the day.
+ const [reservations,held]=await Promise.all([
+  loadAll('status','RESERVED'),
+  hour>=17?loadAll('status','PICKED_UP'):Promise.resolve([] as RentalOrder[])
+ ]);
+ const booked=hour>=17?reservations.filter(o=>o.pickupDate===tomorrow):[];
+ const latePickups=overduePickupNotices(reservations,now);
  const orders=[...new Map([...held,...booked].map(o=>[o.id,o])).values()];
- const risks=tomorrowReturnRisk(orders,now);
- return NextResponse.json({risks,checkedAt:now.toISOString(),truncated:false},{headers:{'Cache-Control':'private,no-store'}});
+ const risks=hour>=17?tomorrowReturnRisk(orders,now):[];
+ return NextResponse.json({risks,latePickups,checkedAt:now.toISOString(),truncated:false},{headers:{'Cache-Control':'private,no-store'}});
  }catch(e){return handleError(e,'GET /api/v5/return-risk');}}
