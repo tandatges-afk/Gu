@@ -1,3 +1,4 @@
+import {formatVNDateTime} from '@/lib/vn-datetime';
 'use client';
 import {useEffect,useState} from 'react';
 import {Cloud,ExternalLink,HardDrive,RefreshCw} from 'lucide-react';
@@ -34,7 +35,7 @@ export function GuSystem({api}:{api:Api}){
    <Measure title="Băng thông" data={cloud?.bandwidth} bytes/>
    <Measure title="Xử lý ảnh" data={cloud?.transformations}/>
    <div className="gu-system-detail"><HardDrive size={16}/><span>Số ảnh/tài nguyên: <b>{fmt(cloud?.resources)}</b></span></div>
-   {cloud?.updatedAt&&<small className="gu-system-updated">Cập nhật: {new Date(cloud.updatedAt).toLocaleString('vi-VN')}</small>}
+   {cloud?.updatedAt&&<small className="gu-system-updated">Cập nhật: {formatVNDateTime(cloud.updatedAt)}</small>}
    <a href="https://console.cloudinary.com/" target="_blank" rel="noopener noreferrer" className="gu-system-source">Cloudinary Console <ExternalLink size={14}/></a>
   </section>
  </>;

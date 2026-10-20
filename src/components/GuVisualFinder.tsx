@@ -5,6 +5,7 @@ import {thumbCloudinaryUrl} from '@/lib/cloudinary-images';
 import {ProductImage,type ApiCall} from './GuExtras';
 import type {InventoryItem} from '@/lib/types';
 import {visibleStockLabel,type VisualAvailabilityState} from '@/lib/visual-availability';
+import {formatVNDateTime,formatVNDateKey} from '@/lib/vn-datetime';
 /** Low-cost image candidate ranking: browser color-and-outline fingerprint, NOT AI or identity proof. */
 function fingerprint(canvas:HTMLCanvasElement):number[]{const ctx=canvas.getContext('2d',{willReadFrequently:true});if(!ctx)throw new Error('Thiết bị không hỗ trợ so sánh ảnh.');
  const {data}=ctx.getImageData(0,0,32,32);const out=Array(24).fill(0) as number[];
@@ -18,7 +19,7 @@ async function photoVector(source:File|string){return new Promise<number[]>((res
  img.onerror=()=>{if(typeof source!=='string')URL.revokeObjectURL(url);reject(Error('Ảnh không tải được.'));};img.src=url;
  });}
 function distance(a:number[],b:number[]){return a.reduce((sum,n,i)=>sum+Math.abs(n-b[i]),0);}
-const describeTime=(time:string|null,date:string)=>time?new Date(time).toLocaleString('vi-VN',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false,timeZone:'Asia/Ho_Chi_Minh'}):date.split('-').reverse().join('/');
+const describeTime=(time:string|null,date:string)=>time?formatVNDateTime(time):formatVNDateKey(date);
 function StatusInfo({info,pending}:{info:VisualAvailabilityState|undefined;pending:boolean}){
  const status=info?.status||'UNKNOWN';
  const label=pending?'Đang kiểm tra…':info?visibleStockLabel(status):'Chưa xác minh';
@@ -30,7 +31,7 @@ function StatusInfo({info,pending}:{info:VisualAvailabilityState|undefined;pendi
    </div>}
  </div>;
 }
-export function GuVisualFinder({api,onChoose}:{api:ApiCall;onChoose?:(item:InventoryItem)=>void}){
+export function GuVisualFinder({api,onChoose,active=true}:{api:ApiCall;onChoose?:(item:InventoryItem)=>void;active?:boolean}){
  const [file,setFile]=useState<File|null>(null);
  const [chosen,setChosen]=useState<InventoryItem|null>(null);
  const [copyNote,setCopyNote]=useState('');
@@ -39,19 +40,21 @@ export function GuVisualFinder({api,onChoose}:{api:ApiCall;onChoose?:(item:Inven
  const [availabilityLoading,setAvailabilityLoading]=useState(false);
  const [availability,setAvailability]=useState<Record<string,VisualAvailabilityState>>({});
  const [availabilityError,setAvailabilityError]=useState('');
+ const availabilityLastChecked=useRef(0);
  const [note,setNote]=useState('');
  const scanToken=useRef(0);
  const pasteFile=async()=>{try{if(!navigator.clipboard?.read)throw Error('Trình duyệt không hỗ trợ đọc ảnh clipboard.');const clips=await navigator.clipboard.read();for(const clip of clips){const mime=clip.types.find(x=>x.startsWith('image/'));if(mime){const blob=await clip.getType(mime);setFile(new File([blob],'anh-dan.'+(mime.split('/')[1]||'png'),{type:mime}));setNote('Đã nhận ảnh từ clipboard.');return;}}throw Error('Clipboard chưa có ảnh.');}catch(e){setNote(e instanceof Error?e.message:'Không thể dán ảnh.');}};
- useEffect(()=>{const onPaste=(e:ClipboardEvent)=>{const file=Array.from(e.clipboardData?.files||[]).find(f=>f.type.startsWith('image/'));if(file){setFile(file);setNote('Đã dán ảnh bằng Ctrl+V.');}};window.addEventListener('paste',onPaste);return()=>window.removeEventListener('paste',onPaste);},[]);
+ useEffect(()=>{if(!active)return;const onPaste=(e:ClipboardEvent)=>{const file=Array.from(e.clipboardData?.files||[]).find(f=>f.type.startsWith('image/'));if(file){setFile(file);setNote('Đã dán ảnh bằng Ctrl+V.');}};window.addEventListener('paste',onPaste);return()=>window.removeEventListener('paste',onPaste);},[active]);
  const loadAvailability=async(items:InventoryItem[],seq:number)=>{
   if(!items.length)return;
   setAvailabilityLoading(true);setAvailabilityError('');
   try{
    const response=await api<{states:Record<string,VisualAvailabilityState>}>('v5/visual-availability',{method:'POST',body:JSON.stringify({itemIds:items.map(i=>i.id)})});
-   if(seq===scanToken.current)setAvailability(response.states||{});
+   if(seq===scanToken.current){setAvailability(response.states||{});availabilityLastChecked.current=Date.now();}
   }catch(e){if(seq===scanToken.current)setAvailabilityError(e instanceof Error?e.message:'Không kiểm tra được trạng thái kho và lịch đặt.');}
   finally{if(seq===scanToken.current)setAvailabilityLoading(false);}
  };
+ useEffect(()=>{if(active&&results.length&&Date.now()-availabilityLastChecked.current>60_000){void loadAvailability(results.slice(0,12).map(r=>r.item),scanToken.current);}},[active]);
  const scan=async()=>{
   if(!file)return;
   const seq=++scanToken.current;

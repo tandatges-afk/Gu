@@ -1107,3 +1107,14 @@ html,body{background:var(--paper);color:var(--ink)}
 }
 
 .gu-visual-result-toolbar{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin:17px 0 2px}.gu-visual-result-toolbar strong{color:#27415e;font-size:14px}.gu-visual-result-toolbar .btn{min-height:38px;font-size:12px}
+/* v5.3.3: 24-hour VN date inputs, independent of device/browser AM/PM locale */
+.gu-vn-datetime,.gu-vn-date-only{position:relative;display:flex;align-items:stretch;gap:8px;min-width:0;width:100%}
+.gu-vn-datetime>.input:first-child{flex:1.45;min-width:0}
+.gu-vn-datetime>.input:nth-child(2){flex:1;min-width:0;font-variant-numeric:tabular-nums}
+.gu-vn-date-only>.input{flex:1;min-width:0}
+.gu-vn-datetime>button,.gu-vn-date-only>button{flex:0 0 38px;border-radius:10px;background:#f3f6f8;border:1px solid #d9e1e8;color:#253c52;font-size:20px}
+.gu-vn-native-date{position:absolute!important;right:0;bottom:0;max-width:1px;max-height:1px;opacity:0;pointer-events:none}
+@media(max-width:420px){.gu-vn-datetime{flex-wrap:wrap}.gu-vn-datetime>.input:first-child{flex-basis:calc(60% - 23px)}.gu-vn-datetime>.input:nth-child(2){flex-basis:calc(40% - 23px)}}
+.gu-booking-blockers{padding:10px 13px;border:1px solid #e6d5ad;background:#fffaf0;color:#78572a;border-radius:10px;line-height:1.5;font-size:12px}
+.gu-payment-warning{padding:10px 12px;background:#fff4e6;border:1px solid #f0cfa8;border-radius:8px;color:#854a1e;font-size:12px;line-height:1.5}
+.gu-tab-panel[hidden]{display:none!important}

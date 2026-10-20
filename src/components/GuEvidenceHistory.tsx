@@ -1,3 +1,4 @@
+import {formatVNDateTime} from '@/lib/vn-datetime';
  'use client';
 import {useEffect,useState} from 'react';
 import type {ApiCall} from './GuExtras';
@@ -17,7 +18,7 @@ export function GuEvidenceHistory({item,api,onClose}:{item:InventoryItem;api:Api
  {info&&<p><b>{info.rounds.length}/{info.maxRounds} lượt ảnh</b>{info.pendingDelete>0?' · '+info.pendingDelete+' tác vụ xóa đang chờ':''}</p>}
  {error&&<p className="field-error">{error}</p>}
  {!info&&!error&&<p>Đang tải lịch sử ảnh…</p>}
- {info?.rounds.slice().reverse().map((r,i)=><button type="button" className="gu-v5-job" key={r.orderId} disabled={busy} onClick={()=>void open(r.orderId)}><b>Lượt {info.rounds.length-i} · {new Date(r.completedAt).toLocaleString('vi-VN',{timeZone:'Asia/Ho_Chi_Minh'})}</b><span>Mở ảnh giao và ảnh nhận</span></button>)}
+ {info?.rounds.slice().reverse().map((r,i)=><button type="button" className="gu-v5-job" key={r.orderId} disabled={busy} onClick={()=>void open(r.orderId)}><b>Lượt {info.rounds.length-i} · {formatVNDateTime(r.completedAt)}</b><span>Mở ảnh giao và ảnh nhận</span></button>)}
  {order&&<section className="gu-v5-inspection-item"><h3>{order.code} · {order.customerName}</h3><p>Giao: {order.handoverProof?.byName||'Chưa rõ'} · Nhận: {order.returnProof?.byName||'Chưa rõ'}</p>{angles.map(angle=><div key={angle} className="gu-v5-angle"><strong>{angle}</strong><div className="gu-v5-compare"><div><small>Ảnh giao</small>{hand[angle]?.url?<img src={hand[angle].url} alt={'Ảnh giao '+angle}/>:<p>Không có ảnh</p>}</div><div><small>Ảnh nhận</small>{ret[angle]?.url?<img src={ret[angle].url} alt={'Ảnh nhận '+angle}/>:<p>Không có ảnh</p>}</div></div></div>)}</section>}
  </div></div></div>;
 }

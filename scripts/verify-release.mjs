@@ -76,6 +76,9 @@ const required = [
   'src/components/GuStaffShifts.tsx',
   'src/app/api/v5/visual-availability/route.ts',
   'src/lib/visual-availability.ts',
+  'src/lib/vn-datetime.ts',
+  'src/lib/payment-review.ts',
+  'src/components/GuVNDateTimeInput.tsx',
   'src/components/GuVisualFinder.tsx'
 ];
 const missing = required.filter(p => !existsSync(join(root,p)));
@@ -141,9 +144,12 @@ checks.push(['hiển thị giờ giao và giờ nhận', /gu-calendar-cell-time/
 checks.push(['tìm ảnh kèm trạng thái và lịch 7 ngày', /visual-availability/, 'src/components/GuVisualFinder.tsx']);
 checks.push(['cảnh báo đóng được', /setDismissedRiskSignature\(riskSignature\)/, 'src/app/page.tsx']);
 checks.push(['lọc lịch thiết kế riêng', /gu-calendar-controls-v532/, 'src/app/page.tsx']);
+checks.push(['cache trong phiên không reload tab', /tabCacheRef/, 'src/app/page.tsx']);
+checks.push(['đồng hồ VN 24h', /formatVNDateTime/, 'src/lib/vn-datetime.ts']);
+checks.push(['đối soát thu thừa', /overpaid/, 'src/lib/payment-review.ts']);
 const absent = checks.filter(([name,pattern,file]) => missing.includes(file) || !pattern.test(read(file))).map(([name])=>name);
 const pkg = JSON.parse(read('package.json'));
-if (pkg.version !== '5.3.2-beta.1') absent.push('phiên bản 5.3.2-beta.1 trong package.json');
+if (pkg.version !== '5.3.3-beta.1') absent.push('phiên bản 5.3.3-beta.1 trong package.json');
 if (missing.length || absent.length) {
   console.error('KHÔNG ĐỒNG BỘ. Thiếu tệp:', missing.join(', ') || 'không');
   console.error('Thiếu thành phần:', absent.join(', ') || 'không');
