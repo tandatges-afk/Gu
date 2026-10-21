@@ -1,0 +1,65 @@
+/* GU v5.4.3: calendar density, day tracks and status hierarchy only.
+   The tinted day TRACKS (not just headers) span all products in a date column. */
+.grid{grid-template-columns:284px repeat(7,minmax(94px,1fr));min-width:1010px;align-items:stretch}
+.grid :global(.calendar-corner),.grid :global(.calendar-item){box-sizing:border-box;max-width:none;min-width:0;width:284px}
+.grid :global(.calendar-item){min-height:86px;height:86px;display:flex;align-items:center;gap:9px;padding:6px 10px;overflow:visible}
+.grid :global(.calendar-item) :global(.gu-calendar-photo),
+.grid :global(.calendar-item) :global(.photo-fallback.gu-calendar-photo){width:51px!important;height:60px!important;flex:0 0 51px!important;border-radius:9px;object-fit:contain}
+.grid :global(.calendar-item) .productText{display:flex;flex-direction:column;min-width:0;flex:1;justify-content:center;gap:3px;overflow:visible}
+.productName{display:-webkit-box!important;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden!important;white-space:normal!important;text-overflow:ellipsis;font-size:12.5px!important;font-weight:800!important;line-height:1.24!important;overflow-wrap:anywhere;max-height:32px;color:#172b45}
+.productCode{display:block!important;width:fit-content;max-width:100%;overflow:hidden!important;text-overflow:ellipsis;white-space:nowrap!important;padding:2px 6px;background:#eaf3ef;border:1px solid #cfe2d5;border-radius:5px;font:800 10.5px/1.2 'DM Sans',sans-serif!important;letter-spacing:.2px;color:#215b48!important}
+.grid :global(.gu-nearest-link){margin:0!important;line-height:1.1!important;font-size:10px!important;white-space:nowrap;display:inline-flex;gap:4px;align-items:center}
+.dayHeader{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;padding:6px 4px!important;min-height:67px;border-bottom:1px solid #e4e8ed!important;font-variant-numeric:tabular-nums}
+.dayCaption{font-size:10px;letter-spacing:0;font-weight:800;color:inherit;white-space:nowrap;line-height:1.25}
+.dayTrack{min-width:0;display:flex;align-items:center;justify-content:center;position:relative;padding:3px 0;min-height:86px;border-bottom:1px solid #e7ebed;border-right:1px solid #f0f1f3}
+.toneToday{background:#fff3e6!important;box-shadow:inset 2px 0 #e2a46d,inset -2px 0 #e2a46d}
+.toneTomorrow{background:#fdf0f2!important;box-shadow:inset 2px 0 #da9aa9,inset -2px 0 #da9aa9}
+.toneAfterTomorrow{background:#f0f2f8!important;box-shadow:inset 2px 0 #a0abc4,inset -2px 0 #a0abc4}
+.dayHeader.toneToday{color:#96541e}.dayHeader.toneTomorrow{color:#a34c5d}.dayHeader.toneAfterTomorrow{color:#4c5c75}
+.grid .dayTrack .slot{flex:1;box-sizing:border-box;width:calc(100% - 12px);max-width:none;height:66px;min-height:66px;max-height:66px;margin:0 6px!important;padding:5px 5px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;border-radius:9px;overflow:hidden;position:relative;box-shadow:0 1px 2px #2130490c;animation:none!important}
+.stateLabel{display:block;width:100%;font-weight:900;font-size:10px;line-height:1.12;white-space:nowrap;text-overflow:ellipsis;overflow:hidden;text-align:center;letter-spacing:0}
+.customer{font-size:10px;font-weight:750;line-height:1.12;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.freeAction{font-size:9px;font-weight:650;white-space:nowrap;opacity:.85}
+.grid .slot :global(.gu-calendar-cell-time){font-size:9.5px!important;line-height:1.15;white-space:nowrap!important;overflow:hidden;text-overflow:ellipsis;margin:0;color:inherit!important}
+.grid .slot.stateOverdue{background:#fce9eb!important;color:#9c2339!important;border:2px solid #d97b8a!important}
+.grid .slot.stateWarning{background:#f0eafa!important;color:#5e4094!important;border:2px solid #9a7bc8!important}
+.grid .slot.statePicked{background:#e8f0fc!important;color:#245b9a!important;border:2px solid #92b7e6!important}
+.grid .slot.stateReserved{background:#fff2dd!important;color:#885719!important;border:2px solid #d8af6c!important}
+.grid .slot.stateFree{background:#e7f6ee!important;color:#236b4d!important;border:2px solid #8ecbb0!important}
+.grid .slot.stateBlocked{background:#eef0f2!important;color:#68717d!important;border:1px solid #c8d0d7!important}
+.grid .slot.statePast{background:#f5f5f6!important;color:#808793!important;border:1px solid #e1e4e7!important}
+/* Ordered by urgency. Dot + written label: accessible without relying on color. */
+.legend{gap:5px!important;align-items:center!important}
+.legend>span{display:inline-flex;align-items:center;gap:6px;border:1px solid transparent;border-radius:7px;padding:6px 8px;font-weight:750;font-size:11px;line-height:1.1;white-space:nowrap}
+.legend>span i{width:7px;height:7px;border-radius:50%;flex:none;background:currentColor}
+.legendWarning{background:#f0eafa;border-color:#d5c9ed!important;color:#6b4d9a}
+.legendOverdue{background:#fce9eb;border-color:#ecc1c8!important;color:#ae3b51}
+.legendPicked{background:#e8f0fc;border-color:#c3d6ef!important;color:#3064a0}
+.legendReserved{background:#fff2dd;border-color:#eddaa9!important;color:#926424}
+.legendFree{background:#e7f6ee;border-color:#c3e8d5!important;color:#2b7055}
+.mobileTrack{border-radius:12px;min-width:0;display:flex;align-items:stretch;padding:5px;background:#fff;border:1px solid #edf0f4}
+.mobileTrack .slot{margin:0;width:100%;height:120px;min-height:120px;max-height:none;animation:none!important}
+.mobileTrack .slot.stateOverdue{background:#fce9eb!important;color:#9c2339!important;border:2px solid #d97b8a!important}
+.mobileTrack .slot.stateWarning{background:#f0eafa!important;color:#5e4094!important;border:2px solid #9a7bc8!important}
+.mobileTrack .slot.statePicked{background:#e8f0fc!important;color:#245b9a!important;border:2px solid #92b7e6!important}
+.mobileTrack .slot.stateReserved{background:#fff2dd!important;color:#885719!important;border:2px solid #d8af6c!important}
+.mobileTrack .slot.stateFree{background:#e7f6ee!important;color:#236b4d!important;border:2px solid #8ecbb0!important}
+.mobileTrack .slot.stateBlocked{background:#eef0f2!important;color:#68717d!important}
+.mobileTrack .slot.statePast{background:#f5f5f6!important;color:#808793!important}
+@media(min-width:851px){.grid{grid-template-columns:284px repeat(7,minmax(94px,1fr))!important;min-width:1010px!important}}
+@media(max-width:850px){.legend{gap:5px!important}.legend>span{padding:6px 7px;font-size:10px}.mobileTrack .stateLabel{font-size:11px}.mobileTrack .customer{font-size:11px}}
+
+/* Creator information stays accessible in the native cell title without taking height. */
+.slot :global(.gu-calendar-cell-creator){display:none!important}
+@media(max-width:850px){.mobileTrack .slot :global(.gu-calendar-cell-creator){display:none!important}}
+
+/* Full name/code on demand without ever increasing the number of visible rows. */
+.productNameButton,.mobileProductName{appearance:none;border:0;background:transparent;color:inherit;display:block;width:100%;max-width:100%;padding:0;margin:0;text-align:left;cursor:pointer}
+.productNameButton:focus-visible,.mobileProductName:focus-visible{outline:2px solid #56829e;outline-offset:2px;border-radius:3px}
+.mobileProductName{font-size:14px;font-weight:800;line-height:1.4;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere}
+.peekDialog{max-width:min(92vw,470px)!important}
+.peekBody{display:flex;gap:14px;align-items:flex-start;padding:12px 22px 24px;min-width:0}
+.peekBody :global(.gu-calendar-photo){width:72px!important;height:80px!important;flex:0 0 72px!important;object-fit:contain}
+.peekBody>div{flex:1;min-width:0;display:grid;justify-items:start;gap:9px}
+.peekBody strong{font-size:15px;line-height:1.45;overflow-wrap:anywhere}
+.peekBody span{font-size:12px;color:#677586}

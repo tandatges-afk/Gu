@@ -7,7 +7,9 @@ const css=readFileSync('src/app/globals.css','utf8');
 test('phone uses per-product rental cards rather than the sticky 890px desktop table',()=>{
   assert.match(page,/className="gu-mobile-calendar"/);
   assert.match(page,/className="calendar-scroll gu-calendar-desktop"/);
-  assert.match(page,/calendarDays\.map\(day=>renderCalendarCell\(item,day,true\)\)/);
+  assert.match(page,/calendarDays\.map\(day=>\{const tone=calendarDayTone\(day,today\)/);
+  assert.match(page,/renderCalendarCell\(item,day,true\)/);
+  assert.match(page,/calendarUi\.mobileTrack/);
   assert.match(css,/\.gu-calendar-desktop\s*\{\s*display:\s*none/);
   assert.match(css,/\.gu-mobile-calendar\s*\{\s*display:\s*grid/);
 });
