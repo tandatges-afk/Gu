@@ -109,7 +109,10 @@ const required = [
   'tests/v539-split-rental-groups.test.ts',
   'docs/GU-v5.3.9-SPLIT-RENTAL-ORDERS.md',
   'docs/GU-v5.4.5-GOM-KHACH-UU-TIEN-LICH-7-NGAY.md',
-  'tests/calendar-v545-customer-occupancy-sort.test.ts'
+  'tests/calendar-v545-customer-occupancy-sort.test.ts',
+  'src/components/GuV5Booking.module.css',
+  'tests/booking-dialog-v546-ui.test.ts',
+  'docs/GU-v5.4.6-BOOKING-DIALOG-UI.md'
 ];
 const missing = required.filter(p => !existsSync(join(root,p)));
 const read = p => readFileSync(join(root,p),'utf8');
@@ -193,7 +196,7 @@ checks.push(['nhóm cùng khách trong lịch', /customerKey\(anchor\)/, 'src/li
 checks.push(['ưu tiên lịch dày 7 ngày', /b\.totalDays-a\.totalDays/, 'src/lib/calendar-presentation.ts']);
 const absent = checks.filter(([name,pattern,file]) => missing.includes(file) || !pattern.test(read(file))).map(([name])=>name);
 const pkg = JSON.parse(read('package.json'));
-if (pkg.version !== '5.4.5-beta.1') absent.push('phiên bản 5.4.5-beta.1 trong package.json');
+if (pkg.version !== '5.4.6-beta.1') absent.push('phiên bản 5.4.6-beta.1 trong package.json');
 if (missing.length || absent.length) {
   console.error('KHÔNG ĐỒNG BỘ. Thiếu tệp:', missing.join(', ') || 'không');
   console.error('Thiếu thành phần:', absent.join(', ') || 'không');

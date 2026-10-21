@@ -1,3 +1,5 @@
+> **GU v5.4.6 Beta 1:** Cải thiện popup Tạo đơn và Đặt lịch trước cho PC/mobile. Xem `docs/GU-v5.4.6-BOOKING-DIALOG-UI.md`.
+
 > **GU v5.3.0 Beta 1 — Đăng ký ca nhân viên:** Đăng ký Chủ nhật 12:00–20:00 cho tuần kế tiếp; 3 ca/ngày, 2 người/ca, ít nhất 5 ngày/tuần; nhân viên ngoài ca chỉ có quyền vào màn đăng ký, hết ca +15 phút tự đăng xuất. Trước khi deploy lên Vercel xem **[hướng dẫn chuyển đổi không khóa nhầm toàn bộ nhân viên](docs/GU-v5.3.0-CA-LAM-VIEC.md)**.
 
 # GU v5.2.0-beta.1 · Full source cho GitHub Codespaces

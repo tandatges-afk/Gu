@@ -11,7 +11,7 @@ import {vietnamToday} from '@/lib/rental';
 import {GuVNDateTimeInput} from './GuVNDateTimeInput';
 import {isoDayFromVN,isValidHHMM} from '@/lib/vn-datetime';
 import {productGroup,type RentalGroup} from '@/lib/order-group';
-import rentalTabs from './GuRentalSeparation.module.css';
+import ui from './GuV5Booking.module.css';
 const localInput=(d:Date)=>new Date(d.getTime()+7*3600000).toISOString().slice(0,16);
 function initialTimes(day?:string,endDay?:string,startHour?:string,endHour?:string){
  const now=localInput(new Date(Date.now()+5*60000));
@@ -78,25 +78,56 @@ export function GuV5Booking({items,customers,api,initial,onClose,onSuccess,onCus
    const r=await api<RentalOrder>('v5/orders',{method:'POST',body:JSON.stringify({customerId:cid,itemIds:selected,pickupAt,returnAt,note,bookingKind:needsPrepay?'RESERVE':'WALK_IN',reservationPaymentProofId:reservationProofId,paymentDraftId,rentalGroup,cameraPackageHours:cameraItems.length?cameraPackageHours:undefined,...(quickCustomer?{quickCustomer:{name:name.trim(),phone:digits(phone)}}:{})})});
    await onSuccess(`Đã tạo đơn ${r.code}.`);onCreated?.(r.id);
  }catch(e){setError(e instanceof Error?e.message:'Tạo đơn thất bại.');}finally{setBusy(false);}};
- return <form className="modal-body" noValidate onSubmit={e=>void submit(e)}>
+ return <form className={`modal-body ${ui.bookingForm}`} noValidate onSubmit={e=>void submit(e)}>
   {error&&<div className="inline-alert danger-alert">{error}</div>}
-  <div className={rentalTabs.groupLabel} role="status"><strong>{rentalGroup==='CAMERA'?'ĐƠN THUÊ MÁY ẢNH':'ĐƠN THUÊ TRANG PHỤC / PHỤ KIỆN'}</strong></div>
-  <div className="form-grid"><label className="form-field"><span>Khách hàng</span><select className="input" value={customerId} onChange={e=>{setCustomerId(e.target.value);setQuickCustomer(false);}}><option value="">Chọn khách hàng</option>{[...customers,...people.filter(p=>!customers.some(x=>x.id===p.id))].map(c=><option key={c.id} value={c.id}>{c.name} · {c.phone}</option>)}</select></label>
-  <div className="gu-customer-search-anchor"><label className="form-field"><span>Tìm khách theo số điện thoại</span><input autoComplete="off" className="input" value={phone} onFocus={()=>setShowPhoneSuggestions(true)} onBlur={()=>setTimeout(()=>setShowPhoneSuggestions(false),120)} onChange={e=>{setPhone(e.target.value);setCustomerId('');setShowPhoneSuggestions(true);}} placeholder="Gõ SĐT và chọn khách bên dưới"/></label>
-  {!quickCustomer&&showPhoneSuggestions&&phone.trim().length>=3&&people.length>0&&<div className="gu-v11-customer-results" role="listbox" aria-label="Gợi ý khách theo số điện thoại">{people.map(c=><button key={c.id} role="option" aria-selected={c.id===customerId} className={'gu-v11-customer-result '+(c.id===customerId?'chosen':'')} type="button" onMouseDown={e=>e.preventDefault()} onClick={()=>{setCustomerId(c.id);setPhone(c.phone);setQuickCustomer(false);setShowPhoneSuggestions(false);}}><strong>{c.name}</strong><span>{c.phone}</span></button>)}</div>}</div></div>
-  <button type="button" className="btn btn-white" onClick={()=>setQuickCustomer(v=>!v)}>{quickCustomer?'Chọn khách cũ':'Thêm khách mới ngay'}</button>
-  {quickCustomer&&<div className="form-grid"><label className="form-field"><span>Họ tên khách mới</span><input required className="input" value={name} onChange={e=>setName(e.target.value)}/></label><label className="form-field"><span>SĐT khách mới</span><input required className="input" value={phone} onChange={e=>setPhone(e.target.value)}/></label></div>}
-  <div className="form-grid"><label className="form-field"><span>Nhận đồ (ngày và giờ)</span><GuVNDateTimeInput required value={pickupAt} onChange={setPickupAt} ariaLabel="Giờ nhận đồ"/></label><label className="form-field"><span>Trả đồ dự kiến</span><GuVNDateTimeInput required value={returnAt} onChange={setReturnAt} ariaLabel="Giờ trả đồ"/></label></div>
-  <label className="form-field"><input aria-label={rentalGroup==='CAMERA'?'Tìm máy ảnh':'Tìm trang phục hoặc phụ kiện'} className="input" value={query} onChange={e=>setQuery(e.target.value)} placeholder="Tìm sản phẩm..."/></label>
-  <div className="gu-v5-product-select">{visible.filter(i=>selected.includes(i.id)).concat(visible.filter(i=>!selected.includes(i.id))).slice(0,80).map(i=><button type="button" key={i.id} className={'gu-v5-product '+(selected.includes(i.id)?'gu-v5-selected':'')} onClick={()=>setSelected(v=>v.includes(i.id)?v.filter(x=>x!==i.id):[...v,i.id])}><ProductImage paths={i.imagePaths}/><span><b>{i.name}</b><small>{i.hangerCode||i.sku} · {i.cameraSerial?'Serial '+i.cameraSerial+' · ':''}{i.category}</small></span><strong>{selected.includes(i.id)?'✓ Đã chọn':'Chọn'}</strong></button>)}</div>
-  {cameraItems.length>0&&<section className="gu-camera-package-panel"><label className="form-field"><span>Chọn gói thuê máy ảnh (bắt buộc)</span><select className="input" value={cameraPackageHours} onChange={e=>{const hours=Number(e.target.value) as CameraPackageHours;if(!CAMERA_TIERS.includes(hours))return;setCameraPackageHours(hours);setReturnAt(addPackageHours(pickupAt,hours));}}><option value="">Chọn gói máy ảnh</option>{CAMERA_TIERS.map(hours=><option value={hours} key={hours}>Gói {hours} giờ</option>)}</select></label>
+  <section className={ui.section} aria-labelledby="gu-booking-customer-title">
+   <div className={ui.sectionHeading}>
+    <h3 id="gu-booking-customer-title">Khách hàng</h3>
+    <button type="button" className={ui.quickAction} onClick={()=>{setQuickCustomer(v=>!v);setShowPhoneSuggestions(false);}}>
+     {quickCustomer?'← Chọn khách có sẵn':'+ Thêm khách mới'}
+    </button>
+   </div>
+   {!quickCustomer?<div className={ui.customerGrid}>
+    <label className={ui.field}><span>Chọn khách hàng</span>
+     <select className="input" value={customerId} onChange={e=>{setCustomerId(e.target.value);setQuickCustomer(false);}}>
+      <option value="">Chọn khách đã có</option>
+      {[...customers,...people.filter(p=>!customers.some(x=>x.id===p.id))].map(c=><option key={c.id} value={c.id}>{c.name} · {c.phone}</option>)}
+     </select>
+    </label>
+    <div className={`gu-customer-search-anchor ${ui.phoneAnchor}`}>
+     <label className={ui.field}><span>Tìm theo số điện thoại</span>
+      <input type="tel" autoComplete="off" className="input" value={phone} onFocus={()=>setShowPhoneSuggestions(true)} onBlur={()=>setTimeout(()=>setShowPhoneSuggestions(false),120)} onChange={e=>{setPhone(e.target.value);setCustomerId('');setShowPhoneSuggestions(true);}} placeholder="Nhập số điện thoại"/>
+     </label>
+     {showPhoneSuggestions&&phone.trim().length>=3&&people.length>0&&<div className="gu-v11-customer-results" role="listbox" aria-label="Gợi ý khách theo số điện thoại">{people.map(c=><button key={c.id} role="option" aria-selected={c.id===customerId} className={'gu-v11-customer-result '+(c.id===customerId?'chosen':'')} type="button" onMouseDown={e=>e.preventDefault()} onClick={()=>{setCustomerId(c.id);setPhone(c.phone);setQuickCustomer(false);setShowPhoneSuggestions(false);}}><strong>{c.name}</strong><span>{c.phone}</span></button>)}</div>}
+    </div>
+   </div>:<div className={ui.customerGrid}>
+    <label className={ui.field}><span>Tên khách hàng</span><input required className="input" autoComplete="name" value={name} onChange={e=>setName(e.target.value)} placeholder="Họ và tên"/></label>
+    <label className={ui.field}><span>Số điện thoại</span><input required type="tel" autoComplete="tel" className="input" value={phone} onChange={e=>setPhone(e.target.value)} placeholder="Số điện thoại"/></label>
+   </div>}
+  </section>
+  <section className={ui.section} aria-labelledby="gu-booking-time-title">
+   <div className={ui.sectionHeading}><h3 id="gu-booking-time-title">Thời gian thuê</h3></div>
+   <div className={ui.dateGrid}>
+    <div className={ui.field}><span>Nhận đồ</span><GuVNDateTimeInput required value={pickupAt} onChange={setPickupAt} ariaLabel="Ngày giờ nhận đồ"/></div>
+    <div className={ui.field}><span>Trả dự kiến</span><GuVNDateTimeInput required value={returnAt} onChange={setReturnAt} ariaLabel="Ngày giờ trả đồ"/></div>
+   </div>
+  </section>
+  <section className={ui.section} aria-labelledby="gu-booking-product-title">
+   <div className={ui.sectionHeading}><h3 id="gu-booking-product-title">Sản phẩm thuê</h3><span className={ui.count}>{selected.length} đã chọn</span></div>
+   <label className={ui.searchField}><span className={ui.srOnly}>Tìm sản phẩm theo tên hoặc mã</span><input aria-label={rentalGroup==='CAMERA'?'Tìm máy ảnh':'Tìm trang phục hoặc phụ kiện'} className="input" value={query} onChange={e=>setQuery(e.target.value)} placeholder="Tìm sản phẩm theo tên hoặc mã…"/></label>
+   <div className={`gu-v5-product-select ${ui.productList}`}>
+    {visible.filter(i=>selected.includes(i.id)).concat(visible.filter(i=>!selected.includes(i.id))).slice(0,80).map(i=><button type="button" key={i.id} aria-pressed={selected.includes(i.id)} className={'gu-v5-product '+ui.productRow+' '+(selected.includes(i.id)?'gu-v5-selected '+ui.chosen:'')} onClick={()=>setSelected(v=>v.includes(i.id)?v.filter(x=>x!==i.id):[...v,i.id])}><ProductImage paths={i.imagePaths}/><span><b>{i.name}</b><small>{i.hangerCode||i.sku} · {i.cameraSerial?'Serial '+i.cameraSerial+' · ':''}{i.category}</small></span><strong>{selected.includes(i.id)?'✓ Đã chọn':'Chọn'}</strong></button>)}
+    {visible.length===0&&<p className={ui.empty}>Không tìm thấy sản phẩm phù hợp.</p>}
+   </div>
+  </section>
+  {cameraItems.length>0&&<section className={`gu-camera-package-panel ${ui.packagePanel}`}><label className="form-field"><span>Chọn gói thuê máy ảnh (bắt buộc)</span><select className="input" value={cameraPackageHours} onChange={e=>{const hours=Number(e.target.value) as CameraPackageHours;if(!CAMERA_TIERS.includes(hours))return;setCameraPackageHours(hours);setReturnAt(addPackageHours(pickupAt,hours));}}><option value="">Chọn gói máy ảnh</option>{CAMERA_TIERS.map(hours=><option value={hours} key={hours}>Gói {hours} giờ</option>)}</select></label>
   {cameraPackageHours!==''&&cameraItems.map(item=>isCameraModel(item.cameraModel)?<p key={item.id} className="gu-camera-package-preview">{item.name} · {item.hangerCode||item.cameraSerial} · Gói {cameraPackageHours}h: {money(cameraBasePrice(item.cameraModel,cameraPackageHours))}. Quá hạn thực tế: +10.000đ mỗi giờ trễ bắt đầu.</p>:<p key={item.id} className="field-error">{item.name} chưa có mẫu máy hợp lệ.</p>)}</section>}
   {quoteError&&<div className="inline-alert danger-alert">Có sản phẩm không đủ thông tin để tính giá. Kiểm tra mẫu máy ảnh hoặc khoảng giờ thuê.</div>}
-  <div className="booking-total"><div><b>{selected.length} sản phẩm · {rentalGroup==='CAMERA'?(cameraPackageHours?`Gói máy ảnh ${cameraPackageHours} giờ`:'Chưa chọn gói máy ảnh'):`${blocks||'—'} chu kỳ 24 giờ`}</b></div><strong>{money(total)}</strong></div>
-  {needsPrepay&&<section className="gu-v52-prepay"><strong>ĐẶT LỊCH TRƯỚC · ẢNH XÁC NHẬN TIỀN CỌC</strong><div className="booking-total"><span>Khách cần thanh toán ngay</span><strong>{money(total)}</strong></div>
+  <div className={`booking-total ${ui.summary}`}><div><b>{selected.length} sản phẩm · {rentalGroup==='CAMERA'?(cameraPackageHours?`Gói máy ảnh ${cameraPackageHours} giờ`:'Chưa chọn gói máy ảnh'):`${blocks||'—'} chu kỳ 24 giờ`}</b></div><strong>{money(total)}</strong></div>
+  {needsPrepay&&<section className={`gu-v52-prepay ${ui.prepay}`}><strong>ĐẶT LỊCH TRƯỚC · ẢNH XÁC NHẬN TIỀN CỌC</strong><div className="booking-total"><span>Khách cần thanh toán ngay</span><strong>{money(total)}</strong></div>
 <GuSecureUpload purpose="reservation" draftId={paymentDraftId} onUploaded={setReservationProofId} label="Chụp ảnh xác nhận tiền cọc"/></section>}
-  <label className="form-field"><span>Ghi chú đơn</span><input className="input" value={note} onChange={e=>setNote(e.target.value)}/></label>
+  <label className={`${ui.field} ${ui.noteField}`}><span>Ghi chú đơn</span><input className="input" value={note} onChange={e=>setNote(e.target.value)}/></label>
   {incomplete&&<p className="gu-booking-blockers" role="status">{incomplete}</p>}
-  <div className="modal-actions"><button type="button" className="btn btn-white" onClick={onClose}>Đóng</button><button type="submit" className="btn btn-dark" disabled={busy}>{busy?'Đang tạo…':needsPrepay?'Lưu ảnh cọc & giữ lịch':'Tạo đơn giao ngay'}</button></div>
+  <div className={`modal-actions ${ui.actions}`}><button type="button" className="btn btn-white" onClick={onClose}>Đóng</button><button type="submit" className="btn btn-dark" disabled={busy}>{busy?'Đang tạo…':needsPrepay?'Lưu ảnh cọc & giữ lịch':'Tạo đơn giao ngay'}</button></div>
  </form>;
 }
