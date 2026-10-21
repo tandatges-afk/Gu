@@ -44,7 +44,7 @@ import {isCameraCategory} from '@/lib/camera-rental';
 import {orderGroup,productGroup,type RentalGroup} from '@/lib/order-group';
 import rentalTabs from '@/components/GuRentalSeparation.module.css';
 import calendarUi from '@/components/GuCalendarTimeline.module.css';
-import {calendarDayTone,calendarVisualState} from '@/lib/calendar-presentation';
+import {calendarDayTone,calendarSlotState,sortCalendarProductsForDay} from '@/lib/calendar-presentation';
 
 type Page = 'visual'|'reviews'|'overview'|'calendar'|'orders'|'camera-orders'|'debts'|'inventory'|'laundry'|'customers'|'reports'|'staff'|'shifts'|'audit'|'system';
 type Modal = 'booking'|'item'|'customer'|'category'|'detail'|null;
@@ -446,10 +446,13 @@ export default function Home() {
   const creatorName=(o:RentalOrder)=>orderCreatorName(o,data?.staffNames);
   const calendarBaseItems=calendarLoaded?calendarRemote:items.slice(0,25);
   const calendarSearchPool=calendarQuery.trim()?[...new Map([...calendarBaseItems,...items].map(item=>[item.id,item] as const)).values()]:calendarBaseItems;
-  const calendarItems=calendarSearchPool.filter(i=>(calendarCategory==='ALL'||i.category===calendarCategory)&&
+  const calendarFilteredItems=calendarSearchPool.filter(i=>(calendarCategory==='ALL'||i.category===calendarCategory)&&
     (calendarCreator==='ALL'||calendarActive.some(o=>o.createdBy===calendarCreator&&o.lines.some(l=>l.itemId===i.id)&&o.pickupDate<=calendarDays[6]&&o.returnDate>=calendarStart))&&
     (calendarStatus==='ALL'||calendarItemState(i,calendarActive,calendarStart,7,today)===calendarStatus)&&
     matchesCalendarSearch(i,calendarActive,calendarQuery));
+  // Reorder ALL visible products using the first date on screen, not the next day's state.
+  // Desktop and mobile receive the same order. Switching dates recalculates the groups.
+  const calendarItems=sortCalendarProductsForDay(calendarFilteredItems,calendarStart,calendarActive,today,riskIds);
   const findNearest=async(itemId:string)=>{
     setNearestLoading(itemId);setNearestResult(null);
     try {
@@ -463,23 +466,14 @@ export default function Home() {
   // Shared occupancy logic for desktop timeline and mobile product cards.
   // Keep both views on the exact same booking rules and click handlers.
   const renderCalendarCell=(item:InventoryItem,day:string,mobile=false)=>{
-    const matching=calendarActive.filter(o=>o.lines.some(l=>l.itemId===item.id)&&day>=o.pickupDate&&day<=o.returnDate&&day>=(o.lines.find(l=>l.itemId===item.id)?.startDate||o.pickupDate));
-    const order=matching[0];
-    const lateOrder=calendarOverdue.find(o=>o.lines.some(l=>l.itemId===item.id));
-    const shown=order||(lateOrder&&day>=lateOrder.pickupDate?lateOrder:undefined);
-    const late=!!lateOrder&&day>lateOrder.returnDate;
-    const nextDayRisk=riskIds.has(item.id)&&day===today&&Boolean(shown)&&!late;
-    const blocked=!shown&&(['LAUNDRY','MAINTENANCE','MISSING'].includes(item.status)||!(item.replacementValue>0));
-    const isPast=day<today;
+    const {matching,shown,late,warning:nextDayRisk,blocked,isPast,visual}=calendarSlotState(item,day,calendarActive,today,riskIds);
     const title=shown?shown.customerName+' · '+shown.code+' · Tạo bởi: '+creatorName(shown)+(late?' · TRẢ TRỄ':'')+(nextDayRisk?' · 17H: CHƯA TRẢ, MAI CÓ ĐƠN':''):blocked?statusLabels[item.status]||'Chưa được định giá':isPast?'Ngày đã qua':day===today?'Giao đồ ngay':'Đặt trước';
     const date=new Date(day+'T00:00:00Z');
     const week=['CN','T2','T3','T4','T5','T6','T7'][date.getUTCDay()];
-    // Business state always outranks the quiet column tint. No colour-only status indications.
-    const visual=calendarVisualState({late,warning:nextDayRisk,orderStatus:shown?.status,blocked,isPast,blockedLabel:statusLabels[item.status]});
     return <button key={day} type="button" title={title} aria-label={`${prettyDay(day)}: ${visual.label}. ${title}`} className={'calendar-cell '+calendarUi.slot+' '+calendarUi[visual.className]+' '+(mobile?'gu-calendar-mobile-cell ':'')+(nextDayRisk?'gu-next-day-risk ':late?'gu-calendar-late ':shown?(shown.status==='PICKED_UP'?'occupied-picked':'occupied-reserved'):blocked?'cell-blocked':'cell-free')} disabled={!shown&&(blocked||isPast)} onClick={()=>matching.length>1?setCalendarMatches(matching):shown?openDetail(shown):openBooking(day===today?'PICKUP':'RESERVE',item.id,day)}>
       {mobile&&<span className="gu-calendar-cell-date"><strong>{week}</strong><small>{day.slice(8,10)}/{day.slice(5,7)}</small></span>}
-      <span className={'gu-calendar-cell-result '+calendarUi.stateLabel}>{visual.label}</span>
-      {shown?<span className={calendarUi.customer} title={shown.customerName}>{matching.length>1?matching.length+' lượt':shown.customerName.split(' ').slice(-1)[0]}</span>:!blocked&&!isPast?<span className={calendarUi.freeAction}>+ Đặt thuê</span>:null}
+      {visual.className==='stateFree'?<span className={calendarUi.freeAction} aria-hidden="true">+</span>:<span className={'gu-calendar-cell-result '+calendarUi.stateLabel}>{visual.label}</span>}
+      {shown&&<span className={calendarUi.customer} title={shown.customerName}>{matching.length>1?matching.length+' lượt':shown.customerName.split(' ').slice(-1)[0]}</span>}
       {shown&&<span className="gu-calendar-cell-time" title={'Giờ nhận: '+vnDisplayHour(shown.pickupAt)+' · Giờ trả: '+vnDisplayHour(shown.returnAt)}>{calendarCellTime(shown)}</span>}
       {shown&&<span className="gu-calendar-cell-creator" title={'Tạo bởi: '+creatorName(shown)}>NV: {creatorName(shown).split(/\s+/).slice(-1)[0]}</span>}
     </button>;
@@ -570,7 +564,7 @@ export default function Home() {
           <div className="gu-catalog-pager"><div className="gu-search-wrap"><Search size={15}/><input className="input" value={calendarQuery} onChange={e=>setCalendarQuery(e.target.value)} placeholder="Tìm tên sản phẩm, mã GU-00234 / 234, khách đang thuê hoặc SĐT…"/></div><button type="button" className="btn btn-white" disabled={!calendarNext} onClick={()=>setCalendarPageCursor(calendarNext)}>25 món tiếp theo <ChevronRight size={14}/></button><button type="button" className="btn btn-white" disabled={!calendarPageCursor} onClick={()=>setCalendarPageCursor(null)}>Đầu danh sách</button></div>
           
           <section className="panel calendar-panel"><div className="calendar-toolbar gu-calendar-toolbar-v532">
-            <div className="gu-calendar-toolbar-title"><div><h3>Lịch sản phẩm</h3></div><div className={'legend '+calendarUi.legend} aria-label="Chú giải các trạng thái thuê"><span className={calendarUi.legendWarning}><i/>Cảnh báo 17h</span><span className={calendarUi.legendOverdue}><i/>Trả trễ</span><span className={calendarUi.legendPicked}><i/>Đã lấy</span><span className={calendarUi.legendReserved}><i/>Đã giữ</span><span className={calendarUi.legendFree}><i/>Còn trống</span></div></div>
+            <div className="gu-calendar-toolbar-title"><div><h3>Lịch sản phẩm</h3></div><div className={'legend '+calendarUi.legend} aria-label="Chú giải các trạng thái thuê"><span className={calendarUi.legendOverdue}><i/>Trả trễ</span><span className={calendarUi.legendWarning}><i/>Cảnh báo 17h</span><span className={calendarUi.legendPicked}><i/>Đã lấy</span><span className={calendarUi.legendReserved}><i/>Đã giữ</span><span className={calendarUi.legendFree}><i/>Còn trống</span></div></div>
             <div className="calendar-controls gu-calendar-controls-v532">
               <div className="gu-calendar-filter-fields">
                 <label><span>Danh mục</span><select className="input gu-calendar-cat" aria-label="Lọc danh mục sản phẩm" value={calendarCategory} onChange={e=>setCalendarCategory(e.target.value)}><option value="ALL">Tất cả danh mục</option>{Array.from(new Set(items.map(i=>i.category))).sort().map(c=><option value={c} key={c}>{c}</option>)}</select></label>
@@ -583,7 +577,7 @@ export default function Home() {
             </div>
           </div>
           <div className="calendar-scroll gu-calendar-desktop"><div className={'calendar-grid '+calendarUi.grid}><div className="calendar-corner">SẢN PHẨM / NGÀY</div>
-            {calendarDays.map(d=>{const tone=calendarDayTone(d,today);return <div key={d} className={'calendar-day '+calendarUi.dayHeader+' '+(tone?calendarUi[tone]:'')}><span>{new Date(d+'T00:00:00Z').toLocaleDateString('vi-VN',{weekday:'short',timeZone:'UTC'})}</span><strong>{prettyDay(d)}</strong>{tone&&<small className={calendarUi.dayCaption}>{tone==='toneToday'?'Hôm nay':tone==='toneTomorrow'?'Ngày mai':'Ngày mốt'}</small>}</div>;})}
+            {calendarDays.map(d=>{const tone=calendarDayTone(d,today);return <div key={d} className={'calendar-day '+calendarUi.dayHeader+' '+(tone?calendarUi[tone]:'')}><span>{new Date(d+'T00:00:00Z').toLocaleDateString('vi-VN',{weekday:'short',timeZone:'UTC'})}</span><strong>{prettyDay(d)}</strong></div>;})}
             {calendarItems.map(item=><div className={'calendar-row '+(calendarOverdue.some(o=>o.lines.some(l=>l.itemId===item.id))?'overdue-row':'')} key={item.id}>
               <div className="calendar-item"><ProductImage paths={item.imagePaths} className="gu-calendar-photo"/><div className={calendarUi.productText}><button type="button" className={calendarUi.productNameButton} title={'Xem đầy đủ: '+item.name} aria-label={'Xem tên và mã đầy đủ của '+item.name} onClick={()=>setCalendarProductPeek(item)}><strong className={calendarUi.productName}>{item.name}</strong></button><span className={calendarUi.productCode} title={'Mã SP: '+(getProductCode(item)||'chưa cấp')}>{getProductCode(item)||'Chưa có mã'}</span><button type="button" className="gu-nearest-link" disabled={nearestLoading===item.id} onClick={()=>void findNearest(item.id)}><CalendarSearch size={12}/> {nearestLoading===item.id?'Đang tìm…':'Ngày trống gần nhất'}</button>{nearestResult?.itemId===item.id&&<small className="gu-nearest-inline">{nearestResult.nextPickupDate?`Trống: ${prettyDay(nearestResult.nextPickupDate)}`:nearestResult.reason}</small>}</div></div>
               {calendarDays.map(day=>{const tone=calendarDayTone(day,today);return <div key={day} className={calendarUi.dayTrack+' '+(tone?calendarUi[tone]:'')}>{renderCalendarCell(item,day)}</div>;})}
