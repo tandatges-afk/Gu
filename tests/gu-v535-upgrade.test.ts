@@ -22,7 +22,7 @@ test('chỉ mục ảnh compact, backfill chỉ Admin, kiểm tra ảnh cùng s�
  assert.match(route,/requireAdmin\(me\)/);assert.match(route,/validVisualSignature/);
  assert.match(route,/info\?\.imagePaths\?\.\[0\]!==entry\.imagePath/);
  assert.match(route,/take=150/);
- const finder=read('src/components/GuVisualFinder.tsx');assert.match(finder,/rankVisualItems/);
+ const finder=read('src/components/GuVisualFinder.tsx');assert.match(finder,/rankVisualCandidates/);
  assert.doesNotMatch(finder,/Promise\.all\(Array\.from\(\{length:6\}/);
 });
 test('tạo khách cùng transaction đơn và khóa SĐT, không gọi tạo khách trước',()=>{

@@ -2,7 +2,7 @@ export type ItemStatus = 'AVAILABLE' | 'RENTED' | 'LAUNDRY' | 'MAINTENANCE' | 'M
 export type OrderStatus = 'RESERVED' | 'PICKED_UP' | 'RETURNED' | 'CANCELLED' | 'VOIDED';
 export type Role = 'admin' | 'staff';
 export interface InventoryItem {
-  id: string; name: string; nameKey?: string; nameSearchBigrams?: string[]; visualSignature?: import('./visual-index').VisualSignature; visualImagePath?: string; sku: string; hangerCode?: string; category: string; size: string; color: string;
+  id: string; name: string; nameKey?: string; nameSearchBigrams?: string[]; visualSignature?: import('./visual-index').VisualSignature; visualSignatures?: import('./visual-index').VisualIndexEntry[]; visualImagePath?: string; sku: string; hangerCode?: string; category: string; size: string; color: string;
   cameraModel?: import('./camera-rental').CameraModel; cameraSerial?: string;
   dailyRate: number; bufferDays: number; replacementValue: number;
   inspectionAngles?: string[]; referenceShots?: Record<string,string>; archivedAt?: string|null; imagePaths?: string[]; requiresLaundry?: boolean; laundryStartedAt?: string|null; laundryCompletedAt?: string|null; expectedReturnDate?: string|null; currentOrderId?: string|null; status: ItemStatus; createdAt: string; createdBy?: string;

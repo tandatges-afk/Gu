@@ -11,3 +11,12 @@
 .chosen{display:grid;justify-items:start;gap:10px;padding:16px;border:1px solid #cddddd;border-radius:14px;background:#f8fbfa}.chosen img{width:160px;max-height:220px;object-fit:contain}
 @media(max-width:650px){.actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}.actions :global(.btn){width:100%;font-size:13px}.result{grid-template-columns:78px minmax(0,1fr);padding:10px}.result img{width:78px;min-height:110px}}
 @media(max-width:350px){.actions{grid-template-columns:1fr}.result{grid-template-columns:64px minmax(0,1fr)}.result img{width:64px}}
+/* Visual search V2: local, responsive controls; no global CSS overrides. */
+.searchSettings{display:flex;gap:14px;align-items:center;min-width:0;flex-wrap:wrap;background:#f6f9fc;border-radius:12px;padding:12px}
+.preview{display:block;max-height:155px;width:120px;min-width:0;object-fit:contain;background:white;border:1px solid #dce4ee;border-radius:10px}
+.filters{flex:1;min-width:min(100%,260px);display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.filters label{display:grid;gap:5px;color:#284963;font-size:13px;font-weight:600;min-width:0}
+.filters select{font:inherit;font-weight:400;width:100%;min-height:43px;border:1px solid #b9cadb;border-radius:9px;background:white;color:#203c52;padding:7px 10px}
+.filters small{grid-column:1/-1;color:#546d80;line-height:1.5}
+.matchLabel{display:inline-block;color:#165c52;font-size:11px;font-weight:600;border-radius:7px;background:#eaf6f0;padding:4px 7px;margin-bottom:9px}
+@media(max-width:600px){.searchSettings{align-items:flex-start}.preview{width:92px;max-height:112px}.filters{grid-template-columns:1fr;min-width:0}.filters small{grid-column:1}}

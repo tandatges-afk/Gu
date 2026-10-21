@@ -397,12 +397,14 @@ export default function Home() {
   const saveStockItem=async()=>{
    if(items.some(i=>i.id!==editingItem&&normalizeProductName(i.name)===normalizeProductName(newItem.name))){setItemError('Tên sản phẩm đã tồn tại.');return;}
    setItemError('');
-   let signature;
-   if(newItem.imagePaths[0]){
-    try{signature=await imageSignature(newItem.imagePaths[0]);}
-    catch{setToast('Ảnh đã lưu nhưng chưa tạo được chỉ mục; Admin vào Tìm bằng ảnh để lập chỉ mục sau.');}
-   }
-   const payload={...newItem,...(signature?{visualSignature:signature}:{}),referenceShots:Object.fromEntries(Object.entries(newItem.referenceShots).filter(([,url])=>Boolean(url)))};
+   // Index all available product views instead of only the cover image.
+   // A failed Cloudinary/CORS read must not prevent inventory management.
+   const signatures=(await Promise.all(newItem.imagePaths.slice(0,5).map(async imagePath=>{
+     try{return {imagePath,signature:await imageSignature(imagePath)};}
+     catch{return null;}
+   }))).filter((row):row is NonNullable<typeof row>=>row!==null);
+   if(newItem.imagePaths.length>signatures.length)setToast(`${newItem.imagePaths.length-signatures.length} ảnh chưa lập được chỉ mục. Admin có thể bổ sung sau.`);
+   const payload={...newItem,visualSignatures:signatures,referenceShots:Object.fromEntries(Object.entries(newItem.referenceShots).filter(([,url])=>Boolean(url)))};
    await action(editingItem?'items/'+editingItem:'items',editingItem?{action:'EDIT',...payload}:payload,editingItem?'Đã sửa sản phẩm.':'Đã nhập kho sản phẩm.',editingItem?'PATCH':'POST');
   };
   const openModal=(m:Modal)=>{setItemError('');if(m==='item'){setAngleDraft('');setEditingItem(null);setNewItem({name:'',category:'Phụ kiện',size:'Một size',color:'',dailyRate:20000,requiresLaundry:false,cameraModel:'',cameraSerial:'',replacementValue:0,inspectionAngles:[],referenceShots:{},imagePaths:[]});}if(m==='category'){setEditingCategory(null);setCategoryName('');}setErr('');setModal(m);};

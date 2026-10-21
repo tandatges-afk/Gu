@@ -1,4 +1,4 @@
-import {validVisualSignature} from '@/lib/visual-index';
+import {validVisualSignature,validVisualIndexEntries} from '@/lib/visual-index';
 import { NextRequest,NextResponse } from 'next/server';
 import {productSearchBigrams} from '@/lib/product-search';
 import {normalizeProductName,productNameIndexId,PRODUCT_NAME_INDEX_MIGRATION} from '@/lib/product-name';
@@ -70,6 +70,8 @@ export async function PATCH(req:NextRequest,ctx:{params:Promise<{id:string}>}) {
         const requiresLaundry=launderingForCategory(category,b.requiresLaundry===true);
         if(!Array.isArray(b.imagePaths)||b.imagePaths.length>5||b.imagePaths.some((url:unknown)=>typeof url!=='string'||!(snap.data()?.imagePaths||[]).includes(url)&&!validProductImageUrl(url,me.uid,process.env.CLOUDINARY_CLOUD_NAME||'')))throw new ApiError(400,'Ảnh sản phẩm không hợp lệ.');
         patch={name,nameKey,nameSearchBigrams:productSearchBigrams(name),category,size,color,dailyRate,requiresLaundry,imagePaths:b.imagePaths,bufferDays:0};
+        if(b.visualSignatures!==undefined){if(!validVisualIndexEntries(b.visualSignatures)||(b.visualSignatures as {imagePath:string}[]).some(entry=>!(b.imagePaths as string[]).slice(0,5).includes(entry.imagePath)))throw new ApiError(400,'Chỉ mục nhiều ảnh không hợp lệ.');patch.visualSignatures=b.visualSignatures;}
+        else{const old=validVisualIndexEntries(snap.data()?.visualSignatures)?snap.data()!.visualSignatures as {imagePath:string;signature:unknown}[]:[];patch.visualSignatures=old.filter(entry=>(b.imagePaths as string[]).slice(0,5).includes(entry.imagePath));}
         if(b.visualSignature!==undefined){if(!validVisualSignature(b.visualSignature))throw new ApiError(400,'Chỉ mục ảnh không hợp lệ.');patch.visualSignature=b.visualSignature;patch.visualImagePath=b.imagePaths[0]||'';}
         else if((b.imagePaths as string[])[0]!==snap.data()?.visualImagePath){patch.visualSignature=null;patch.visualImagePath=null;}
         if(me.role==='admin'){const rawAngles=b.inspectionAngles??snap.data()?.inspectionAngles??[];const angles=Array.isArray(rawAngles)&&rawAngles.length?normalizedAngles(rawAngles):[];patch.inspectionAngles=angles;
