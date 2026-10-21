@@ -15,7 +15,7 @@ test('Rows form adjacent status groups for the first displayed day and REGROUP w
  const rows=[item('free'),item('picked-a'),item('reserved'),item('picked-b')];
  const orders=[order('picked-a','PICKED_UP',day1,day1),order('picked-b','PICKED_UP',day1,day1),order('picked-b','RESERVED',day2,day2),order('reserved','RESERVED',day1,day1)];
  const todayOrder=sortCalendarProductsForDay(rows,day1,orders,day1).map(i=>i.id);
- assert.deepEqual(todayOrder,['picked-a','picked-b','reserved','free']);
+ assert.deepEqual(todayOrder,['picked-b','picked-a','reserved','free']); // More occupied days first within 'Đã lấy'.
  const tomorrowOrder=sortCalendarProductsForDay(rows,day2,orders,day1).map(i=>i.id);
  assert.deepEqual(tomorrowOrder,['picked-b','free','picked-a','reserved']);
  assert.notDeepEqual(todayOrder,tomorrowOrder);
