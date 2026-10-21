@@ -48,6 +48,7 @@ export async function GET(req:NextRequest){
   if(!snap.exists||!info?.consumedOrderId)throw new ApiError(404,'Ảnh chưa thuộc đơn đã xác nhận.');
   const order=await db().collection('orders').doc(info.consumedOrderId).get();
   if(!order.exists)throw new ApiError(404,'Không tìm thấy đơn của ảnh.');
+  if(['DELETING','PURGED'].includes(String(order.data()?.sensitiveEvidenceStatus||''))||order.data()?.photoReviewStatus==='REVIEWED'||order.data()?.reviewedAt||['CANCELLED','VOIDED'].includes(String(order.data()?.status||'')))throw new ApiError(410,'Ảnh đã hết thời hạn lưu giữ sau khi duyệt.');
   if(!canReadEvidence(me,order.data()||{}))throw new ApiError(403,'Bạn không có quyền xem chứng từ của đơn này.');
   let bytes:Buffer;
   if(info.provider==='cloudinary'){

@@ -13,6 +13,7 @@ import {auditInTransaction} from '@/lib/audit';
 import {FieldValue,type Transaction} from 'firebase-admin/firestore';
 import {addCompletedRound,type InspectionRound} from '@/lib/evidence-retention-rules';
 import {runEvidenceCleanup} from '@/lib/evidence-retention';
+import {queueSensitiveEvidenceCleanup,runSensitiveEvidenceCleanup} from '@/lib/sensitive-evidence-cleanup';
 import {finalRent,handoverBillingStart} from '@/lib/gu-v52-workflow';
 import {readVerifiedEvidence} from '@/lib/secure-evidence';
 import type {RentalOrder,InventoryItem} from '@/lib/types';
@@ -129,8 +130,7 @@ export async function PATCH(req:NextRequest,ctx:{params:Promise<{id:string}>}){
     if(!order.handoverProof?.items?.length)throw new ApiError(409,'Chưa có ảnh bàn giao.');
     const proofs=readProof(b.items,order,me.uid,me.name,'RETURN',now);
     await verifyProofUploads(tx,proofs,'return',me.uid,id);
-    const trackerRefs=order.lines.map(l=>db().collection('inspectionEvidence').doc(l.itemId));
-    const [snaps,trackers]=await Promise.all([Promise.all(itemRefs.map(r=>tx.get(r))),Promise.all(trackerRefs.map(r=>tx.get(r)))]);
+    const snaps=await Promise.all(itemRefs.map(r=>tx.get(r)));
     if(snaps.some(s=>!s.exists||s.data()?.status!=='RENTED'||s.data()?.currentOrderId!==id))throw new ApiError(409,'Kho không còn thuộc đơn này, không thể tự nhận trả.');
     const endTime=now;
     const quote=order.lines.map(l=>approvedLineQuote(l,
@@ -151,14 +151,27 @@ export async function PATCH(req:NextRequest,ctx:{params:Promise<{id:string}>}){
     syncDebtIndex(tx,db(),revised);
     tx.update(ref,{status:'RETURNED',returnStage:'APPROVED',returnProof,total:rent,compensationTotal:compensation,lateFeeTotal:0,rentalDays:actualBlocks,returnedAt:now,refundPending,photoReviewStatus:'PENDING',cameraLatePendingItemIds:pendingCameraIds,cameraLateFeePending:pendingCameraIds.length>0,cameraOvertimeFeeTotal:revised.cameraOvertimeFeeTotal,updatedAt:now,history:[...order.history,{action:'STAFF_RETURN_COMPLETE',at:now,by:me.uid,detail:'Đã nhận và hoàn kho độc lập với Admin; ảnh lưu chờ kiểm tra hậu kiểm'}]});
     itemRefs.forEach((r,i)=>{const p=proofs.find(v=>v.itemId===order.lines[i].itemId);const item=snaps[i].data() as InventoryItem;const state=p?.condition==='MISSING'?'MISSING':p?.condition==='ISSUE'?'MAINTENANCE':item.requiresLaundry===false?'AVAILABLE':'LAUNDRY';tx.update(r,{status:state,currentOrderId:null,expectedReturnDate:null,...(state==='LAUNDRY'?{laundryStartedAt:now,laundryCompletedAt:null}:{})});});
-    trackerRefs.forEach((trackerRef,i)=>{const itemId=order.lines[i].itemId;const hasHandover=Object.values(order.handoverProof?.items.find(p=>p.itemId===itemId)?.shots||{}).some(v=>!!v.url);const hasReturn=Object.values(proofs.find(p=>p.itemId===itemId)?.shots||{}).some(v=>!!v.url);if(!hasHandover||!hasReturn)return;const rounds=(trackers[i].data()?.rounds||[]) as InspectionRound[];const result=addCompletedRound(rounds,{orderId:id,completedAt:now});tx.set(trackerRef,{itemId,rounds:result.keep,updatedAt:now});for(const old of result.expired)tx.set(db().collection('inspectionCleanup').doc(itemId+'_'+old.orderId),{itemId,orderId:old.orderId,triggerOrderId:id,createdAt:now},{merge:true});});
     release?.();tx.set(job,{stage:'REVIEW',orderId:id,code:order.code,customerName:order.customerName,updatedAt:now},{merge:true});
    }else if(action==='REVIEW_PHOTOS'){
     if(order.status!=='RETURNED'||order.photoReviewStatus!=='PENDING'||!order.returnProof)throw new ApiError(409,'Không có ảnh trả hàng chờ kiểm tra.');
-    tx.update(ref,{photoReviewStatus:'REVIEWED',photoReviewedBy:me.uid,photoReviewedAt:now,updatedAt:now,history:[...order.history,{action:'PHOTO_REVIEWED',by:me.uid,at:now,detail:'Admin đã kiểm tra ảnh; không thay đổi tình trạng kho hay thanh toán'}]});
+    // Preserve seven complete handover+return photo rounds per physical item;
+    // an employee's RECEIVE alone is not an Admin-approved round.
+    const trackerRefs=order.lines.map(l=>db().collection('inspectionEvidence').doc(l.itemId));
+    const trackers=await Promise.all(trackerRefs.map(r=>tx.get(r)));
+    trackerRefs.forEach((trackerRef,i)=>{
+     const itemId=order.lines[i].itemId;
+     const hasHandover=Object.values(order.handoverProof?.items.find(p=>p.itemId===itemId)?.shots||{}).some(s=>!!s.url);
+     const hasReturn=Object.values(order.returnProof?.items.find(p=>p.itemId===itemId)?.shots||{}).some(s=>!!s.url);
+     if(!hasHandover||!hasReturn)return;
+     const result=addCompletedRound((trackers[i].data()?.rounds||[]) as InspectionRound[],{orderId:id,completedAt:now});
+     tx.set(trackerRef,{itemId,rounds:result.keep,updatedAt:now});
+     for(const old of result.expired)tx.set(db().collection('inspectionCleanup').doc(itemId+'_'+old.orderId),{itemId,orderId:old.orderId,triggerOrderId:id,createdAt:now},{merge:true});
+    });
+    tx.update(ref,{photoReviewStatus:'REVIEWED',photoReviewedBy:me.uid,photoReviewedAt:now,sensitiveEvidenceStatus:'DELETING',updatedAt:now,history:[...order.history,{action:'PHOTO_REVIEWED',by:me.uid,at:now,detail:'Admin duyệt ảnh; đã lập lệnh xóa chứng từ nhạy cảm khỏi Cloudinary'}]});
+    queueSensitiveEvidenceCleanup(tx,id,now);
     tx.set(job,{stage:'DONE',updatedAt:now},{merge:true});
    }else if(action==='RETURN_COLLATERAL'){
-    if(order.status!=='RETURNED'||!order.handoverDepositProofId)throw new ApiError(409,'Đơn chưa trả hoặc không có vật cọc cần hoàn lại.');
+    if(order.status!=='RETURNED'||!(order.handoverDepositProofId||order.hadHandoverDeposit))throw new ApiError(409,'Đơn chưa trả hoặc không có vật cọc cần hoàn lại.');
     if(order.collateralReturnedAt)throw new ApiError(409,'Vật cọc đã được xác nhận hoàn lại.');
     if(b.confirmReturned!==true)throw new ApiError(400,'Chưa xác nhận đã trao trả vật cọc.');
     tx.update(ref,{collateralReturnedAt:now,collateralReturnedBy:me.uid,updatedAt:now,history:[...order.history,{action:'COLLATERAL_RETURNED',by:me.uid,at:now,detail:`Đã hoàn lại trực tiếp vật cọc loại ${order.handoverDepositKind||'OTHER'}, không chụp lại`}]});
@@ -223,7 +236,7 @@ export async function PATCH(req:NextRequest,ctx:{params:Promise<{id:string}>}){
     // v5 stores actual rental amount as total, not total + separate late charge.
     const revised={...order,total:rent,paid:netPaid,refundTotal:(order.refundTotal||0)+refundDue,status,compensationTotal:compensation,otherFeeTotal:otherFee,lateFeeTotal:0,rentalDays:actualBlocks,cameraLateFeePending:pendingCameraIds.length>0,cameraLatePendingItemIds:pendingCameraIds,cameraOvertimeFeeTotal,returnStage:'APPROVED' as const,updatedAt:now};
     syncDebtIndex(tx,db(),revised);
-    tx.update(ref,{total:rent,paid:netPaid,refundTotal:(order.refundTotal||0)+refundDue,status,compensationTotal:compensation,otherFeeTotal:otherFee,lateFeeTotal:0,rentalDays:actualBlocks,cameraLateFeePending:pendingCameraIds.length>0,cameraLatePendingItemIds:pendingCameraIds,cameraOvertimeFeeTotal,returnStage:'APPROVED',reviewedBy:me.uid,reviewedByName:me.name,reviewedAt:now,returnedAt:order.returnProof.at,updatedAt:now,history:[...order.history,{action:'ADMIN_APPROVE_RETURN',by:me.uid,at:now,amount:rent,detail:`Duyệt nhận; thuê ${rent}, tăng thời gian ${lateFeeTotal}, đền bù ${compensation}, phụ phí ${otherFee} (${note}), hoàn thực tế ${refundDue} (${refundMethod||'không có'}); phí máy ảnh ${cameraOvertimeFeeTotal}`}]});
+    tx.update(ref,{total:rent,paid:netPaid,refundTotal:(order.refundTotal||0)+refundDue,status,compensationTotal:compensation,otherFeeTotal:otherFee,lateFeeTotal:0,rentalDays:actualBlocks,cameraLateFeePending:pendingCameraIds.length>0,cameraLatePendingItemIds:pendingCameraIds,cameraOvertimeFeeTotal,returnStage:'APPROVED',reviewedBy:me.uid,reviewedByName:me.name,reviewedAt:now,returnedAt:order.returnProof.at,sensitiveEvidenceStatus:'DELETING',updatedAt:now,history:[...order.history,{action:'ADMIN_APPROVE_RETURN',by:me.uid,at:now,amount:rent,detail:`Duyệt nhận; thuê ${rent}, tăng thời gian ${lateFeeTotal}, đền bù ${compensation}, phụ phí ${otherFee} (${note}), hoàn thực tế ${refundDue} (${refundMethod||'không có'}); phí máy ảnh ${cameraOvertimeFeeTotal}`}]});
     itemRefs.forEach((r,i)=>{const missing=order.returnProof?.items.find(p=>p.itemId===order.lines[i].itemId)?.condition==='MISSING';const item=snaps[i].data() as InventoryItem;const issue=order.returnProof?.items.find(p=>p.itemId===order.lines[i].itemId)?.condition==='ISSUE';const state=missing?'MISSING':issue?'MAINTENANCE':item.requiresLaundry===false?'AVAILABLE':'LAUNDRY';tx.update(r,{status:state,currentOrderId:null,expectedReturnDate:null,...(state==='LAUNDRY'?{laundryStartedAt:now,laundryCompletedAt:null}:{})});});
     // A completed handover+return is ONE round per individual physical asset.
     trackerRefs.forEach((trackerRef,i)=>{
@@ -239,6 +252,7 @@ export async function PATCH(req:NextRequest,ctx:{params:Promise<{id:string}>}){
         tx.set(db().collection('inspectionCleanup').doc(cleanupId),{itemId:order.lines[i].itemId,orderId:old.orderId,triggerOrderId:id,createdAt:now},{merge:true});
       }
     });
+    queueSensitiveEvidenceCleanup(tx,id,now);
     release?.();tx.set(job,{stage:'DONE',updatedAt:now},{merge:true});
    }else if(action==='VOID'||action==='CANCEL'){
     if(action==='CANCEL'&&order.status!=='RESERVED')throw new ApiError(409,'Đơn đã giao, chỉ Admin được hủy có kiểm nhận vật lý.');
@@ -248,7 +262,8 @@ export async function PATCH(req:NextRequest,ctx:{params:Promise<{id:string}>}){
     if(snaps.some(s=>!s.exists)|| (action==='VOID'&&snaps.some(s=>s.data()?.currentOrderId&&s.data()?.currentOrderId!==id)))throw new ApiError(409,'Trạng thái kho đã thay đổi, không thể xóa.');
     const release=await removeOrderIntervals(tx,order);
     const newStatus=action==='VOID'?'VOIDED':'CANCELLED';
-    tx.update(ref,{status:newStatus,voidedAt:action==='VOID'?now:null,voidedBy:action==='VOID'?me.uid:null,updatedAt:now,history:[...order.history,{action:action==='VOID'?'ADMIN_VOID':'CANCEL',by:me.uid,at:now,detail:action==='VOID'?'Đã xác nhận thu đủ đồ sạch, khóa đơn và hoàn kho':'Hủy lịch chưa giao'}]});
+    queueSensitiveEvidenceCleanup(tx,id,now);
+    tx.update(ref,{sensitiveEvidenceStatus:'DELETING',status:newStatus,voidedAt:action==='VOID'?now:null,voidedBy:action==='VOID'?me.uid:null,updatedAt:now,history:[...order.history,{action:action==='VOID'?'ADMIN_VOID':'CANCEL',by:me.uid,at:now,detail:action==='VOID'?'Đã xác nhận thu đủ đồ sạch, khóa đơn và hoàn kho':'Hủy lịch chưa giao'}]});
     if(action==='VOID')itemRefs.forEach(r=>tx.update(r,{status:'AVAILABLE',currentOrderId:null,expectedReturnDate:null,laundryCompletedAt:now}));
     release?.();tx.set(job,{stage:'DONE',updatedAt:now},{merge:true});
     syncDebtIndex(tx,db(),{...order,status:newStatus,updatedAt:now});
@@ -353,9 +368,9 @@ export async function PATCH(req:NextRequest,ctx:{params:Promise<{id:string}>}){
    }
    auditInTransaction(tx,me,'V5_'+action,'order',id,`${order.code} / ${me.name}`);
   });
-  if(action==='RECEIVE'||action==='APPROVE_RETURN'||action==='FINALIZE_LEGACY_RETURN'){
+  if(['REVIEW_PHOTOS','APPROVE_RETURN','FINALIZE_LEGACY_RETURN','CANCEL','VOID'].includes(action)){
     // Durable job is saved in Firestore; this runs after the HTTP response, and Cron retries failures.
-    after(async()=>{try{await runEvidenceCleanup(8);}catch(error){console.error('Deferred evidence cleanup',error);}});
+    after(async()=>{try{await Promise.all([runEvidenceCleanup(8),runSensitiveEvidenceCleanup(8)]);}catch(error){console.error('Deferred evidence cleanup',error);}});
   }
   return NextResponse.json({ok:true});
  }catch(e){return handleError(e,'PATCH /api/v5/orders/[id]');}

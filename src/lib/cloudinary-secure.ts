@@ -27,6 +27,8 @@ export async function uploadSecureCloudinary(bytes:Buffer,contentType:string,uid
  body.set('file',new Blob([new Uint8Array(bytes)],{type:contentType}),`evidence.${format}`);
  body.set('public_id',publicId);
  body.set('type','authenticated');
+ // Never place customer IDs or collateral photos in Cloudinary automatic backups.
+ body.set('backup','false');
  body.set('overwrite','false');
  let result:Response;
  try{result=await fetch(`https://api.cloudinary.com/v1_1/${name}/image/upload`,{method:'POST',headers:{Authorization:cloudinarySecureAuthHeader()},body,cache:'no-store',signal:AbortSignal.timeout(25000)});}
@@ -62,7 +64,7 @@ export async function downloadSecureCloudinary(image:SecureCloudinaryImage){
 export async function deleteSecureCloudinary(publicId:string){
  const {name}=cloudinarySecureConfig();
  if(!/^gu\/secure-evidence\/[A-Za-z0-9_-]{1,128}\/[a-f0-9-]{36}$/.test(publicId))throw new ApiError(400,'Mã ảnh không hợp lệ.');
- const query=new URLSearchParams();query.append('public_ids[]',publicId);
+ const query=new URLSearchParams({invalidate:'true'});query.append('public_ids[]',publicId);
  const result=await fetch(`https://api.cloudinary.com/v1_1/${name}/resources/image/authenticated?${query}`,{method:'DELETE',headers:{Authorization:cloudinarySecureAuthHeader()},cache:'no-store',signal:AbortSignal.timeout(20000)});
  if(!result.ok)throw new ApiError(502,'Không xóa được ảnh thử hoặc ảnh không có chứng từ.');
  const data=await result.json() as {deleted?:Record<string,string>};

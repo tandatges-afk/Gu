@@ -23,10 +23,10 @@ export function GuV5Review({api,onChanged,active=true}:{api:ApiCall;onChanged:()
  useEffect(()=>{if(active&&Date.now()-lastLoaded.current>60_000)void reload();},[active]);
  const open=async(id:string)=>{try{const r=await api<{order:RentalOrder;items:InventoryItem[]}>('v5/orders/'+id);setOrder(r.order);setItems(r.items);}catch(e){setError(e instanceof Error?e.message:'Không mở được đơn.');}};
  const done=async()=>{
-  if(!order||!confirm('Xác nhận đã xem ảnh giao/nhận? Thao tác này KHÔNG làm thay đổi trạng thái sản phẩm hay số tiền.'))return;
+  if(!order||!confirm('Duyệt ảnh giao/nhận và bắt đầu xóa vĩnh viễn ảnh CCCD, vật cọc, chứng từ của đơn khỏi Cloudinary? Chỉ giữ 7 lượt ảnh góc chụp đã duyệt của mỗi món.'))return;
   setBusy(true);setError('');try{
    await api('v5/orders/'+order.id,{method:'PATCH',body:JSON.stringify({action:'REVIEW_PHOTOS'})});
-   setOrder(null);await reload();await onChanged();setNote('Đã đánh dấu Admin kiểm tra ảnh, không ảnh hưởng khả năng cho thuê tiếp.');
+   setOrder(null);await reload();await onChanged();setNote('Đã duyệt ảnh. Chứng từ nhạy cảm đã được đưa vào hàng đợi xóa tự động; có thể cần thời gian để Cloudinary xác nhận.');
   }catch(e){setError(e instanceof Error?e.message:'Không cập nhật được.');}finally{setBusy(false);}
  };
  return <section className="gu-v5-review">
@@ -78,9 +78,11 @@ export function GuV5OrderDetail({order,items,api,onChanged,isAdmin,onCapture}:{o
  {existingGroup==='LEGACY_MIXED'&&<p className="inline-alert">Đơn dữ liệu cũ chứa máy ảnh và trang phục chung. Vẫn xem và xử lý trả hàng bình thường, nhưng không được thêm sản phẩm mới. Hãy tạo hai đơn riêng nếu khách tiếp tục thuê.</p>}
  {order.bookingKind==='RESERVE'&&<p className="inline-alert">Đặt trước: bắt buộc thanh toán đủ 100% giá thuê ({money(order.prepaidRentTotal||0)}) khi đặt lịch. Không cần chụp đồ cho đến khi giao.</p>}
  {order.reservationPaymentProofId&&<details><summary>Ảnh chứng từ đã thu tiền thuê</summary><GuSecurePhoto id={order.reservationPaymentProofId} alt="Ảnh tiền thuê đặt trước"/></details>}
- {order.handoverDepositProofId&&<details open={order.status==='PICKED_UP'}><summary>Vật cọc phải trả cho khách: {order.handoverDepositKind||'Khác'}</summary><p>Trả lại vật cọc trực tiếp khi khách giao đồ. Không yêu cầu chụp ảnh trả vật cọc.</p><GuSecurePhoto id={order.handoverDepositProofId} alt="Vật cọc khi giao"/></details>}
- {order.status==='RETURNED'&&order.handoverDepositProofId&&!order.collateralReturnedAt&&<div className="inline-alert danger-alert">Chưa xác nhận đã hoàn vật cọc {order.handoverDepositKind||'khác'} cho khách.<button type="button" className="btn btn-white" disabled={busy} onClick={()=>{if(confirm('Nhân viên xác nhận đã trả vật cọc cho khách?'))void act('RETURN_COLLATERAL',{confirmReturned:true});}}>Đã hoàn vật cọc</button></div>}
+ {(order.handoverDepositProofId||order.hadHandoverDeposit)&&<details open={order.status==='PICKED_UP'}><summary>Vật cọc phải trả cho khách: {order.handoverDepositKind||'Khác'}</summary><p>Trả lại vật cọc trực tiếp khi khách giao đồ. Không yêu cầu chụp ảnh trả vật cọc.</p>{order.handoverDepositProofId?<GuSecurePhoto id={order.handoverDepositProofId} alt="Vật cọc khi giao"/>:<small>Ảnh vật cọc đã được xóa sau hậu kiểm.</small>}</details>}
+ {order.status==='RETURNED'&&(order.handoverDepositProofId||order.hadHandoverDeposit)&&!order.collateralReturnedAt&&<div className="inline-alert danger-alert">Chưa xác nhận đã hoàn vật cọc {order.handoverDepositKind||'khác'} cho khách.<button type="button" className="btn btn-white" disabled={busy} onClick={()=>{if(confirm('Nhân viên xác nhận đã trả vật cọc cho khách?'))void act('RETURN_COLLATERAL',{confirmReturned:true});}}>Đã hoàn vật cọc</button></div>}
  {order.photoReviewStatus==='PENDING'&&<p className="inline-alert">Ảnh đang chờ Admin hậu kiểm. Hàng đã được hoàn kho/giặt, không bị khóa.</p>}
+ {order.sensitiveEvidenceStatus==='DELETING'&&<p className="inline-alert">Chứng từ CCCD/vật cọc/thanh toán đang chờ Cloudinary xác nhận xóa. GU đã khóa quyền mở ảnh, hệ thống sẽ tự thử lại nếu bị lỗi.</p>}
+ {order.sensitiveEvidenceStatus==='PURGED'&&<p className="inline-alert">Đã xóa chứng từ nhạy cảm khỏi kho dữ liệu vận hành. Lịch sử đơn và tối đa 7 lượt ảnh góc chụp đã duyệt vẫn được giữ.</p>}
  {order.returnStage==='AWAITING_ADMIN'&&<div className="inline-alert danger-alert">Đơn dữ liệu cũ đang chờ duyệt. Nhân viên có thể hoàn tất nhận trả mà không đợi Admin.{order.status==='PICKED_UP'&&<button type="button" className="btn btn-white" disabled={busy} onClick={()=>void act('FINALIZE_LEGACY_RETURN')}>Hoàn tất nhận trả đơn cũ</button>}</div>}
  {['RESERVED','PICKED_UP'].includes(order.status)&&order.returnStage!=='AWAITING_ADMIN'&&<button type="button" className="btn btn-dark gu-v11-capture-button" onClick={onCapture}>{order.status==='RESERVED'?'Chụp ảnh giao và vật cọc':order.pendingExtraItemIds?.length?'Chụp ảnh giao thêm':'Chụp ảnh nhận trả · thanh toán'}</button>}
  {order.cameraLateFeePending&&<p className="inline-alert danger-alert">Máy ảnh chưa đối soát phí trễ, Admin cần tính lại trước khi thu.</p>}

@@ -16,6 +16,6 @@ export async function readVerifiedEvidence(tx:Transaction,id:string,uid:string,p
  if(!validEvidenceId(id))throw new ApiError(400,'Thiếu ảnh cọc/thanh toán hợp lệ.');
  const ref=db().collection('secureEvidenceUploads').doc(id);const snap=await tx.get(ref);
  const e=snap.data();
- if(!snap.exists||e?.ownerUid!==uid||e?.purpose!==purpose||e?.draftId!==draftId||e?.consumedOrderId)throw new ApiError(409,'Ảnh chưa được gửi từ tài khoản này hoặc đã sử dụng.');
+ if(!snap.exists||e?.ownerUid!==uid||e?.purpose!==purpose||e?.draftId!==draftId||e?.consumedOrderId||e?.cleanupState==='DELETING')throw new ApiError(409,'Ảnh chưa được gửi từ tài khoản này hoặc đã sử dụng.');
  return {ref,data:e!};
 }

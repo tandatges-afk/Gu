@@ -22,7 +22,21 @@ for(const name of collections){
    if(cursor)q=q.startAfter(cursor);
    const s=await q.get();
    if(!s.docs.length){await writeFile(checkpoint,'DONE');break;}
-   const records=s.docs.map(d=>JSON.stringify({id:d.id,data:d.data()})).join('\n')+'\n';
+   // Backups must not become a second repository for customer document images.
+   // Keep financial and inventory records, but strip all customer evidence IDs,
+   // photos and snapshots. Existing backups created before this release still
+   // require manual secure deletion or handling according to retention policy.
+   const sanitize=(data,name)=>{
+     if(name!=='orders')return data;
+     const copy={...data};
+     delete copy.reservationPaymentProofId;
+     delete copy.handoverDepositProofId;
+     delete copy.handoverProof;
+     delete copy.returnProof;
+     delete copy.referencePhotos;
+     return copy;
+   };
+   const records=s.docs.map(d=>JSON.stringify({id:d.id,data:sanitize(d.data(),name)})).join('\n')+'\n';
    await appendFile(target,records,{mode:0o600});
    cursor=s.docs.at(-1).id;await writeFile(checkpoint,cursor,{mode:0o600});total+=s.size;
    if(s.size<Math.min(100,limit-total+s.size)){await writeFile(checkpoint,'DONE');break;}

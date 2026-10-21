@@ -62,6 +62,9 @@ const required = [
   'vercel.json',
   'src/lib/camera-rental.ts',
   'src/lib/evidence-retention.ts',
+  'src/lib/sensitive-evidence-rules.ts',
+  'src/lib/sensitive-evidence-cleanup.ts',
+  'docs/GU-v5.4.2-TU-DONG-XOA-CHUNG-TU-ANH-COC.md',
   'src/lib/evidence-retention-rules.ts',
   'src/lib/product-policies.ts',
   'src/lib/v5-review-pricing.ts',
@@ -177,13 +180,16 @@ checks.push(['thống kê kho bỏ sản phẩm lưu trữ', /archivedByStatus/,
 checks.push(['bộ lọc kho riêng và xóa lỗi cũ', /clearError\(\);/, 'src/components/GuInventoryFilters.tsx']);
 checks.push(['nhắc khách quá giờ nhận ở backend', /overduePickupNotices\(reservations,now\)/, 'src/app/api/v5/return-risk/route.ts']);
 checks.push(['thông báo khách quá giờ nhận', /gu-late-pickup-banner/, 'src/app/page.tsx']);
+checks.push(['xóa chứng từ sau Admin duyệt', /queueSensitiveEvidenceCleanup\(tx,id,now\)/, 'src/app/api/v5/orders/[id]/route.ts']);
+checks.push(['giữ đúng bảy lượt ảnh', /KEEP_INSPECTION_ROUNDS=7/, 'src/lib/evidence-retention-rules.ts']);
+checks.push(['không tạo backup ảnh cọc mới', /body.set\('backup','false'\)/, 'src/lib/cloudinary-secure.ts']);
 checks.push(['chẩn đoán bucket private', /cloudinarySecureConfig/, 'src/lib/cloudinary-secure.ts']);
 checks.push(['gói máy ảnh được chọn chủ động', /chosenCameraPackageSnapshot/, 'src/app/api/v5/orders/route.ts']);
 checks.push(['chụp ảnh cọc không chọn phương thức', /method:'PHOTO_PROOF'/, 'src/app/api/v5/orders/route.ts']);
 checks.push(['lỗi upload Storage được phân loại', /downloadSecureCloudinary/, 'src/app/api/v5/secure-photo/route.ts']);
 const absent = checks.filter(([name,pattern,file]) => missing.includes(file) || !pattern.test(read(file))).map(([name])=>name);
 const pkg = JSON.parse(read('package.json'));
-if (pkg.version !== '5.4.1-beta.1') absent.push('phiên bản 5.4.1-beta.1 trong package.json');
+if (pkg.version !== '5.4.2-beta.1') absent.push('phiên bản 5.4.2-beta.1 trong package.json');
 if (missing.length || absent.length) {
   console.error('KHÔNG ĐỒNG BỘ. Thiếu tệp:', missing.join(', ') || 'không');
   console.error('Thiếu thành phần:', absent.join(', ') || 'không');
