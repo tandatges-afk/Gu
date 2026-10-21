@@ -1,11 +1,7 @@
 /** Camera rates attach to the contracted package, not the cheapest package after a late return. */
 export const CAMERA_MODELS=['Canon EOS R50','Canon M50'] as const;
 export type CameraModel=typeof CAMERA_MODELS[number];
-export function isCameraCategory(category:string):boolean {
- // Accessories (including camera accessories) must use the 24-hour accessory rental workflow.
- if(/phụ\s*kiện|phu\s*kien|accessor/i.test(category))return false;
- return /máy\s*ảnh|may\s*anh|camera/i.test(category);
-}
+export function isCameraCategory(category:string):boolean {return /máy\s*ảnh|may\s*anh|camera/i.test(category);}
 export function isCameraModel(model:unknown):model is CameraModel{return CAMERA_MODELS.includes(model as CameraModel);}
 export const CAMERA_PRICE:Record<CameraModel,readonly [number,number,number,number]>={
  'Canon EOS R50':[110_000,130_000,190_000,350_000],
@@ -26,15 +22,6 @@ export function cameraBasePrice(model:CameraModel,hours:CameraPackageHours):numb
  return CAMERA_PRICE[model][idx];
 }
 export type CameraLine={category?:string;cameraModel?:CameraModel;cameraPackageHours?:CameraPackageHours;cameraPackageBasePrice?:number;lineTotal?:number};
-/** Explicit tier chosen by staff. The scheduled return may be earlier, but never beyond the paid tier. */
-export function chosenCameraPackageSnapshot(model:CameraModel,scheduledStart:string,scheduledEnd:string,chosen:unknown){
- if(typeof chosen!=='number'||!CAMERA_TIERS.includes(chosen as CameraPackageHours))throw new Error('Phải chọn gói máy ảnh 3h, 6h, 24h hoặc 48h.');
- const duration=(Date.parse(scheduledEnd)-Date.parse(scheduledStart))/HOUR_MS;
- if(!Number.isFinite(duration)||duration<=0)throw new Error('Khoảng giờ thuê máy ảnh không hợp lệ.');
- if(duration>chosen+1e-8)throw new Error('Giờ trả dự kiến vượt gói máy ảnh đã chọn. Hãy chọn gói dài hơn hoặc chỉnh giờ trả.');
- return {cameraPackageHours:chosen as CameraPackageHours,cameraPackageBasePrice:cameraBasePrice(model,chosen as CameraPackageHours)};
-}
-
 export function cameraPackageSnapshot(model:CameraModel,scheduledStart:string,scheduledEnd:string):{cameraPackageHours:CameraPackageHours;cameraPackageBasePrice:number}{
  const duration=(Date.parse(scheduledEnd)-Date.parse(scheduledStart))/HOUR_MS;
  const hours=cameraPackageForDuration(duration);

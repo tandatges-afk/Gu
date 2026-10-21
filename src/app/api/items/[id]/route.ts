@@ -1,4 +1,3 @@
-import {validVisualSignature,validVisualIndexEntries} from '@/lib/visual-index';
 import { NextRequest,NextResponse } from 'next/server';
 import {productSearchBigrams} from '@/lib/product-search';
 import {normalizeProductName,productNameIndexId,PRODUCT_NAME_INDEX_MIGRATION} from '@/lib/product-name';
@@ -70,10 +69,6 @@ export async function PATCH(req:NextRequest,ctx:{params:Promise<{id:string}>}) {
         const requiresLaundry=launderingForCategory(category,b.requiresLaundry===true);
         if(!Array.isArray(b.imagePaths)||b.imagePaths.length>5||b.imagePaths.some((url:unknown)=>typeof url!=='string'||!(snap.data()?.imagePaths||[]).includes(url)&&!validProductImageUrl(url,me.uid,process.env.CLOUDINARY_CLOUD_NAME||'')))throw new ApiError(400,'Ảnh sản phẩm không hợp lệ.');
         patch={name,nameKey,nameSearchBigrams:productSearchBigrams(name),category,size,color,dailyRate,requiresLaundry,imagePaths:b.imagePaths,bufferDays:0};
-        if(b.visualSignatures!==undefined){if(!validVisualIndexEntries(b.visualSignatures)||(b.visualSignatures as {imagePath:string}[]).some(entry=>!(b.imagePaths as string[]).slice(0,5).includes(entry.imagePath)))throw new ApiError(400,'Chỉ mục nhiều ảnh không hợp lệ.');patch.visualSignatures=b.visualSignatures;}
-        else{const old=validVisualIndexEntries(snap.data()?.visualSignatures)?snap.data()!.visualSignatures as {imagePath:string;signature:unknown}[]:[];patch.visualSignatures=old.filter(entry=>(b.imagePaths as string[]).slice(0,5).includes(entry.imagePath));}
-        if(b.visualSignature!==undefined){if(!validVisualSignature(b.visualSignature))throw new ApiError(400,'Chỉ mục ảnh không hợp lệ.');patch.visualSignature=b.visualSignature;patch.visualImagePath=b.imagePaths[0]||'';}
-        else if((b.imagePaths as string[])[0]!==snap.data()?.visualImagePath){patch.visualSignature=null;patch.visualImagePath=null;}
         if(me.role==='admin'){const rawAngles=b.inspectionAngles??snap.data()?.inspectionAngles??[];const angles=Array.isArray(rawAngles)&&rawAngles.length?normalizedAngles(rawAngles):[];patch.inspectionAngles=angles;
           const referenceShots=b.referenceShots??snap.data()?.referenceShots??{};
           if(typeof referenceShots!=='object'||Array.isArray(referenceShots)||Object.entries(referenceShots as Record<string,unknown>).some(([angle,url])=>!angles.includes(angle)||!(Object.values(snap.data()?.referenceShots||{}).includes(url)||validProductImageUrl(url,me.uid,process.env.CLOUDINARY_CLOUD_NAME||''))))throw new ApiError(400,'Ảnh chuẩn góc chụp không hợp lệ.');
@@ -93,7 +88,7 @@ export async function PATCH(req:NextRequest,ctx:{params:Promise<{id:string}>}) {
         else if(existingName?.exists)tx.delete(oldNameRef);
         tx.create(nextNameRef,{key:normalizeProductName(requestedName),name:requestedName,owners:[id],updatedAt:new Date().toISOString()});
       }
-      tx.update(ref,patch);
+      tx.update(ref,{...patch,updatedAt:new Date().toISOString()});
       auditInTransaction(tx,me,editing?'ITEM_EDIT':updatingValue?'ITEM_VALUE':cleaned?'ITEM_CLEANED':'ITEM_STATUS','item',id,
         editing?`Chỉnh sửa ${snap.data()?.name}`:updatingValue?`Admin định giá ${snap.data()?.name}: ${value} VND`:`${snap.data()?.name}: ${snap.data()?.status} → ${status}`);
     });

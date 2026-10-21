@@ -2,8 +2,7 @@ import {NextRequest,NextResponse,after} from 'next/server';
 import {db} from '@/lib/firebase-admin';
 import {staffUser,handleError,jsonBody,ApiError,requireAdmin,requirePcStaff} from '@/lib/http';
 import {billableBlocks,vnDayKey} from '@/lib/hourly-pricing';
-import {rentalCharge,cameraPackageSnapshot,chosenCameraPackageSnapshot,isCameraCategory,isCameraModel} from '@/lib/camera-rental';
-import {orderGroup,itemsBelongToGroup} from '@/lib/order-group';
+import {rentalCharge,cameraPackageSnapshot,isCameraCategory,isCameraModel} from '@/lib/camera-rental';
 import {approvedLineQuote} from '@/lib/v5-review-pricing';
 import {returnReconciliation} from '@/lib/settlement-ledger';
 import {completeProof,type PhotoProof,type Capture} from '@/lib/inspection-proof';
@@ -13,8 +12,7 @@ import {auditInTransaction} from '@/lib/audit';
 import {FieldValue,type Transaction} from 'firebase-admin/firestore';
 import {addCompletedRound,type InspectionRound} from '@/lib/evidence-retention-rules';
 import {runEvidenceCleanup} from '@/lib/evidence-retention';
-import {queueSensitiveEvidenceCleanup,runSensitiveEvidenceCleanup} from '@/lib/sensitive-evidence-cleanup';
-import {finalRent,handoverBillingStart} from '@/lib/gu-v52-workflow';
+import {finalRent} from '@/lib/gu-v52-workflow';
 import {readVerifiedEvidence} from '@/lib/secure-evidence';
 import type {RentalOrder,InventoryItem} from '@/lib/types';
 export const runtime='nodejs';
@@ -95,13 +93,13 @@ export async function PATCH(req:NextRequest,ctx:{params:Promise<{id:string}>}){
     // Reserved rentals keep their original scheduled pickup time for pricing and timeline
     // even when the customer comes later, so the planned slot remains authoritative.
     if(Date.parse(now)>=Date.parse(order.returnAt||''))throw new ApiError(409,'Giờ trả dự kiến đã qua; PC cần cập nhật lịch trước khi giao.');
-    const billingStart=handoverBillingStart({bookingKind:order.bookingKind,scheduledPickupAt:order.scheduledPickupAt,pickupAt:order.pickupAt,actualHandoverAt:now});
-    const actualLines=order.lines.map(l=>{const startAt=order.bookingKind==='RESERVE'?(l.startAt||billingStart):billingStart;return {...l,startAt,lineTotal:rentalCharge(l,startAt,order.returnAt!)};});
+    const billingStart=order.scheduledPickupAt||order.pickupAt||now;
+    const actualLines=order.lines.map(l=>{const startAt=earlyHandover?now:(order.bookingKind==='RESERVE'?l.startAt||billingStart:now);return {...l,startAt,lineTotal:rentalCharge(l,startAt,order.returnAt!)};});
     const computedTotal=actualLines.reduce((sum,l)=>sum+Number(l.lineTotal||0),0);
     const actualTotal=order.bookingKind==='RESERVE'?Math.max(order.bookedRentTotal||order.total,computedTotal):computedTotal;
     if(earlySlots.length)createIntervalWrites(tx,earlySlots,earlyPrior,id);
     if(depositEvidence)tx.update(depositEvidence.ref,{consumedOrderId:id,consumedAt:now});
-    tx.update(ref,{status:'PICKED_UP',scheduledPickupAt:order.scheduledPickupAt||order.pickupAt,lines:actualLines,total:actualTotal,...(depositEvidence?{handoverDepositProofId:depositProofId,handoverDepositKind:depositKind}:{}),handoverProof:{status:'SUBMITTED',by:me.uid,byName:me.name,at:now,items:proofs},updatedAt:now,history:[...order.history,{action:'HANDOVER_PHOTOS',by:me.uid,at:now,detail:`Nhân viên ${me.name} đã chụp ${proofs.length} sản phẩm và giữ nguyên giờ thuê theo lịch hẹn`} ]});
+    tx.update(ref,{status:'PICKED_UP',scheduledPickupAt:order.scheduledPickupAt||order.pickupAt,...(earlyHandover?{pickupAt:now,pickupDate:vnDayKey(now),rentalDays:billableBlocks(now,order.returnAt!)}:{}),lines:actualLines,total:actualTotal,...(depositEvidence?{handoverDepositProofId:depositProofId,handoverDepositKind:depositKind}:{}),handoverProof:{status:'SUBMITTED',by:me.uid,byName:me.name,at:now,items:proofs},updatedAt:now,history:[...order.history,{action:'HANDOVER_PHOTOS',by:me.uid,at:now,detail:`Nhân viên ${me.name} đã chụp ${proofs.length} sản phẩm và giữ nguyên giờ thuê theo lịch hẹn`} ]});
     itemRefs.forEach(r=>tx.update(r,{status:'RENTED',currentOrderId:id,expectedReturnDate:order.returnDate}));
     tx.set(job,{stage:'OUT',code:order.code,orderId:id,customerName:order.customerName,returnAt:order.returnAt,updatedAt:now},{merge:true});
     syncDebtIndex(tx,db(),{...order,lines:actualLines,total:actualTotal,status:'PICKED_UP',updatedAt:now});
@@ -130,7 +128,8 @@ export async function PATCH(req:NextRequest,ctx:{params:Promise<{id:string}>}){
     if(!order.handoverProof?.items?.length)throw new ApiError(409,'Chưa có ảnh bàn giao.');
     const proofs=readProof(b.items,order,me.uid,me.name,'RETURN',now);
     await verifyProofUploads(tx,proofs,'return',me.uid,id);
-    const snaps=await Promise.all(itemRefs.map(r=>tx.get(r)));
+    const trackerRefs=order.lines.map(l=>db().collection('inspectionEvidence').doc(l.itemId));
+    const [snaps,trackers]=await Promise.all([Promise.all(itemRefs.map(r=>tx.get(r))),Promise.all(trackerRefs.map(r=>tx.get(r)))]);
     if(snaps.some(s=>!s.exists||s.data()?.status!=='RENTED'||s.data()?.currentOrderId!==id))throw new ApiError(409,'Kho không còn thuộc đơn này, không thể tự nhận trả.');
     const endTime=now;
     const quote=order.lines.map(l=>approvedLineQuote(l,
@@ -151,27 +150,14 @@ export async function PATCH(req:NextRequest,ctx:{params:Promise<{id:string}>}){
     syncDebtIndex(tx,db(),revised);
     tx.update(ref,{status:'RETURNED',returnStage:'APPROVED',returnProof,total:rent,compensationTotal:compensation,lateFeeTotal:0,rentalDays:actualBlocks,returnedAt:now,refundPending,photoReviewStatus:'PENDING',cameraLatePendingItemIds:pendingCameraIds,cameraLateFeePending:pendingCameraIds.length>0,cameraOvertimeFeeTotal:revised.cameraOvertimeFeeTotal,updatedAt:now,history:[...order.history,{action:'STAFF_RETURN_COMPLETE',at:now,by:me.uid,detail:'Đã nhận và hoàn kho độc lập với Admin; ảnh lưu chờ kiểm tra hậu kiểm'}]});
     itemRefs.forEach((r,i)=>{const p=proofs.find(v=>v.itemId===order.lines[i].itemId);const item=snaps[i].data() as InventoryItem;const state=p?.condition==='MISSING'?'MISSING':p?.condition==='ISSUE'?'MAINTENANCE':item.requiresLaundry===false?'AVAILABLE':'LAUNDRY';tx.update(r,{status:state,currentOrderId:null,expectedReturnDate:null,...(state==='LAUNDRY'?{laundryStartedAt:now,laundryCompletedAt:null}:{})});});
+    trackerRefs.forEach((trackerRef,i)=>{const itemId=order.lines[i].itemId;const hasHandover=Object.values(order.handoverProof?.items.find(p=>p.itemId===itemId)?.shots||{}).some(v=>!!v.url);const hasReturn=Object.values(proofs.find(p=>p.itemId===itemId)?.shots||{}).some(v=>!!v.url);if(!hasHandover||!hasReturn)return;const rounds=(trackers[i].data()?.rounds||[]) as InspectionRound[];const result=addCompletedRound(rounds,{orderId:id,completedAt:now});tx.set(trackerRef,{itemId,rounds:result.keep,updatedAt:now});for(const old of result.expired)tx.set(db().collection('inspectionCleanup').doc(itemId+'_'+old.orderId),{itemId,orderId:old.orderId,triggerOrderId:id,createdAt:now},{merge:true});});
     release?.();tx.set(job,{stage:'REVIEW',orderId:id,code:order.code,customerName:order.customerName,updatedAt:now},{merge:true});
    }else if(action==='REVIEW_PHOTOS'){
     if(order.status!=='RETURNED'||order.photoReviewStatus!=='PENDING'||!order.returnProof)throw new ApiError(409,'Không có ảnh trả hàng chờ kiểm tra.');
-    // Preserve seven complete handover+return photo rounds per physical item;
-    // an employee's RECEIVE alone is not an Admin-approved round.
-    const trackerRefs=order.lines.map(l=>db().collection('inspectionEvidence').doc(l.itemId));
-    const trackers=await Promise.all(trackerRefs.map(r=>tx.get(r)));
-    trackerRefs.forEach((trackerRef,i)=>{
-     const itemId=order.lines[i].itemId;
-     const hasHandover=Object.values(order.handoverProof?.items.find(p=>p.itemId===itemId)?.shots||{}).some(s=>!!s.url);
-     const hasReturn=Object.values(order.returnProof?.items.find(p=>p.itemId===itemId)?.shots||{}).some(s=>!!s.url);
-     if(!hasHandover||!hasReturn)return;
-     const result=addCompletedRound((trackers[i].data()?.rounds||[]) as InspectionRound[],{orderId:id,completedAt:now});
-     tx.set(trackerRef,{itemId,rounds:result.keep,updatedAt:now});
-     for(const old of result.expired)tx.set(db().collection('inspectionCleanup').doc(itemId+'_'+old.orderId),{itemId,orderId:old.orderId,triggerOrderId:id,createdAt:now},{merge:true});
-    });
-    tx.update(ref,{photoReviewStatus:'REVIEWED',photoReviewedBy:me.uid,photoReviewedAt:now,sensitiveEvidenceStatus:'DELETING',updatedAt:now,history:[...order.history,{action:'PHOTO_REVIEWED',by:me.uid,at:now,detail:'Admin duyệt ảnh; đã lập lệnh xóa chứng từ nhạy cảm khỏi Cloudinary'}]});
-    queueSensitiveEvidenceCleanup(tx,id,now);
+    tx.update(ref,{photoReviewStatus:'REVIEWED',photoReviewedBy:me.uid,photoReviewedAt:now,updatedAt:now,history:[...order.history,{action:'PHOTO_REVIEWED',by:me.uid,at:now,detail:'Admin đã kiểm tra ảnh; không thay đổi tình trạng kho hay thanh toán'}]});
     tx.set(job,{stage:'DONE',updatedAt:now},{merge:true});
    }else if(action==='RETURN_COLLATERAL'){
-    if(order.status!=='RETURNED'||!(order.handoverDepositProofId||order.hadHandoverDeposit))throw new ApiError(409,'Đơn chưa trả hoặc không có vật cọc cần hoàn lại.');
+    if(order.status!=='RETURNED'||!order.handoverDepositProofId)throw new ApiError(409,'Đơn chưa trả hoặc không có vật cọc cần hoàn lại.');
     if(order.collateralReturnedAt)throw new ApiError(409,'Vật cọc đã được xác nhận hoàn lại.');
     if(b.confirmReturned!==true)throw new ApiError(400,'Chưa xác nhận đã trao trả vật cọc.');
     tx.update(ref,{collateralReturnedAt:now,collateralReturnedBy:me.uid,updatedAt:now,history:[...order.history,{action:'COLLATERAL_RETURNED',by:me.uid,at:now,detail:`Đã hoàn lại trực tiếp vật cọc loại ${order.handoverDepositKind||'OTHER'}, không chụp lại`}]});
@@ -236,7 +222,7 @@ export async function PATCH(req:NextRequest,ctx:{params:Promise<{id:string}>}){
     // v5 stores actual rental amount as total, not total + separate late charge.
     const revised={...order,total:rent,paid:netPaid,refundTotal:(order.refundTotal||0)+refundDue,status,compensationTotal:compensation,otherFeeTotal:otherFee,lateFeeTotal:0,rentalDays:actualBlocks,cameraLateFeePending:pendingCameraIds.length>0,cameraLatePendingItemIds:pendingCameraIds,cameraOvertimeFeeTotal,returnStage:'APPROVED' as const,updatedAt:now};
     syncDebtIndex(tx,db(),revised);
-    tx.update(ref,{total:rent,paid:netPaid,refundTotal:(order.refundTotal||0)+refundDue,status,compensationTotal:compensation,otherFeeTotal:otherFee,lateFeeTotal:0,rentalDays:actualBlocks,cameraLateFeePending:pendingCameraIds.length>0,cameraLatePendingItemIds:pendingCameraIds,cameraOvertimeFeeTotal,returnStage:'APPROVED',reviewedBy:me.uid,reviewedByName:me.name,reviewedAt:now,returnedAt:order.returnProof.at,sensitiveEvidenceStatus:'DELETING',updatedAt:now,history:[...order.history,{action:'ADMIN_APPROVE_RETURN',by:me.uid,at:now,amount:rent,detail:`Duyệt nhận; thuê ${rent}, tăng thời gian ${lateFeeTotal}, đền bù ${compensation}, phụ phí ${otherFee} (${note}), hoàn thực tế ${refundDue} (${refundMethod||'không có'}); phí máy ảnh ${cameraOvertimeFeeTotal}`}]});
+    tx.update(ref,{total:rent,paid:netPaid,refundTotal:(order.refundTotal||0)+refundDue,status,compensationTotal:compensation,otherFeeTotal:otherFee,lateFeeTotal:0,rentalDays:actualBlocks,cameraLateFeePending:pendingCameraIds.length>0,cameraLatePendingItemIds:pendingCameraIds,cameraOvertimeFeeTotal,returnStage:'APPROVED',reviewedBy:me.uid,reviewedByName:me.name,reviewedAt:now,returnedAt:order.returnProof.at,updatedAt:now,history:[...order.history,{action:'ADMIN_APPROVE_RETURN',by:me.uid,at:now,amount:rent,detail:`Duyệt nhận; thuê ${rent}, tăng thời gian ${lateFeeTotal}, đền bù ${compensation}, phụ phí ${otherFee} (${note}), hoàn thực tế ${refundDue} (${refundMethod||'không có'}); phí máy ảnh ${cameraOvertimeFeeTotal}`}]});
     itemRefs.forEach((r,i)=>{const missing=order.returnProof?.items.find(p=>p.itemId===order.lines[i].itemId)?.condition==='MISSING';const item=snaps[i].data() as InventoryItem;const issue=order.returnProof?.items.find(p=>p.itemId===order.lines[i].itemId)?.condition==='ISSUE';const state=missing?'MISSING':issue?'MAINTENANCE':item.requiresLaundry===false?'AVAILABLE':'LAUNDRY';tx.update(r,{status:state,currentOrderId:null,expectedReturnDate:null,...(state==='LAUNDRY'?{laundryStartedAt:now,laundryCompletedAt:null}:{})});});
     // A completed handover+return is ONE round per individual physical asset.
     trackerRefs.forEach((trackerRef,i)=>{
@@ -252,7 +238,6 @@ export async function PATCH(req:NextRequest,ctx:{params:Promise<{id:string}>}){
         tx.set(db().collection('inspectionCleanup').doc(cleanupId),{itemId:order.lines[i].itemId,orderId:old.orderId,triggerOrderId:id,createdAt:now},{merge:true});
       }
     });
-    queueSensitiveEvidenceCleanup(tx,id,now);
     release?.();tx.set(job,{stage:'DONE',updatedAt:now},{merge:true});
    }else if(action==='VOID'||action==='CANCEL'){
     if(action==='CANCEL'&&order.status!=='RESERVED')throw new ApiError(409,'Đơn đã giao, chỉ Admin được hủy có kiểm nhận vật lý.');
@@ -262,8 +247,7 @@ export async function PATCH(req:NextRequest,ctx:{params:Promise<{id:string}>}){
     if(snaps.some(s=>!s.exists)|| (action==='VOID'&&snaps.some(s=>s.data()?.currentOrderId&&s.data()?.currentOrderId!==id)))throw new ApiError(409,'Trạng thái kho đã thay đổi, không thể xóa.');
     const release=await removeOrderIntervals(tx,order);
     const newStatus=action==='VOID'?'VOIDED':'CANCELLED';
-    queueSensitiveEvidenceCleanup(tx,id,now);
-    tx.update(ref,{sensitiveEvidenceStatus:'DELETING',status:newStatus,voidedAt:action==='VOID'?now:null,voidedBy:action==='VOID'?me.uid:null,updatedAt:now,history:[...order.history,{action:action==='VOID'?'ADMIN_VOID':'CANCEL',by:me.uid,at:now,detail:action==='VOID'?'Đã xác nhận thu đủ đồ sạch, khóa đơn và hoàn kho':'Hủy lịch chưa giao'}]});
+    tx.update(ref,{status:newStatus,voidedAt:action==='VOID'?now:null,voidedBy:action==='VOID'?me.uid:null,updatedAt:now,history:[...order.history,{action:action==='VOID'?'ADMIN_VOID':'CANCEL',by:me.uid,at:now,detail:action==='VOID'?'Đã xác nhận thu đủ đồ sạch, khóa đơn và hoàn kho':'Hủy lịch chưa giao'}]});
     if(action==='VOID')itemRefs.forEach(r=>tx.update(r,{status:'AVAILABLE',currentOrderId:null,expectedReturnDate:null,laundryCompletedAt:now}));
     release?.();tx.set(job,{stage:'DONE',updatedAt:now},{merge:true});
     syncDebtIndex(tx,db(),{...order,status:newStatus,updatedAt:now});
@@ -280,25 +264,12 @@ export async function PATCH(req:NextRequest,ctx:{params:Promise<{id:string}>}){
    }else if(action==='PAY'){
     if(order.cameraLateFeePending)throw new ApiError(409,'Đơn máy ảnh cũ chưa đối soát tự động; Admin bấm Tính lại phí máy ảnh trước khi thu.');
     const amount=Number(b.amount||0);if(!Number.isSafeInteger(amount)||amount<=0||amount>100_000_000)throw new ApiError(400,'Số tiền thu phải lớn hơn 0.');
-    const method=String(b.method||'CASH');
-    if(!['CASH','TRANSFER'].includes(method))throw new ApiError(400,'Chọn thanh toán tiền mặt hoặc chuyển khoản.');
-    const reference=String(b.reference||'').trim().slice(0,100);
-    if(method==='TRANSFER'&&reference.length<4)throw new ApiError(400,'Chuyển khoản cần mã giao dịch hoặc nội dung đối chiếu.');
-    const requestId=String(b.requestId||'');
-    if(!/^[a-f0-9-]{36}$/.test(requestId))throw new ApiError(400,'Phiên thu tiền không hợp lệ. Vui lòng thử lại.');
-    const movement=ref.collection('cashMovements').doc(requestId);
-    const previously=await tx.get(movement);
-    if(previously.exists){
-     if(previously.data()?.kind!=='PAYMENT'||previously.data()?.actorUid!==me.uid||previously.data()?.amount!==amount||previously.data()?.method!==method||previously.data()?.reference!==reference)
-      throw new ApiError(409,'Mã thu tiền đã dùng cho giao dịch khác.');
-     return;
-    }
     const allowed=order.total+(order.compensationTotal||0)+(order.otherFeeTotal||0)+(order.lateFeeTotal||0)-(order.paid||0);
     if(amount>allowed)throw new ApiError(409,'Số tiền thu vượt số còn phải thu.');
     const revised={...order,paid:order.paid+amount,updatedAt:now};syncDebtIndex(tx,db(),revised);
-    tx.set(db().collection('cashDaily').doc(vnDayKey(now)),{amount:FieldValue.increment(amount),payments:FieldValue.increment(1),updatedAt:now},{merge:true});
-    tx.create(movement,{orderId:id,kind:'PAYMENT',amount,method,reference,actorUid:me.uid,actorName:me.name,createdAt:now,description:'Thu tiền đơn v5, chống ghi trùng bằng requestId'});
-    tx.update(ref,{paid:order.paid+amount,updatedAt:now,history:[...order.history,{action:'PAY',by:me.uid,at:now,amount,detail:`Đã nhận tiền qua ${method} (${reference||'tiền mặt'})`}]});
+    const day=vnDayKey(now);tx.set(db().collection('cashDaily').doc(day),{amount:FieldValue.increment(amount),payments:FieldValue.increment(1),updatedAt:now},{merge:true});
+    tx.create(ref.collection('cashMovements').doc(),{orderId:id,kind:'PAYMENT',amount,method:'UNSPECIFIED',reference:'',actorUid:me.uid,actorName:me.name,createdAt:now,description:'Thu tiền trên đơn v5'});
+    tx.update(ref,{paid:order.paid+amount,updatedAt:now,history:[...order.history,{action:'PAY',by:me.uid,at:now,amount,detail:'Thu tiền theo bảng giá giờ'}]});
    }else if(action==='ADD_ITEMS'){
     if(!order.pickupAt||!order.returnAt||order.returnStage==='AWAITING_ADMIN'||order.pendingExtraItemIds?.length)throw new ApiError(409,'Đơn đang chờ chụp bổ sung hoặc nhận trả.');
     const ids=b.itemIds;
@@ -307,39 +278,18 @@ export async function PATCH(req:NextRequest,ctx:{params:Promise<{id:string}>}){
     const snaps=await Promise.all(refs.map(r=>tx.get(r)));
     if(snaps.some(s=>!s.exists||s.data()?.archivedAt||s.data()?.status!=='AVAILABLE'))throw new ApiError(409,'Có sản phẩm bổ sung chưa sẵn sàng.');
     if(snaps.some(s=>!Array.isArray(s.data()?.inspectionAngles)||!s.data()?.inspectionAngles.length))throw new ApiError(409,'Admin phải cấu hình góc chụp cho sản phẩm bổ sung trước khi giao.');
-    const existingGroup=orderGroup(order);
-    if(existingGroup==='LEGACY_MIXED')throw new ApiError(409,'Đơn cũ đang có đồ hỗn hợp; không thể thêm món. Hãy tạo đơn mới theo từng nhóm.');
-    if(!itemsBelongToGroup(snaps.map(s=>String(s.data()?.category||'')),existingGroup))throw new ApiError(409,'Không thể thêm máy ảnh vào đơn trang phục hoặc ngược lại. Hãy tạo đơn riêng.');
     const start=order.status==='RESERVED'?order.pickupAt:now;
     if(Date.parse(start)>=Date.parse(order.returnAt))throw new ApiError(409,'Đã qua giờ trả dự kiến. Cần gia hạn trước.');
     const slots=intervalRefs(ids,start,order.returnAt);
     const prior=await checkIntervalAvailability(tx,slots);
-    const cameraTier=existingGroup==='CAMERA'?order.lines.find(l=>isCameraCategory(l.category||''))?.cameraPackageHours:undefined;
-    const extra=snaps.map(s=>{const i={id:s.id,...s.data()} as InventoryItem;billableBlocks(start,order.returnAt!);
-      let pkg={};if(isCameraCategory(i.category)){
-        if(!isCameraModel(i.cameraModel))throw new ApiError(409,'Máy ảnh chưa có mẫu máy hợp lệ.');
-        try{pkg=cameraTier?chosenCameraPackageSnapshot(i.cameraModel,start,order.returnAt!,cameraTier):cameraPackageSnapshot(i.cameraModel,start,order.returnAt!);}
-        catch(e){throw new ApiError(400,e instanceof Error?e.message:'Gói thuê bổ sung không hợp lệ.');}
-      }
-      return {itemId:i.id,name:i.name,sku:i.sku,hangerCode:i.hangerCode,size:i.size,category:i.category,cameraModel:i.cameraModel,cameraSerial:i.cameraSerial,...pkg,dailyRate:i.dailyRate,bufferDays:0,replacementValue:i.replacementValue,startAt:start,startDate:vnDayKey(start),lineTotal:rentalCharge({...i,...pkg},start,order.returnAt!)};});
+    const extra=snaps.map(s=>{const i={id:s.id,...s.data()} as InventoryItem;const blocks=billableBlocks(start,order.returnAt!);return {itemId:i.id,name:i.name,sku:i.sku,hangerCode:i.hangerCode,size:i.size,category:i.category,cameraModel:i.cameraModel,cameraSerial:i.cameraSerial,...(isCameraCategory(i.category)&&isCameraModel(i.cameraModel)?cameraPackageSnapshot(i.cameraModel,start,order.returnAt!):{}),dailyRate:i.dailyRate,bufferDays:0,replacementValue:i.replacementValue,startAt:start,startDate:vnDayKey(start),lineTotal:rentalCharge(i,start,order.returnAt!)};});
     const nextLines=[...order.lines,...extra];const total=nextLines.reduce((sum,l)=>sum+l.lineTotal,0);
-    const topup=order.bookingKind==='RESERVE'&&order.status==='RESERVED'?Math.max(0,total-order.paid):0;
-    let paidAfter=order.paid;
-    if(topup>0){
-      const paymentMethod=String(b.paymentMethod||'CASH');const paymentReference=String(b.paymentReference||'').trim().slice(0,100);
-      if(!['CASH','TRANSFER'].includes(paymentMethod)||(paymentMethod==='TRANSFER'&&paymentReference.length<4))throw new ApiError(400,'Thiếu phương thức/mã đối soát thanh toán bổ sung.');
-      if(b.confirmPaid!==true||Number(b.expectedTopup)!==topup)throw new ApiError(409,`Đơn đặt trước cần thu thêm ${topup.toLocaleString('vi-VN')}đ. Xem lại báo giá rồi xác nhận.`);
-      const proof=await readVerifiedEvidence(tx,String(b.paymentProofId||''),me.uid,'reservation',String(b.paymentDraftId||''));
-      tx.update(proof.ref,{consumedOrderId:id,consumedAt:now});
-      tx.create(ref.collection('cashMovements').doc(String(b.paymentProofId)),{orderId:id,kind:'PAYMENT',amount:topup,method:paymentMethod,reference:paymentReference||String(b.paymentProofId),actorUid:me.uid,actorName:me.name,createdAt:now,description:'Thu tiền bổ sung khi thêm đồ vào đơn đặt trước'});
-      tx.set(db().collection('cashDaily').doc(vnDayKey(now)),{amount:FieldValue.increment(topup),payments:FieldValue.increment(1),updatedAt:now},{merge:true});
-      paidAfter+=topup;
-    }
+    if(order.bookingKind==='RESERVE'&&order.status==='RESERVED'&&total>order.paid)throw new ApiError(409,'Đơn đặt trước phải thu đủ 100% trước khi bổ sung sản phẩm.');
     createIntervalWrites(tx,slots,prior,id);
     const pending=order.status==='PICKED_UP'?[...ids]:[];
-    tx.update(ref,{lines:nextLines,total,bookedRentTotal:order.bookingKind==='RESERVE'?total:order.bookedRentTotal||order.total,paid:paidAfter,prepaidRentTotal:order.bookingKind==='RESERVE'&&order.status==='RESERVED'?paidAfter:order.prepaidRentTotal||0,pendingExtraItemIds:pending,referencePhotos:{...order.referencePhotos,...Object.fromEntries(snaps.map(s=>[s.id,s.data()?.referenceShots||{}]))},photoTemplates:{...requiredTemplates(order),...Object.fromEntries(snaps.map(s=>[s.id,(s.data()?.inspectionAngles as string[]|undefined)||[]]))},updatedAt:now,history:[...order.history,{action:'ADD_ITEMS',at:now,by:me.uid,detail:`Thêm ${ids.length} món; ${pending.length?'chờ chụp ảnh giao':'chờ chụp ảnh khi giao đơn'}`} ]});
+    tx.update(ref,{lines:nextLines,total,pendingExtraItemIds:pending,referencePhotos:{...order.referencePhotos,...Object.fromEntries(snaps.map(s=>[s.id,s.data()?.referenceShots||{}]))},photoTemplates:{...requiredTemplates(order),...Object.fromEntries(snaps.map(s=>[s.id,(s.data()?.inspectionAngles as string[]|undefined)||[]]))},updatedAt:now,history:[...order.history,{action:'ADD_ITEMS',at:now,by:me.uid,detail:`Thêm ${ids.length} món; ${pending.length?'chờ chụp ảnh giao':'chờ chụp ảnh khi giao đơn'}`} ]});
     if(pending.length)tx.set(job,{stage:'HANDOVER',updatedAt:now},{merge:true});
-    syncDebtIndex(tx,db(),{...order,lines:nextLines,total,paid:paidAfter,updatedAt:now});
+    syncDebtIndex(tx,db(),{...order,lines:nextLines,total,updatedAt:now});
    }else if(action==='EXTEND'){
     if(!order.pickupAt||!order.returnAt||order.returnStage==='AWAITING_ADMIN')throw new ApiError(409,'Không thể gia hạn khi chờ nhận đồ.');
     const candidate=String(b.returnAt||'');if(!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(candidate))throw new ApiError(400,'Chọn giờ trả mới.');
@@ -350,27 +300,16 @@ export async function PATCH(req:NextRequest,ctx:{params:Promise<{id:string}>}){
     const itemSnaps=await Promise.all(itemRefs.map(r=>tx.get(r)));
     const lines=order.lines.map((l,i)=>({...l,lineTotal:rentalCharge(l,l.startAt||order.pickupAt!,next)}));
     const total=lines.reduce((sum,l)=>sum+l.lineTotal,0);
-    const topup=order.bookingKind==='RESERVE'&&order.status==='RESERVED'?Math.max(0,total-order.paid):0;
-    let paidAfter=order.paid;
-    if(topup>0){
-      const paymentMethod=String(b.paymentMethod||'CASH');const paymentReference=String(b.paymentReference||'').trim().slice(0,100);
-      if(!['CASH','TRANSFER'].includes(paymentMethod)||(paymentMethod==='TRANSFER'&&paymentReference.length<4))throw new ApiError(400,'Thiếu phương thức/mã đối soát thanh toán bổ sung.');
-      if(b.confirmPaid!==true||Number(b.expectedTopup)!==topup)throw new ApiError(409,`Gia hạn cần thu thêm ${topup.toLocaleString('vi-VN')}đ. Kiểm tra lại giá thuê.`);
-      const proof=await readVerifiedEvidence(tx,String(b.paymentProofId||''),me.uid,'reservation',String(b.paymentDraftId||''));
-      tx.update(proof.ref,{consumedOrderId:id,consumedAt:now});
-      tx.create(ref.collection('cashMovements').doc(String(b.paymentProofId)),{orderId:id,kind:'PAYMENT',amount:topup,method:paymentMethod,reference:paymentReference||String(b.paymentProofId),actorUid:me.uid,actorName:me.name,createdAt:now,description:'Thu bổ sung 100% khi gia hạn đơn đặt trước'});
-      tx.set(db().collection('cashDaily').doc(vnDayKey(now)),{amount:FieldValue.increment(topup),payments:FieldValue.increment(1),updatedAt:now},{merge:true});
-      paidAfter+=topup;
-    }
+    if(order.bookingKind==='RESERVE'&&order.status==='RESERVED'&&total>order.paid)throw new ApiError(409,'Đặt trước phải thanh toán bổ sung 100% tiền thuê trước khi gia hạn.');
     createIntervalWrites(tx,more,prior,id);
-    tx.update(ref,{returnAt:next,returnDate:vnDayKey(next),rentalDays:blocks,lines,total,bookedRentTotal:order.bookingKind==='RESERVE'?total:order.bookedRentTotal||order.total,paid:paidAfter,prepaidRentTotal:order.bookingKind==='RESERVE'&&order.status==='RESERVED'?paidAfter:order.prepaidRentTotal||0,updatedAt:now,history:[...order.history,{action:'EXTEND',at:now,by:me.uid,amount:total-order.total,detail:'Gia hạn theo chu kỳ 24 giờ'}]});
-    tx.set(job,{returnAt:next,updatedAt:now},{merge:true});syncDebtIndex(tx,db(),{...order,returnAt:next,returnDate:vnDayKey(next),rentalDays:blocks,lines,total,paid:paidAfter,updatedAt:now});
+    tx.update(ref,{returnAt:next,returnDate:vnDayKey(next),rentalDays:blocks,lines,total,updatedAt:now,history:[...order.history,{action:'EXTEND',at:now,by:me.uid,amount:total-order.total,detail:'Gia hạn theo chu kỳ 24 giờ'}]});
+    tx.set(job,{returnAt:next,updatedAt:now},{merge:true});syncDebtIndex(tx,db(),{...order,returnAt:next,returnDate:vnDayKey(next),rentalDays:blocks,lines,total,updatedAt:now});
    }
    auditInTransaction(tx,me,'V5_'+action,'order',id,`${order.code} / ${me.name}`);
   });
-  if(['REVIEW_PHOTOS','APPROVE_RETURN','FINALIZE_LEGACY_RETURN','CANCEL','VOID'].includes(action)){
+  if(action==='RECEIVE'||action==='APPROVE_RETURN'||action==='FINALIZE_LEGACY_RETURN'){
     // Durable job is saved in Firestore; this runs after the HTTP response, and Cron retries failures.
-    after(async()=>{try{await Promise.all([runEvidenceCleanup(8),runSensitiveEvidenceCleanup(8)]);}catch(error){console.error('Deferred evidence cleanup',error);}});
+    after(async()=>{try{await runEvidenceCleanup(8);}catch(error){console.error('Deferred evidence cleanup',error);}});
   }
   return NextResponse.json({ok:true});
  }catch(e){return handleError(e,'PATCH /api/v5/orders/[id]');}

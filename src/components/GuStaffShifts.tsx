@@ -1,31 +1,30 @@
 'use client';
-import {useCallback,useEffect,useMemo,useState,useRef} from 'react';
+import {useCallback,useEffect,useMemo,useState} from 'react';
 import {CalendarClock,CheckCircle2,Clock3,LoaderCircle,RefreshCcw,Save,ShieldCheck,Users} from 'lucide-react';
 import type {ShiftId,ShiftSeat} from '@/lib/shift-schedule';
 import {MIN_WORK_DAYS,SHIFT_MAX_STAFF,isoWeekMonday,vnDate} from '@/lib/shift-schedule';
-import {formatVNDateTime} from '@/lib/vn-datetime';
 
 type Slot = {date:string;id:ShiftId;start:string;end:string;label:string;key:string;members:ShiftSeat[];remaining:number};
 type Week = {weekStart:string;weekEnd:string;slots:Slot[];selected:string[];canEdit:boolean;
  period:{isOpen:boolean;weekStart:string;opensAt:string;closesAt:string};stats?:{uid:string;name:string;days:number;shifts:number;compliant:boolean}[]};
 type Caller=<T=unknown>(path:string,init?:RequestInit)=>Promise<T>;
 const dayLabel=(date:string)=>new Date(date+'T00:00:00Z').toLocaleDateString('vi-VN',{weekday:'short',day:'2-digit',month:'2-digit',timeZone:'UTC'});
-const prettyDateTime=(iso:string)=>formatVNDateTime(iso);
-export function GuStaffShifts({api,isAdmin=false,registrationOnly=false,active=true}: {api:Caller;isAdmin?:boolean;registrationOnly?:boolean;active?:boolean}){
+const prettyDateTime=(iso:string)=>new Date(iso).toLocaleString('vi-VN',{dateStyle:'short',timeStyle:'short',timeZone:'Asia/Ho_Chi_Minh'});
+export function GuStaffShifts({api,isAdmin=false,registrationOnly=false}: {api:Caller;isAdmin?:boolean;registrationOnly?:boolean}){
  const [week,setWeek]=useState<Week|null>(null);
  const [view,setView]=useState<'next'|'current'>('next');
  const [draft,setDraft]=useState<string[]>([]);
  const [loading,setLoading]=useState(true);
  const [saving,setSaving]=useState(false);
  const [error,setError]=useState('');
- const [message,setMessage]=useState('');const lastLoaded=useRef(0);
+ const [message,setMessage]=useState('');
  const load=useCallback(async()=>{
   setLoading(true);
-  try{const requested=view==='current'?isoWeekMonday(vnDate(new Date())):null;const response=await api<Week>('shifts'+(requested?'?week='+requested:''));setWeek(response);setDraft(response.selected);setError('');lastLoaded.current=Date.now();}
+  try{const requested=view==='current'?isoWeekMonday(vnDate(new Date())):null;const response=await api<Week>('shifts'+(requested?'?week='+requested:''));setWeek(response);setDraft(response.selected);setError('');}
   catch(e){setError(e instanceof Error?e.message:'Không thể tải lịch ca.');}
   finally{setLoading(false);}
  },[api,view]);
- useEffect(()=>{if(active&&Date.now()-lastLoaded.current>60_000)void load();},[load,active]);
+ useEffect(()=>{void load();},[load]);
  const selected=new Set(draft);
  const distinctDays=new Set(draft.map(id=>id.slice(0,10))).size;
  const changed=Boolean(week)&&([...week!.selected].sort().join('|')!==[...draft].sort().join('|'));

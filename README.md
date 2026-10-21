@@ -1,4 +1,4 @@
-> **GU v5.4.6 Beta 1:** Cải thiện popup Tạo đơn và Đặt lịch trước cho PC/mobile. Xem `docs/GU-v5.4.6-BOOKING-DIALOG-UI.md`.
+> **GU v5.4.0 – Firestore Read Optimization:** Giảm Reads cho tra cứu lịch, ca nhân viên, Dashboard, công nợ, báo cáo. Trước khi đưa lên Production, xem [hướng dẫn GU 5.4](docs/GU-v5.4.0-FIRESTORE-OPTIMIZATION.md).
 
 > **GU v5.3.0 Beta 1 — Đăng ký ca nhân viên:** Đăng ký Chủ nhật 12:00–20:00 cho tuần kế tiếp; 3 ca/ngày, 2 người/ca, ít nhất 5 ngày/tuần; nhân viên ngoài ca chỉ có quyền vào màn đăng ký, hết ca +15 phút tự đăng xuất. Trước khi deploy lên Vercel xem **[hướng dẫn chuyển đổi không khóa nhầm toàn bộ nhân viên](docs/GU-v5.3.0-CA-LAM-VIEC.md)**.
 
@@ -67,10 +67,3 @@ Bản sao lưu và index bắt buộc xử lý riêng trên Production, không �
 **Firebase vẫn là cơ sở dữ liệu chính**. GU Admin chỉ giữ thống kê Cloudinary. Bản này chưa tự xác nhận được lỗi 0ff171b8 nếu thiếu log máy chủ.
 
 Xem tài liệu Word GU v5 Beta 9 để biết toàn bộ quy trình Admin, PC và Mobile.
-
-
-## GU v5.3.6 — Cảnh báo quá giờ nhận đồ và Firebase Storage
-
-- Đơn **RESERVED** có `scheduledPickupAt`/`pickupAt` quá giờ hẹn nhưng chưa giao được cảnh báo toàn màn hình, cập nhật mỗi phút khi nhân viên đang mở GU; nút mã đơn mở bộ lọc tìm đơn. Chỉ áp dụng đơn còn đặt trước; đơn đã giao/hủy không cảnh báo. Đơn cũ chỉ có ngày được cảnh báo từ **ngày sau**, tránh tự suy đoán giờ nhận.
-- Bucket để chứa ảnh CCCD/chứng từ thanh toán **cần tạo trước** trong Firebase Console (Blaze) và điền `FIREBASE_STORAGE_BUCKET` chính xác trong Codespaces `.env.local` và Vercel > Environment Variables; không đặt tên `gs://`. Xem `docs/GU-v5.3.6-LATE-PICKUP-STORAGE.md`.
-- Chạy `npm run diagnose:storage` kiểm tra quyền đọc bucket, không tải xuống ảnh hay chỉnh sửa dữ liệu.

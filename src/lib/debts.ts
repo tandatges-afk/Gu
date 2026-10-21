@@ -9,7 +9,7 @@ export type DebtAccount = {
   key:string; customerId:string; customerName:string; customerPhone:string;
   outstanding:number; orderCount:number; orders:DebtOrder[];
 };
-export type DebtSummary = {accounts:DebtAccount[]; totalOutstanding:number; unpaidOrders:number; futureReservations:number; reservationUnpaid:number; pendingCameraLateCount?:number};
+export type DebtSummary = {cursor?:string|null;hasMore?:boolean;pageSize?:number;pageNote?:string;accounts:DebtAccount[]; totalOutstanding:number; unpaidOrders:number; futureReservations:number; reservationUnpaid:number; pendingCameraLateCount?:number};
 const number=(x:unknown)=>typeof x==='number'&&Number.isFinite(x)?Math.max(0,x):0;
 const accountKey=(o:RentalOrder)=>{const phone=(o.customerPhone||'').replace(/\D/g,'');return o.customerId || (phone?'phone:'+phone:'order:'+o.id);};
 

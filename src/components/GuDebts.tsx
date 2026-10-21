@@ -4,8 +4,8 @@ import {AlertCircle,ArrowRight,ChevronDown,PhoneCall,RefreshCcw,Search,Wallet} f
 import type {DebtSummary} from '@/lib/debts';
 import {money} from '@/lib/rental';
 const day=(v:string)=>v?.split('-').reverse().join('/')||'—';
-export function GuDebts({summary,loading,error,onRefresh,onOpen}:{
- summary:DebtSummary|null;loading:boolean;error:string;onRefresh:()=>void;onOpen:(id:string)=>void;
+export function GuDebts({summary,loading,error,onRefresh,onLoadMore,loadingMore,onOpen}:{
+ summary:DebtSummary|null;loading:boolean;error:string;onRefresh:()=>void;onLoadMore:()=>void;loadingMore:boolean;onOpen:(id:string)=>void;
 }){
  const [query,setQuery]=useState('');
  const [onlyReturned,setOnlyReturned]=useState(false);
@@ -28,12 +28,14 @@ export function GuDebts({summary,loading,error,onRefresh,onOpen}:{
   {error&&<div className="inline-alert danger-alert" role="alert"><AlertCircle size={18}/>{error}</div>}
   <section className="panel gu-debt-panel" aria-label="Danh sách công nợ">
    <div className="gu-debt-toolbar"><div className="gu-search-wrap"><Search size={17}/><input type="search" className="input" value={query} onChange={e=>setQuery(e.target.value)} placeholder="Tìm tên khách, số điện thoại hoặc mã đơn…" aria-label="Tìm công nợ"/></div><label className="gu-debt-toggle"><input type="checkbox" checked={onlyReturned} onChange={e=>setOnlyReturned(e.target.checked)}/> Chỉ đơn đã trả đồ</label></div>
+   {summary?.hasMore&&<p className="gu-debt-count">Tổng tiền được tính trên toàn bộ sổ công nợ; danh sách bên dưới đang hiển thị từng trang 100 đơn. Tìm khách chỉ áp dụng các trang đã tải.</p>}
    <div className="gu-debt-count">{loading?'Đang đối soát dữ liệu…':`${accounts.length} khách · ${visibleOrders} đơn · ${money(visibleTotal)} trong bộ lọc`}</div>
    {!loading&&!accounts.length&&<div className="gu-debt-empty"><Wallet size={23}/><strong>{summary?'Không tìm thấy khách cần thu hoặc đối soát trong bộ lọc.':'Chưa có dữ liệu công nợ.'}</strong><span>Hãy thử đổi từ khóa hoặc bỏ bộ lọc.</span></div>}
    <div className="gu-debt-accounts">{accounts.map(account=><details className="gu-debt-account" key={account.key} open={accounts.length===1?true:undefined}>
     <summary><span className="gu-debt-avatar" aria-hidden="true">{account.customerName.trim().slice(0,1).toLocaleUpperCase('vi-VN')}</span><span className="gu-debt-customer"><strong>{account.customerName}</strong><small>{account.customerPhone||'Chưa có SĐT'} · {account.orders.length} đơn cần thu/đối soát</small></span><span className="gu-debt-balance"><small>Còn nợ</small><strong>{money(account.orders.reduce((s,o)=>s+o.outstanding,0))}</strong></span><ChevronDown className="gu-debt-chevron" size={18}/></summary>
     <div className="gu-debt-orders">{account.orders.map(o=><div className="gu-debt-order" key={o.id}><div className="gu-debt-order-main"><b>{o.code}</b><span>{o.status==='RETURNED'?'Đã trả đồ':'Đang thuê'} · Hẹn trả {day(o.returnDate)}{o.cameraLateFeePending?' · CHƯA CHỐT PHÍ TRỄ MÁY ẢNH':''}</span><small>Phải thu {money(o.amount)} · Đã thu {money(o.paid)}</small></div><strong>{money(o.outstanding)}</strong><div className="gu-debt-order-actions"><button type="button" className="btn btn-white" onClick={()=>onOpen(o.id)}>Mở đơn <ArrowRight size={15}/></button>{account.customerPhone&&<a className="btn btn-call" href={'tel:'+account.customerPhone.replace(/[^+0-9]/g,'')}><PhoneCall size={16}/> Gọi khách</a>}</div></div>)}</div>
    </details>)}</div>
+   {summary?.hasMore&&<div style={{padding:16,textAlign:'center'}}><button className="btn btn-white" type="button" disabled={loadingMore} onClick={onLoadMore}>{loadingMore?'Đang tải thêm…':'Tải thêm 100 đơn công nợ'} <ArrowRight size={15}/></button></div>}
   </section>
   
  </>;

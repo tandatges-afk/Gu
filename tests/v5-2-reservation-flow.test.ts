@@ -44,16 +44,14 @@ test('Rental return releases inventory now; photo review later does not mutate i
 test('Payment popup remains after return and offers auto-collection',()=>{
  const capture=read('src/components/GuOrderCapture.tsx');
  assert.match(capture,/if\(phase==='RETURN'\)\{setSettling\(true\)/);
- assert.match(capture,/GuOrderPaymentPanel/);
- const payment=read('src/components/GuOrderPaymentPanel.tsx');
- assert.match(payment,/Thu đủ \$\{money\(due\)\}/);
+ assert.match(capture,/Thu đủ \{money\(due\)\}/);
  assert.match(capture,/APPLY_SURCHARGE/);
  assert.match(capture,/GuSecurePhoto id=\{order\.handoverDepositProofId\}/);
 });
 test('Sensitive collateral images only use private bucket, authenticated GET',()=>{
  const route=read('src/app/api/v5/secure-photo/route.ts');
  assert.match(route,/await staffUser\(req\)/);
- assert.match(route,/uploadSecureCloudinary\(bytes/);assert.match(route,/downloadSecureCloudinary\(image\)/);
+ assert.match(route,/evidenceBucket\(\)\.file\(path\)\.save/);
  assert.match(route,/Cache-Control':'private,no-store/);
  assert.doesNotMatch(route,/res\.cloudinary/);
 });

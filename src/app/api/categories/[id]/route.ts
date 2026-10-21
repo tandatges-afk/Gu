@@ -23,7 +23,7 @@ async function categoryChange(req:NextRequest,ctx:{params:Promise<{id:string}>},
     if(!deleting&&referenced.size>200)throw new ApiError(409,'Danh mục có hơn 200 sản phẩm. Hãy chia việc chuyển danh mục để tránh vượt giới hạn giao dịch.');
     if(nextSnap?.exists)throw new ApiError(409,'Tên danh mục đã tồn tại.');
     const now=new Date().toISOString();
-    if(!deleting)referenced.docs.forEach(item=>tx.update(item.ref,{category:name}));
+    if(!deleting)referenced.docs.forEach(item=>tx.update(item.ref,{category:name,updatedAt:now}));
     if(deleting)tx.delete(ref);else if(id===newId)tx.update(ref,{name});else {tx.delete(ref);tx.create(nextRef,{name,createdAt:String(snapshot.data()?.createdAt||now)});}
     auditInTransaction(tx,me,deleting?'CATEGORY_DELETE':'CATEGORY_EDIT','category',id,deleting?`Xóa ${oldName}`:`${oldName} → ${name}`,now);
   });

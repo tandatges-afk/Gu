@@ -5,6 +5,7 @@ import { classifyTokenFailure } from './auth-errors';
 import { randomUUID } from 'node:crypto';
 import {classifyServerFailure} from './server-error-classifier';
 import { currentStaffAccess, isoWeekMonday, vnDate, type ShiftWeekRecord } from './shift-schedule';
+import {cached,countDoc} from './read-optimization';
 export class ApiError extends Error {
   constructor(public status: number, message: string, public details?: unknown) { super(message); }
 }
@@ -20,7 +21,9 @@ export async function staffUser(req: NextRequest, options?:{allowSchedule?:boole
     console.error('GU Firebase token verification failed:', failure.diagnostic);
     throw new ApiError(failure.status, failure.message);
   }
-  const staff = await db().collection('staff').doc(uid).get();
+  // Cache staff documents briefly across concurrent API calls in this warm instance.
+  // Token signature/revocation is still checked on EVERY request.
+  const staff = await cached('auth:staff:'+uid,12_000,async()=>countDoc(await db().collection('staff').doc(uid).get()));
   if (!staff.exists || staff.data()?.disabled === true) throw new ApiError(403, 'Tài khoản chưa được cấp quyền nhân viên.');
   const role = staff.data()?.role;
   // Historic staff_mobile documents are read as staff until an Admin migrates them.
@@ -30,7 +33,7 @@ export async function staffUser(req: NextRequest, options?:{allowSchedule?:boole
   let shift:ReturnType<typeof currentStaffAccess>|undefined;
   if(normalizedRole==='staff'){
     const monday=isoWeekMonday(vnDate(new Date()));
-    const record=await db().collection('shiftWeeks').doc(monday).get();
+    const record=await cached('auth:week:'+monday,12_000,async()=>countDoc(await db().collection('shiftWeeks').doc(monday).get()));
     shift=currentStaffAccess(new Date(),uid,(record.exists?record.data():null) as ShiftWeekRecord|null);
     // Grace exists only for an ALREADY-authenticated worker finishing the shift.
     // A new Firebase login after shift end cannot enter the 15-minute grace.

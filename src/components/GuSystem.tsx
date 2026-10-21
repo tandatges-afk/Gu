@@ -1,12 +1,11 @@
 'use client';
-import {formatVNDateTime} from '@/lib/vn-datetime';
 import {useEffect,useState} from 'react';
 import {Cloud,ExternalLink,HardDrive,RefreshCw} from 'lucide-react';
 import {usageStatus,type UsageValue} from '@/lib/usage-metrics';
 type Api=<T=unknown>(path:string,init?:RequestInit)=>Promise<T>;
 type CloudinaryReport={source:'provider'|'unavailable';message?:string;updatedAt?:string|null;plan?:string;credits?:UsageValue;freeReferenceCredits?:number;resources?:number|null;storage?:UsageValue;bandwidth?:UsageValue;transformations?:UsageValue};
 type Response={cloudinary:CloudinaryReport;checkedAt:string;cacheMinutes:number};
-type StorageHealth={ok:boolean;bucket:string;location:string|null;projectId:string|null;writeVerified:boolean};
+type ReadReport={scope:string;disclaimer:string;endpoints:{endpoint:string;calls:number;readsEstimate:number;queries:number;cacheHits:number;lastAt:string}[]};
 const fmt=(value:number|null|undefined)=>value==null?'—':value>0&&value<0.01?'< 0,01':value.toLocaleString('vi-VN',{maximumFractionDigits:2});
 const fmtBytes=(value:number|null|undefined)=>value==null?'—':value<1024**2?`${(value/1024).toFixed(1)} KB`:`${(value/1024**3).toFixed(2)} GB`;
 function Measure({title,data,bytes=false}:{title:string;data?:UsageValue;bytes?:boolean}){
@@ -22,10 +21,10 @@ function Measure({title,data,bytes=false}:{title:string;data?:UsageValue;bytes?:
 export function GuSystem({api}:{api:Api}){
  const [data,setData]=useState<Response|null>(null);
  const [error,setError]=useState('');const [busy,setBusy]=useState(false);
- const [storage,setStorage]=useState<StorageHealth|null>(null);const [storageError,setStorageError]=useState('');const [checkingStorage,setCheckingStorage]=useState(false);
- const checkStorage=async(write=false)=>{setCheckingStorage(true);setStorageError('');setStorage(null);try{const result=await api<StorageHealth>('v5/storage-health',write?{method:'POST'}:undefined);setStorage(result);}catch(e){setStorageError(e instanceof Error?e.message:'Không kiểm tra được Storage.');}finally{setCheckingStorage(false);}};
+ const [reads,setReads]=useState<ReadReport|null>(null);const [readsError,setReadsError]=useState('');
+ const loadReads=async()=>{try{setReads(await api<ReadReport>('system/read-metrics'));setReadsError('');}catch(e){setReadsError(e instanceof Error?e.message:'Không thể tải thống kê API.');}};
  const load=async(refresh=false)=>{setBusy(true);try{setData(await api<Response>(refresh?'system?refresh=1':'system'));setError('');}catch(e){setError(e instanceof Error?e.message:'Không thể tải thống kê Cloudinary.');}finally{setBusy(false);}};
- useEffect(()=>{void load();},[]);
+ useEffect(()=>{void load();void loadReads();},[]);
  const cloud=data?.cloudinary;
  return <>
   <div className="page-intro"><div><h1>Cloudinary</h1></div><button className="btn btn-white" disabled={busy} onClick={()=>void load(true)}><RefreshCw size={16}/>{busy?'Đang tải…':'Cập nhật'}</button></div>
@@ -38,17 +37,18 @@ export function GuSystem({api}:{api:Api}){
    <Measure title="Băng thông" data={cloud?.bandwidth} bytes/>
    <Measure title="Xử lý ảnh" data={cloud?.transformations}/>
    <div className="gu-system-detail"><HardDrive size={16}/><span>Số ảnh/tài nguyên: <b>{fmt(cloud?.resources)}</b></span></div>
-   {cloud?.updatedAt&&<small className="gu-system-updated">Cập nhật: {formatVNDateTime(cloud.updatedAt)}</small>}
+   {cloud?.updatedAt&&<small className="gu-system-updated">Cập nhật: {new Date(cloud.updatedAt).toLocaleString('vi-VN')}</small>}
    <a href="https://console.cloudinary.com/" target="_blank" rel="noopener noreferrer" className="gu-system-source">Cloudinary Console <ExternalLink size={14}/></a>
   </section>
-  <section className="panel gu-system-card" aria-label="Kiểm tra Cloudinary bảo mật">
-   <div className="gu-system-heading"><HardDrive size={21}/><h2>Cloudinary · Ảnh cọc</h2></div>
-   <div className="action-row">
-    <button type="button" className="btn btn-white" disabled={checkingStorage} onClick={()=>void checkStorage()}>{checkingStorage?'Đang kiểm tra…':'Kiểm tra kết nối'}</button>
-    <button type="button" className="btn btn-white" disabled={checkingStorage} onClick={()=>void checkStorage(true)}>Thử ghi / xóa</button>
-   </div>
-   {storage&&<p role="status">Chế độ: <b>{storage.bucket}</b> · Cloud: <b>{storage.projectId||'—'}</b>{storage.writeVerified?' · Ghi/xóa: Đạt':''}</p>}
-   {storageError&&<p className="inline-alert danger-alert" role="alert">{storageError}</p>}
+  <section className="panel gu-system-card" style={{padding:20,marginTop:18}} aria-label="Theo dõi hiệu năng Firestore">
+   <div className="gu-system-heading"><HardDrive size={21}/><div><h2>Firestore · API Reads</h2><small>Chỉ dành cho Admin</small></div></div>
+   <button className="btn btn-white" type="button" onClick={()=>void loadReads()} style={{margin:'12px 0'}}><RefreshCw size={16}/> Làm mới thống kê</button>
+   <p style={{fontSize:12,color:'#667085',lineHeight:1.6}}>{reads?.disclaimer||'Lưu lượng được thống kê trên tiến trình máy chủ đang xử lý yêu cầu, không phải tổng Usage Firebase.'}</p>
+   {readsError&&<p className="inline-alert danger-alert">{readsError}</p>}
+   <div className="table-wrap"><table><thead><tr><th>API</th><th>Số lượt</th><th>Đọc ước tính</th><th>Truy vấn</th><th>Cache hit</th></tr></thead><tbody>
+    {reads?.endpoints.map(row=><tr key={row.endpoint}><td>{row.endpoint}</td><td>{fmt(row.calls)}</td><td>{fmt(row.readsEstimate)}</td><td>{fmt(row.queries)}</td><td>{fmt(row.cacheHits)}</td></tr>)}
+    {!reads?.endpoints.length&&<tr><td colSpan={5}>Chưa có số liệu trong instance này.</td></tr>}
+   </tbody></table></div>
   </section>
  </>;
 }

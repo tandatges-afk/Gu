@@ -1,17 +1,16 @@
 {
   "name": "gu-thue-do-xinh",
-  "version": "5.4.6-beta.1",
+  "version": "5.4.0",
   "private": true,
   "type": "module",
   "scripts": {
     "dev": "next dev",
-    "build": "node scripts/check-local-imports.mjs && node scripts/check-client-directives.mjs && node scripts/check-lucide-icons.mjs && next build",
+    "build": "node scripts/check-local-imports.mjs && next build",
     "start": "next start",
     "typecheck": "tsc --noEmit",
     "test": "node --experimental-strip-types --test tests/*.test.ts",
     "diagnose:firebase": "node --env-file=.env.local scripts/diagnose-firebase.mjs",
-    "diagnose:storage": "node --env-file=.env.local scripts/diagnose-storage.mjs",
-    "verify:release": "node scripts/verify-release.mjs && node scripts/check-local-imports.mjs && node scripts/check-client-directives.mjs",
+    "verify:release": "node scripts/verify-release.mjs && node scripts/check-local-imports.mjs",
     "data:plan": "node --env-file=.env.local scripts/reset-demo-data.mjs --plan",
     "data:backup": "node --env-file=.env.local scripts/reset-demo-data.mjs --backup",
     "diagnose:monitoring": "node --experimental-strip-types --env-file=.env.local scripts/diagnose-monitoring.mjs",
@@ -19,10 +18,8 @@
     "data:apply-names": "node --experimental-strip-types --env-file=.env.local scripts/migrate-product-names.mjs --execute --confirm=INDEX-gugu-547e3",
     "staff:unify-plan": "node --env-file=.env.local scripts/migrate-staff-unified.mjs",
     "staff:unify-apply": "node --env-file=.env.local scripts/migrate-staff-unified.mjs --execute --confirm=UNIFY-gugu-547e3",
-    "verify:imports": "node scripts/check-local-imports.mjs && node scripts/check-client-directives.mjs",
-    "verify:client": "node scripts/check-client-directives.mjs",
-    "data:phone-index-plan": "node --experimental-strip-types --env-file=.env.local scripts/migrate-customer-phone-index.mjs --plan",
-    "verify:icons": "node scripts/check-lucide-icons.mjs"
+    "verify:imports": "node scripts/check-local-imports.mjs",
+    "typecheck:tests": "tsc --noEmit -p tsconfig.tests.json"
   },
   "dependencies": {
     "firebase": "^12.0.0",

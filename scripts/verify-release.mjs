@@ -6,6 +6,10 @@ const required = [
   'src/app/page.tsx',
   'src/app/globals.css',
   'src/app/api/bootstrap/route.ts',
+  'src/app/api/bootstrap/updates/route.ts',
+  'src/lib/interval-lookup.ts',
+  'src/lib/read-optimization.ts',
+  'src/app/api/system/read-metrics/route.ts',
   'src/app/api/debts/route.ts',
   'src/components/GuDebts.tsx',
   'src/lib/debts.ts',
@@ -31,7 +35,6 @@ const required = [
   'docs/GU-v5-BETA10-INDEX-AND-UI.md',
   'src/lib/product-name.ts',
   'src/lib/product-search.ts',
-  'src/lib/catalog-code-search.ts',
   'src/lib/return-risk.ts',
   'scripts/migrate-staff-unified.mjs',
   'src/app/api/v5/return-risk/route.ts',
@@ -50,6 +53,7 @@ const required = [
   'docs/GU-V5-BETA6-MOBILE-RESET.md',
   'public/gu-sw.js',
   '.env.example',
+  'firestore.indexes.json',
   'src/components/GuOrderCapture.tsx',
   'src/app/api/v5/orders/route.ts',
   'src/app/api/v5/orders/[id]/route.ts',
@@ -62,9 +66,6 @@ const required = [
   'vercel.json',
   'src/lib/camera-rental.ts',
   'src/lib/evidence-retention.ts',
-  'src/lib/sensitive-evidence-rules.ts',
-  'src/lib/sensitive-evidence-cleanup.ts',
-  'docs/GU-v5.4.2-TU-DONG-XOA-CHUNG-TU-ANH-COC.md',
   'src/lib/evidence-retention-rules.ts',
   'src/lib/product-policies.ts',
   'src/lib/v5-review-pricing.ts',
@@ -77,42 +78,7 @@ const required = [
   'src/lib/secure-evidence.ts',
   'src/lib/shift-schedule.ts',
   'src/app/api/shifts/route.ts',
-  'src/components/GuStaffShifts.tsx',
-  'src/app/api/v5/visual-availability/route.ts',
-  'src/lib/visual-availability.ts',
-  'src/lib/vn-datetime.ts',
-  'src/lib/payment-review.ts',
-  'src/components/GuVNDateTimeInput.tsx',
-  'src/components/GuVisualFinder.tsx',
-  'src/lib/visual-index.ts',
-  'src/lib/visual-image.ts',
-  'src/components/GuVisualFinder.module.css',
-  'src/components/GuOrderPaymentPanel.tsx',
-  'src/components/GuOrderPaymentPanel.module.css',
-  'src/components/GuPrepaidAdjustment.tsx',
-  'src/components/GuInventoryFilters.tsx',
-  'src/components/GuInventoryFilters.module.css',
-  'src/components/GuInventoryTable.module.css',
-  'src/app/api/v5/visual-catalog/route.ts',
-  'scripts/migrate-customer-phone-index.mjs',
-  'docs/GU-v5.3.5-IMAGE-INDEX-INVENTORY-CUSTOMER-PAYMENT.md',
-  'docs/GU-v5.3.6-LATE-PICKUP-STORAGE.md',
-  'scripts/diagnose-storage.mjs',
-  'tests/v536-late-pickup-storage.test.ts',
-  'src/lib/secure-storage-errors.ts',
-  'tests/gu-v537-cameras-deposits.test.ts',
-  'docs/GU-v5.3.7-CAMERA-DEPOSIT-STORAGE.md',
-  'docs/GU-v5.3.8-VISUAL-SEARCH-V2.md',
-  'tests/visual-search-v538.test.ts',
-  'src/lib/order-group.ts',
-  'src/components/GuRentalSeparation.module.css',
-  'tests/v539-split-rental-groups.test.ts',
-  'docs/GU-v5.3.9-SPLIT-RENTAL-ORDERS.md',
-  'docs/GU-v5.4.5-GOM-KHACH-UU-TIEN-LICH-7-NGAY.md',
-  'tests/calendar-v545-customer-occupancy-sort.test.ts',
-  'src/components/GuV5Booking.module.css',
-  'tests/booking-dialog-v546-ui.test.ts',
-  'docs/GU-v5.4.6-BOOKING-DIALOG-UI.md'
+  'src/components/GuStaffShifts.tsx'
 ];
 const missing = required.filter(p => !existsSync(join(root,p)));
 const read = p => readFileSync(join(root,p),'utf8');
@@ -164,39 +130,24 @@ checks.push(['một giao diện cho PC và điện thoại', /GuOrderCapture/, '
 checks.push(['chặn API ngoài ca ở backend', /!options\?\.allowSchedule&&!shift\.canWork/, 'src/lib/http.ts']);
 checks.push(['giao dịch giữ chỗ atomic', /db\(\)\.runTransaction/, 'src/app/api/shifts/route.ts']);
 checks.push(['màn đăng ký ca', /GuStaffShifts/, 'src/app/page.tsx']);
-checks.push(['đăng xuất theo ca 20 giây', /20_000/, 'src/app/page.tsx']);
+checks.push(['đăng xuất theo lịch ca thay vì kiểm tra mỗi 20 giây', /deadline-Date\.now\(\)\+250/, 'src/app/page.tsx']);
+checks.push(['truy vấn khóa lịch sparse', /findDayLocks/, 'src/app/api/calendar/route.ts']);
+checks.push(['dashboard đồng bộ thay đổi', /bootstrap\/updates\?since=/, 'src/app/page.tsx']);
+checks.push(['công nợ tổng hợp và phân trang', /AggregateField\.sum/, 'src/app/api/debts/route.ts']);
+checks.push(['báo cáo theo khoảng', /range\(mode\)/, 'src/app/api/reports/route.ts']);
+checks.push(['đếm truy vấn API', /readMetrics/, 'src/app/api/system/read-metrics/route.ts']);
 checks.push(['đặt trước thu đủ tiền thuê có bằng chứng', /readVerifiedEvidence\(tx,paymentProofId/, 'src/app/api/v5/orders/route.ts']);
 checks.push(['sổ quỹ đặt trước', /kind:'PAYMENT',amount:total/, 'src/app/api/v5/orders/route.ts']);
-checks.push(['ảnh cọc lưu private', /uploadSecureCloudinary\(bytes/, 'src/app/api/v5/secure-photo/route.ts']);
+checks.push(['ảnh cọc lưu private', /evidenceBucket\(\)\.file\(path\)\.save/, 'src/app/api/v5/secure-photo/route.ts']);
 checks.push(['nhận trả không cần Admin giải phóng kho', /status:'RETURNED' as const/, 'src/app/api/v5/orders/[id]/route.ts']);
 checks.push(['admin chỉ kiểm tra ảnh', /action==='REVIEW_PHOTOS'/, 'src/app/api/v5/orders/[id]/route.ts']);
 checks.push(['nhân viên xác nhận hoàn vật cọc', /action==='RETURN_COLLATERAL'/, 'src/app/api/v5/orders/[id]/route.ts']);
-checks.push(['thu đủ tự động sau nhận trả', /Thu đủ \$\{money\(due\)\}/, 'src/components/GuOrderPaymentPanel.tsx']);
+checks.push(['thu đủ tự động sau nhận trả', /Thu đủ \{money\(due\)\}/, 'src/components/GuOrderCapture.tsx']);
 checks.push(['gợi ý SĐT nổi dưới ô nhập', /\.gu-v11-customer-results\{position:absolute/, 'src/app/globals.css']);
 checks.push(['hiển thị giờ giao và giờ nhận', /gu-calendar-cell-time/, 'src/app/page.tsx']);
-checks.push(['tìm ảnh kèm trạng thái và lịch 7 ngày', /visual-availability/, 'src/components/GuVisualFinder.tsx']);
-checks.push(['cảnh báo đóng được', /setDismissedRiskSignature\(riskSignature\)/, 'src/app/page.tsx']);
-checks.push(['lọc lịch thiết kế riêng', /gu-calendar-controls-v532/, 'src/app/page.tsx']);
-checks.push(['cache trong phiên không reload tab', /tabCacheRef/, 'src/app/page.tsx']);
-checks.push(['đồng hồ VN 24h', /formatVNDateTime/, 'src/lib/vn-datetime.ts']);
-checks.push(['đối soát thu thừa', /overpaid/, 'src/lib/payment-review.ts']);
-checks.push(['tìm mã sản phẩm theo chuỗi không mất 0', /inventoryCodeNeedle/, 'src/app/api/catalog/route.ts']);
-checks.push(['thống kê kho bỏ sản phẩm lưu trữ', /archivedByStatus/, 'src/app/api/bootstrap/route.ts']);
-checks.push(['bộ lọc kho riêng và xóa lỗi cũ', /clearError\(\);/, 'src/components/GuInventoryFilters.tsx']);
-checks.push(['nhắc khách quá giờ nhận ở backend', /overduePickupNotices\(reservations,now\)/, 'src/app/api/v5/return-risk/route.ts']);
-checks.push(['thông báo khách quá giờ nhận', /gu-late-pickup-banner/, 'src/app/page.tsx']);
-checks.push(['xóa chứng từ sau Admin duyệt', /queueSensitiveEvidenceCleanup\(tx,id,now\)/, 'src/app/api/v5/orders/[id]/route.ts']);
-checks.push(['giữ đúng bảy lượt ảnh', /KEEP_INSPECTION_ROUNDS=7/, 'src/lib/evidence-retention-rules.ts']);
-checks.push(['không tạo backup ảnh cọc mới', /body.set\('backup','false'\)/, 'src/lib/cloudinary-secure.ts']);
-checks.push(['chẩn đoán bucket private', /cloudinarySecureConfig/, 'src/lib/cloudinary-secure.ts']);
-checks.push(['gói máy ảnh được chọn chủ động', /chosenCameraPackageSnapshot/, 'src/app/api/v5/orders/route.ts']);
-checks.push(['chụp ảnh cọc không chọn phương thức', /method:'PHOTO_PROOF'/, 'src/app/api/v5/orders/route.ts']);
-checks.push(['lỗi upload Storage được phân loại', /downloadSecureCloudinary/, 'src/app/api/v5/secure-photo/route.ts']);
-checks.push(['nhóm cùng khách trong lịch', /customerKey\(anchor\)/, 'src/lib/calendar-presentation.ts']);
-checks.push(['ưu tiên lịch dày 7 ngày', /b\.totalDays-a\.totalDays/, 'src/lib/calendar-presentation.ts']);
 const absent = checks.filter(([name,pattern,file]) => missing.includes(file) || !pattern.test(read(file))).map(([name])=>name);
 const pkg = JSON.parse(read('package.json'));
-if (pkg.version !== '5.4.6-beta.1') absent.push('phiên bản 5.4.6-beta.1 trong package.json');
+if (pkg.version !== '5.4.0') absent.push('phiên bản 5.4.0 trong package.json');
 if (missing.length || absent.length) {
   console.error('KHÔNG ĐỒNG BỘ. Thiếu tệp:', missing.join(', ') || 'không');
   console.error('Thiếu thành phần:', absent.join(', ') || 'không');
