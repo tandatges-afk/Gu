@@ -14,12 +14,11 @@ test('kiểm tra Storage thực sự trong Vercel chỉ cho Admin và không l�
  const route=read('src/app/api/v5/storage-health/route.ts');
  const ui=read('src/components/GuSystem.tsx');
  assert.match(route,/requireAdmin\(me\)/g);
- assert.match(route,/bucket\.getMetadata\(\)/);
- assert.match(route,/randomUUID\(\)/);
- assert.match(route,/object\.save\(/);
- assert.match(route,/object\.delete\(/);
+ assert.match(route,/cloudinarySecureConfig\(\)/);
+ assert.match(route,/uploadSecureCloudinary\(testPng/);
+ assert.match(route,/deleteSecureCloudinary\(stored.publicId\)/);
  assert.doesNotMatch(route,/makePublic|signedUrl|download\(/);
- assert.match(ui,/Kiểm tra bucket/);
+ assert.match(ui,/Kiểm tra kết nối/);
  assert.match(ui,/Thử ghi \/ xóa/);
 });
 test('ẩn hint trùng lặp nhưng giữ nhãn nhập, gói giá và cảnh báo nghiệp vụ',()=>{

@@ -1,44 +1,33 @@
-/** Read-only check of an already-created private Storage bucket. Never prints credentials. */
-import {cert,initializeApp,deleteApp} from 'firebase-admin/app';
-import {getStorage} from 'firebase-admin/storage';
-
-const name=(process.env.FIREBASE_STORAGE_BUCKET||'').trim();
-const projectId=(process.env.FIREBASE_PROJECT_ID||'').trim();
-const email=(process.env.FIREBASE_CLIENT_EMAIL||'').trim();
-const key=(process.env.FIREBASE_PRIVATE_KEY||'').replace(/\\n/g,'\n');
-if(!name||!projectId||!email||!key){
- console.error('Thiếu FIREBASE_STORAGE_BUCKET hoặc thông tin Firebase Admin. Xem docs/GU-v5.3.6-LATE-PICKUP-STORAGE.md.');process.exit(1);
-}
-if(name.startsWith('gs://')||name.includes('/')||!/^[a-z0-9._-]+$/.test(name)){
- console.error('FIREBASE_STORAGE_BUCKET chỉ chứa tên bucket (không có gs:// hoặc dấu /).');process.exit(1);
-}
-const instance=initializeApp({credential:cert({projectId,clientEmail:email,privateKey:key})},'gu-storage-diagnostic');
+/** GU private Cloudinary diagnostic. No Firebase Storage or Blaze required.
+ * Read-only by default; --write-test uploads and deletes one 1x1 dummy PNG.
+ */
+import {randomUUID} from 'node:crypto';
+const name=(process.env.CLOUDINARY_CLOUD_NAME||'').trim();
+const key=(process.env.CLOUDINARY_API_KEY||'').trim();
+const secret=(process.env.CLOUDINARY_API_SECRET||'').trim();
+if(!/^[a-zA-Z0-9_-]+$/.test(name)||!key||!secret){console.error('Thiếu CLOUDINARY_CLOUD_NAME / CLOUDINARY_API_KEY / CLOUDINARY_API_SECRET.');process.exit(1);}
+const auth='Basic '+Buffer.from(`${key}:${secret}`).toString('base64');
+const base=`https://api.cloudinary.com/v1_1/${name}`;
+const request=async(url,options={})=>fetch(url,{...options,headers:{...options.headers,Authorization:auth},cache:'no-store',signal:AbortSignal.timeout(25000)});
+let exitCode=0;
 try{
- const bucket=getStorage(instance).bucket(name);
+ const r=await request(`${base}/usage`);
+ if(!r.ok)throw new Error(`Cloudinary API từ chối xác thực hoặc quota (${r.status}).`);
+ console.log('CLOUDINARY_PRIVATE_CONFIG_OK: API credentials hợp lệ; không cần Firebase Storage/Blaze.');
  if(process.argv.includes('--write-test')){
-  const {randomUUID}=await import('node:crypto');
-  const filename=`gu/diagnostics/${randomUUID()}.txt`;
-  const object=bucket.file(filename);
-  try{
-   await object.save(Buffer.from('gu-storage-probe'),{resumable:false,metadata:{contentType:'text/plain',cacheControl:'private,no-store'}});
-   console.log('Ghi thử object vào bucket thành công.');
-  }finally{
-   try{await object.delete({ignoreNotFound:true});console.log('Đã dọn object kiểm thử.');}
-   catch(e){console.error('Không xóa được object kiểm thử; kiểm tra quyền storage.objects.delete.');throw e;}
-  }
-  console.log('Quyền ghi/xóa Firebase Storage hoạt động, không sử dụng ảnh khách.');
- }else{
-  const [metadata]=await bucket.getMetadata();
-  console.log('Kết nối Firebase Storage thành công.');
-  console.log('Bucket:',metadata.name,'| Location:',metadata.location,'| Project:',projectId);
-  console.log('Không ghi, không đọc và không xóa ảnh.');
-  console.log('Muốn kiểm tra thực quyền ghi/xóa mà không đụng dữ liệu khách: npm run diagnose:storage -- --write-test');
+  const id=randomUUID(),uid='diagnostic',publicId=`gu/secure-evidence/${uid}/${id}`;
+  const image=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGP4//8/AAX+Av4N70a4AAAAAElFTkSuQmCC','base64');
+  const form=new FormData();form.set('file',new Blob([image],{type:'image/png'}),'test.png');form.set('public_id',publicId);form.set('type','authenticated');form.set('overwrite','false');
+  const upload=await request(`${base}/image/upload`,{method:'POST',body:form});
+  if(!upload.ok)throw new Error(`Tải ảnh bảo mật thử thất bại (${upload.status}).`);
+  const saved=await upload.json();
+  if(saved.public_id!==publicId||saved.type!=='authenticated')throw new Error('Cloudinary không xác nhận authenticated. Kiểm tra Media Access.');
+  const query=new URLSearchParams();query.append('public_ids[]',publicId);
+  const del=await request(`${base}/resources/image/authenticated?${query}`,{method:'DELETE'});
+  if(!del.ok)throw new Error(`Đã tạo ảnh thử nhưng xóa không thành công (${del.status}). Cần xóa thủ công trong Cloudinary: ${publicId}`);
+  const deleted=await del.json();
+  if(!['deleted','not_found'].includes(deleted.deleted?.[publicId]||''))throw new Error(`Cloudinary chưa xác nhận xóa ảnh thử: ${publicId}`);
+  console.log('CLOUDINARY_PRIVATE_WRITE_DELETE_OK: authenticated upload + delete thành công.');
  }
-}catch(err){
- const code=typeof err==='object'&&err!==null&&'code' in err?String(err.code):'';
- const message=String(err?.message||'');
- if(code==='404'||/not found|does not exist/i.test(message))console.error('Bucket chưa tồn tại hoặc tên sai. Hãy đối chiếu đúng tên tại Firebase Console > Storage > Files.');
- else if(code==='403'||/permission|denied|billing/i.test(message))console.error('Thiếu quyền Storage hoặc Firebase project chưa bật Blaze. Kiểm tra IAM của service account và gói thanh toán.');
- else console.error('Không truy cập được bucket; kiểm tra cấu hình, IAM, API, kết nối mạng (mã lỗi: '+(code||'không rõ')+').');
- process.exitCode=1;
-}finally{await deleteApp(instance);}
+}catch(e){console.error('GU CLOUDINARY CHECK FAILED:',e instanceof Error?e.message:'Không rõ nguyên nhân');exitCode=1;}
+process.exitCode=exitCode;

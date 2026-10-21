@@ -41,13 +41,13 @@ export function GuSystem({api}:{api:Api}){
    {cloud?.updatedAt&&<small className="gu-system-updated">Cập nhật: {formatVNDateTime(cloud.updatedAt)}</small>}
    <a href="https://console.cloudinary.com/" target="_blank" rel="noopener noreferrer" className="gu-system-source">Cloudinary Console <ExternalLink size={14}/></a>
   </section>
-  <section className="panel gu-system-card" aria-label="Kiểm tra Firebase Storage bảo mật">
-   <div className="gu-system-heading"><HardDrive size={21}/><h2>Firebase Storage · Ảnh cọc</h2></div>
+  <section className="panel gu-system-card" aria-label="Kiểm tra Cloudinary bảo mật">
+   <div className="gu-system-heading"><HardDrive size={21}/><h2>Cloudinary · Ảnh cọc</h2></div>
    <div className="action-row">
-    <button type="button" className="btn btn-white" disabled={checkingStorage} onClick={()=>void checkStorage()}>{checkingStorage?'Đang kiểm tra…':'Kiểm tra bucket'}</button>
+    <button type="button" className="btn btn-white" disabled={checkingStorage} onClick={()=>void checkStorage()}>{checkingStorage?'Đang kiểm tra…':'Kiểm tra kết nối'}</button>
     <button type="button" className="btn btn-white" disabled={checkingStorage} onClick={()=>void checkStorage(true)}>Thử ghi / xóa</button>
    </div>
-   {storage&&<p role="status">Bucket: <b>{storage.bucket}</b> · Project: <b>{storage.projectId||'—'}</b> · Khu vực: <b>{storage.location||'—'}</b>{storage.writeVerified?' · Ghi/xóa: Đạt':''}</p>}
+   {storage&&<p role="status">Chế độ: <b>{storage.bucket}</b> · Cloud: <b>{storage.projectId||'—'}</b>{storage.writeVerified?' · Ghi/xóa: Đạt':''}</p>}
    {storageError&&<p className="inline-alert danger-alert" role="alert">{storageError}</p>}
   </section>
  </>;

@@ -43,7 +43,8 @@ test('Lỗi Storage hiển thị hướng khắc phục an toàn thay vì mã GU
  assert.equal(classifyStorageFailure({statusCode:401})?.code,'GU_STORAGE_AUTH');
  assert.equal(classifyStorageFailure({code:'RANDOM_UNSUPPORTED'}),null);
  const route=read('src/app/api/v5/secure-photo/route.ts');
- assert.match(route,/classifyStorageFailure\(error,'upload'\)/);
+ assert.match(route,/uploadSecureCloudinary\(bytes/);
+ assert.match(read('src/lib/cloudinary-secure.ts'),/type','authenticated'/); 
  assert.match(route,/purpose!=='reservation'&&purpose!=='deposit'/);
  assert.match(read('scripts/diagnose-storage.mjs'),/--write-test/);
 });

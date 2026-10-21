@@ -5,6 +5,7 @@ import {ApiError} from './http';
 import type {Transaction} from 'firebase-admin/firestore';
 export type EvidencePurpose='reservation'|'deposit';
 export const validEvidenceId=(s:unknown):s is string=>typeof s==='string'&&/^[a-f0-9-]{36}$/.test(s);
+/** Legacy Firebase Storage reader only. New evidence is stored on Cloudinary authenticated. */
 export const evidenceBucket=()=>{
  const name=(process.env.FIREBASE_STORAGE_BUCKET||'').trim();
  if(!name)throw new ApiError(503,'Chưa cấu hình FIREBASE_STORAGE_BUCKET trên môi trường đang chạy (Vercel/Codespaces).');

@@ -38,12 +38,13 @@ test('API kiểm tra tất cả RESERVED, UI có banner màu riêng và tìm đ�
  assert.match(page,/setQuery\(code\)/);
  assert.match(css,/\.gu-late-pickup-badge/);
 });
-test('Storage cấu hình từ biến server và có kiểm tra bucket sẵn có',()=>{
+test('Storage ảnh cọc đã chuyển qua Cloudinary authenticated mà không cần Blaze',()=>{
  const script=readFileSync('scripts/diagnose-storage.mjs','utf8');
  const packageJson=JSON.parse(readFileSync('package.json','utf8'));
- assert.match(script,/FIREBASE_STORAGE_BUCKET/);
- assert.match(script,/getMetadata/);
+ assert.match(script,/CLOUDINARY_CLOUD_NAME/);
+ assert.match(script,/CLOUDINARY_API_SECRET/);
+ assert.match(script,/type','authenticated'/);
  assert.match(script,/if\(process\.argv\.includes\('--write-test'\)\)/);
- assert.match(script,/bucket\.getMetadata\(\)/);
+ assert.match(script,/resources\/image\/authenticated/);
  assert.ok(packageJson.scripts['diagnose:storage']);
 });
