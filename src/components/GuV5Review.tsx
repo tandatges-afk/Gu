@@ -6,7 +6,8 @@ import {GuMoneyInput} from './GuMoneyInput';
 import {GuSecurePhoto} from './GuSecurePhoto';
 import {money} from '@/lib/rental';
 import {matchesProductSearch} from '@/lib/product-search';
-import {isCameraCategory} from '@/lib/camera-rental';
+import {isCameraCategory,isCameraModel,chosenCameraPackageSnapshot} from '@/lib/camera-rental';
+import {orderGroup,productGroup} from '@/lib/order-group';
 import {formatVNDateTime} from '@/lib/vn-datetime';
 import {GuVNDateTimeInput} from './GuVNDateTimeInput';
 import {paymentReview} from '@/lib/payment-review';
@@ -54,10 +55,13 @@ export function GuV5OrderDetail({order,items,api,onChanged,isAdmin,onCapture}:{o
  const due=Math.max(0,order.total+(order.compensationTotal||0)+(order.otherFeeTotal||0)+(order.lateFeeTotal||0)-order.paid);
  const refund=Math.max(0,order.paid-order.total-(order.compensationTotal||0)-(order.otherFeeTotal||0)-(order.lateFeeTotal||0));
  const reservedTopup=order.bookingKind==='RESERVE'&&order.status==='RESERVED';
- const addCandidate=[...items,...addResults].filter((i,index,all)=>extra.includes(i.id)&&all.findIndex(x=>x.id===i.id)===index);
+ const existingGroup=orderGroup(order);
+ const allowAdd=(item:InventoryItem)=>existingGroup!=='LEGACY_MIXED'&&productGroup(item.category)===existingGroup;
+ const addCandidate=[...items,...addResults].filter((i,index,all)=>extra.includes(i.id)&&allowAdd(i)&&all.findIndex(x=>x.id===i.id)===index);
  const addTopup=reservedTopup?(()=>{try{
    if(addCandidate.length!==extra.length||!order.pickupAt||!order.returnAt)return null;
-   const extraRent=addCandidate.reduce((s,i)=>s+rentalCharge(i,order.pickupAt!,order.returnAt!),0);
+   const pkgHours=existingGroup==='CAMERA'?order.lines.find(l=>isCameraCategory(l.category||''))?.cameraPackageHours:undefined;
+   const extraRent=addCandidate.reduce((s,i)=>{const pkg=isCameraCategory(i.category)&&pkgHours&&isCameraModel(i.cameraModel)?chosenCameraPackageSnapshot(i.cameraModel,order.pickupAt!,order.returnAt!,pkgHours):{};return s+rentalCharge({...i,...pkg},order.pickupAt!,order.returnAt!);},0);
    return Math.max(0,order.total+extraRent-order.paid);
  }catch{return null;}})():0;
  const extendTopup=reservedTopup?(()=>{try{
@@ -71,6 +75,7 @@ export function GuV5OrderDetail({order,items,api,onChanged,isAdmin,onCapture}:{o
  <p>Giờ giao: <b>{order.pickupAt?formatVNDateTime(order.pickupAt):order.pickupDate}</b> · Giờ trả dự kiến: <b>{order.returnAt?formatVNDateTime(order.returnAt):order.returnDate}</b></p>
  <p>Giá thuê: <b>{money(order.total)}</b> · Đã thu: <b>{money(order.paid)}</b> · Còn phải thu: <b>{money(due)}</b></p>
  <p>Nhân viên tạo: {order.createdByName||'—'} · Giao: {order.handoverProof?.byName||'Chưa giao'} · Nhận: {order.returnProof?.byName||'Chưa nhận'}</p>
+ {existingGroup==='LEGACY_MIXED'&&<p className="inline-alert">Đơn dữ liệu cũ chứa máy ảnh và trang phục chung. Vẫn xem và xử lý trả hàng bình thường, nhưng không được thêm sản phẩm mới. Hãy tạo hai đơn riêng nếu khách tiếp tục thuê.</p>}
  {order.bookingKind==='RESERVE'&&<p className="inline-alert">Đặt trước: bắt buộc thanh toán đủ 100% giá thuê ({money(order.prepaidRentTotal||0)}) khi đặt lịch. Không cần chụp đồ cho đến khi giao.</p>}
  {order.reservationPaymentProofId&&<details><summary>Ảnh chứng từ đã thu tiền thuê</summary><GuSecurePhoto id={order.reservationPaymentProofId} alt="Ảnh tiền thuê đặt trước"/></details>}
  {order.handoverDepositProofId&&<details open={order.status==='PICKED_UP'}><summary>Vật cọc phải trả cho khách: {order.handoverDepositKind||'Khác'}</summary><p>Trả lại vật cọc trực tiếp khi khách giao đồ. Không yêu cầu chụp ảnh trả vật cọc.</p><GuSecurePhoto id={order.handoverDepositProofId} alt="Vật cọc khi giao"/></details>}
@@ -87,7 +92,7 @@ export function GuV5OrderDetail({order,items,api,onChanged,isAdmin,onCapture}:{o
  {isAdmin&&order.status==='RESERVED'&&<button className="btn btn-white" disabled={busy||order.paid>0} onClick={()=>{if(confirm('Hủy lịch chưa giao?'))void act('CANCEL');}}>Hủy lịch chưa giao (chỉ khi không có tiền cần hoàn)</button>}
  {isAdmin&&order.cameraLateFeePending&&<button className="btn btn-white" disabled={busy} onClick={()=>void act('AUTO_RESOLVE_CAMERA_LATE')}>Tính lại phí trễ máy ảnh</button>}
  {['RESERVED','PICKED_UP'].includes(order.status)&&<div className="gu-v5-photo-actions"><label>Gia hạn đến giờ<GuVNDateTimeInput value={extension} onChange={setExtension} ariaLabel="Gia hạn đến giờ"/></label>{reservedTopup?<GuPrepaidAdjustment key={'extension-'+extension} label="Gia hạn theo giờ" amount={extension?extendTopup:null} busy={busy} onConfirm={payment=>void act('EXTEND',{returnAt:extension,...payment})}/>:<button className="btn btn-white" disabled={busy||!extension} onClick={()=>void act('EXTEND',{returnAt:extension})}>Gia hạn theo giờ</button>}</div>}
- {['RESERVED','PICKED_UP'].includes(order.status)&&!order.pendingExtraItemIds?.length&&<section className="gu-v5-add-items"><button type="button" className="btn btn-white" onClick={()=>setAddOpen(v=>!v)}>Thêm sản phẩm vào đơn</button>{addOpen&&<><input className="input" placeholder="Tìm sản phẩm" value={addQuery} onChange={e=>{setAddQuery(e.target.value);if(e.target.value.trim())void api<{results:InventoryItem[]}>('catalog?kind=items&size=50&q='+encodeURIComponent(e.target.value.trim())).then(r=>setAddResults(r.results)).catch(()=>{});}}/><div className="gu-v5-product-select">{[...items,...addResults].filter((i,index,all)=>!i.archivedAt&&!order.lines.some(l=>l.itemId===i.id)&&all.findIndex(y=>y.id===i.id)===index&&matchesProductSearch(i.name+' '+(i.hangerCode||'')+' '+i.category,addQuery)).slice(0,50).map(i=><button key={i.id} type="button" className={'gu-v5-product '+(extra.includes(i.id)?'gu-v5-selected':'')} onClick={()=>setExtra(v=>v.includes(i.id)?v.filter(x=>x!==i.id):[...v,i.id])}><ProductImage paths={i.imagePaths}/><span><b>{i.name}</b><small>{i.hangerCode||i.sku}</small></span><strong>{extra.includes(i.id)?'✓ Đã chọn':'Chọn'}</strong></button>)}</div>{reservedTopup?<GuPrepaidAdjustment key={'add-'+extra.join(',')} label={'Thêm '+extra.length+' món'} amount={extra.length?addTopup:null} busy={busy} onConfirm={payment=>void act('ADD_ITEMS',{itemIds:extra,...payment})}/>:<button type="button" className="btn btn-dark" disabled={busy||!extra.length} onClick={()=>void act('ADD_ITEMS',{itemIds:extra})}>Xác nhận thêm {extra.length} món</button>}</>}</section>}
+ {['RESERVED','PICKED_UP'].includes(order.status)&&!order.pendingExtraItemIds?.length&&existingGroup!=='LEGACY_MIXED'&&<section className="gu-v5-add-items"><button type="button" className="btn btn-white" onClick={()=>setAddOpen(v=>!v)}>Thêm sản phẩm vào đơn</button>{addOpen&&<><input className="input" placeholder="Tìm sản phẩm" value={addQuery} onChange={e=>{setAddQuery(e.target.value);if(e.target.value.trim())void api<{results:InventoryItem[]}>('catalog?kind=items&size=50&q='+encodeURIComponent(e.target.value.trim())).then(r=>setAddResults(r.results)).catch(()=>{});}}/><div className="gu-v5-product-select">{[...items,...addResults].filter((i,index,all)=>!i.archivedAt&&allowAdd(i)&&!order.lines.some(l=>l.itemId===i.id)&&all.findIndex(y=>y.id===i.id)===index&&matchesProductSearch(i.name+' '+(i.hangerCode||'')+' '+i.category,addQuery)).slice(0,50).map(i=><button key={i.id} type="button" className={'gu-v5-product '+(extra.includes(i.id)?'gu-v5-selected':'')} onClick={()=>setExtra(v=>v.includes(i.id)?v.filter(x=>x!==i.id):[...v,i.id])}><ProductImage paths={i.imagePaths}/><span><b>{i.name}</b><small>{i.hangerCode||i.sku}</small></span><strong>{extra.includes(i.id)?'✓ Đã chọn':'Chọn'}</strong></button>)}</div>{reservedTopup?<GuPrepaidAdjustment key={'add-'+extra.join(',')} label={'Thêm '+extra.length+' món'} amount={extra.length?addTopup:null} busy={busy} onConfirm={payment=>void act('ADD_ITEMS',{itemIds:extra,...payment})}/>:<button type="button" className="btn btn-dark" disabled={busy||!extra.length} onClick={()=>void act('ADD_ITEMS',{itemIds:extra})}>Xác nhận thêm {extra.length} món</button>}</>}</section>}
  {isAdmin&&['RESERVED','PICKED_UP','RETURNED'].includes(order.status)&&<button className="btn btn-danger" disabled={busy||order.paid>0} onClick={()=>{if(confirm('Chỉ xóa khi đã nhận đủ đồ sạch. Xác nhận?'))void act('VOID',{confirmCleanItems:true});}}>Admin xóa đơn & hoàn kho sạch</button>}
  </div>;
 }

@@ -4,6 +4,7 @@ import {db} from '@/lib/firebase-admin';
 import {staffUser,handleError,ApiError} from '@/lib/http';
 import {productSearchText,matchesProductSearch} from '@/lib/product-search';
 import {isInventoryCodeQuery,inventoryCodeNeedle,matchesInventoryCode} from '@/lib/catalog-code-search';
+import {orderGroup,productGroup} from '@/lib/order-group';
 export const runtime='nodejs';
 export const preferredRegion='sin1';
 export async function GET(req:NextRequest){
@@ -24,10 +25,12 @@ export async function GET(req:NextRequest){
   const term=String(u.searchParams.get('q')||'').trim().slice(0,80);
   const mode=u.searchParams.get('field')||'';
   const token=String(u.searchParams.get('cursor')||'');
+  const requestedRentalGroup=['orders','items'].includes(kind)?u.searchParams.get('rentalGroup')||'ALL':'ALL';
+  if(!['ALL','CAMERA','CLOTHING'].includes(requestedRentalGroup))throw new ApiError(400,'Bộ lọc loại đơn không hợp lệ.');
   const requestedStatus=kind==='items'?String(u.searchParams.get('status')||'ALL'):'ALL';
   const requestedCategory=kind==='items'?String(u.searchParams.get('category')||'ALL'):'ALL';
   if(!['ALL','AVAILABLE','RENTED','LAUNDRY','MAINTENANCE','MISSING'].includes(requestedStatus)||requestedCategory.length>50)throw new ApiError(400,'Bộ lọc kho không hợp lệ.');
-  const inventoryMatches=(entry:Record<string,unknown>)=>!entry.archivedAt&&(requestedStatus==='ALL'||entry.status===requestedStatus)&&(requestedCategory==='ALL'||entry.category===requestedCategory);
+  const inventoryMatches=(entry:Record<string,unknown>)=>!entry.archivedAt&&(requestedStatus==='ALL'||entry.status===requestedStatus)&&(requestedCategory==='ALL'||entry.category===requestedCategory)&&(requestedRentalGroup==='ALL'||productGroup(String(entry.category||''))===requestedRentalGroup);
   let collection:Query=db().collection(kind),field=kind==='orders'?'createdAt':kind==='customers'?'name':'name';
   // Indexed code values cannot perform substring searches with Firestore startAt.
   // Scan an ordered, bounded page of codes and carry a cursor for the last scanned doc.
@@ -154,6 +157,28 @@ export async function GET(req:NextRequest){
     const cursor=hasMore&&lastId?Buffer.from(JSON.stringify([lastValue,lastId])).toString('base64url'):null;
     return NextResponse.json({kind,results:matches,cursor,hasMore:Boolean(cursor),pageSize:take},
       {headers:{'Cache-Control':'private,no-store'}});
+  }
+  if(kind==='orders'&&requestedRentalGroup!=='ALL'){
+    const matches:Array<{id:string;[key:string]:unknown}>=[];
+    let lastDocId:string|null=null,lastValue='';let hasMore=false;
+    for(let page=0;page<12;page++){
+      const scan=await collection.limit(100).get();
+      if(scan.empty){hasMore=false;break;}
+      for(const [idx,doc] of scan.docs.entries()){
+        lastDocId=doc.id;lastValue=String(doc.get(field)||'');
+        const entry=doc.data();
+        if((me.role==='admin'||!['RETURNED','CANCELLED','VOIDED'].includes(String(entry.status)))&&
+          (requestedRentalGroup==='CAMERA'?orderGroup({rentalGroup:entry.rentalGroup,lines:Array.isArray(entry.lines)?entry.lines:[]})==='CAMERA':orderGroup({rentalGroup:entry.rentalGroup,lines:Array.isArray(entry.lines)?entry.lines:[]})!=='CAMERA')){
+          matches.push({id:doc.id,...entry});
+          if(matches.length>=take){hasMore=idx<scan.docs.length-1||scan.size===100;break;}
+        }
+      }
+      if(matches.length<take)hasMore=scan.size===100;
+      if(matches.length>=take||!hasMore)break;
+      collection=collection.startAfter(scan.docs[scan.docs.length-1]);
+    }
+    const cursor=hasMore&&lastDocId?Buffer.from(JSON.stringify([lastValue,lastDocId])).toString('base64url'):null;
+    return NextResponse.json({kind,results:matches,cursor,hasMore:Boolean(cursor),pageSize:take},{headers:{'Cache-Control':'private,no-store'}});
   }
   const snapshot=await collection.limit(take+1).get();
   let docs=snapshot.docs.slice(0,take);

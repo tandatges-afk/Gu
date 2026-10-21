@@ -3,6 +3,7 @@ import {db} from '@/lib/firebase-admin';
 import {staffUser,handleError,jsonBody,ApiError,requirePcStaff} from '@/lib/http';
 import {localDateTimeToISO,billableBlocks,vnDayKey} from '@/lib/hourly-pricing';
 import {rentalCharge,chosenCameraPackageSnapshot,isCameraCategory,isCameraModel} from '@/lib/camera-rental';
+import {itemsBelongToGroup,type RentalGroup} from '@/lib/order-group';
 import {intervalRefs,checkIntervalAvailability,createIntervalWrites,simpleId} from '@/lib/v5-server';
 import {normalizedAngles} from '@/lib/inspection-proof';
 import {auditInTransaction} from '@/lib/audit';
@@ -22,6 +23,8 @@ export async function POST(req:NextRequest){
   const quickPhone=quick?normalizePhone(quick.phone):'';
   if(!quick&&!simpleId(String(b.customerId||'')))throw new ApiError(400,'Chọn khách hàng hợp lệ.');
 
+  const group=b.rentalGroup as RentalGroup;
+  if(group!=='CAMERA'&&group!=='CLOTHING')throw new ApiError(400,'Chọn loại đơn: Thuê máy ảnh hoặc Thuê trang phục/phụ kiện.');
   const ids=b.itemIds;
   if(!Array.isArray(ids)||ids.length<1||ids.length>12||ids.some(x=>typeof x!=='string'||!simpleId(x))||new Set(ids).size!==ids.length)throw new ApiError(400,'Chọn từ 1 đến 12 sản phẩm không trùng nhau.');
   const pickupAt=localDateTimeToISO(String(b.pickupAt||''));const returnAt=localDateTimeToISO(String(b.returnAt||''));
@@ -63,6 +66,7 @@ export async function POST(req:NextRequest){
    const items=itemSnaps.map(s=>({id:s.id,...s.data()} as InventoryItem));
    if(items.some(i=>i.archivedAt||['MAINTENANCE','MISSING'].includes(i.status)))throw new ApiError(409,'Có sản phẩm đã ngưng sử dụng hoặc thất lạc.');
    if(items.some(i=>!Array.isArray(i.inspectionAngles)||!i.inspectionAngles.length))throw new ApiError(409,'Admin cần thêm góc ảnh giao/nhận cho từng sản phẩm trước khi tạo đơn.');
+   if(!itemsBelongToGroup(items.map(i=>i.category),group))throw new ApiError(409,'Đơn máy ảnh và đơn trang phục/phụ kiện phải tạo riêng. Không thể chọn đồ khác nhóm.');
    const cameraItems=items.filter(i=>isCameraCategory(i.category));
    if(cameraItems.length&&(!cameraItems.every(i=>isCameraModel(i.cameraModel))))throw new ApiError(409,'Máy ảnh chưa được Admin cấu hình đúng mẫu máy.');
    let chosenCamera:ReturnType<typeof chosenCameraPackageSnapshot>|null=null;
@@ -85,7 +89,7 @@ export async function POST(req:NextRequest){
     catch{throw new ApiError(409,`Góc chụp của sản phẩm “${item.name}” không hợp lệ. Admin cần kiểm tra lại.`);}
    }
    const referencePhotos=Object.fromEntries(items.map(i=>[i.id,i.referenceShots||{}]));
-   const record:Omit<RentalOrder,'id'>={code,customerId:customer.id,customerName:customer.name,customerPhone:customer.phone,pickupDate:vnDayKey(pickupAt),returnDate:vnDayKey(returnAt),pickupAt,returnAt,pricingVersion:'GU_HOURLY_V1',photoTemplates,referencePhotos,rentalDays:blocks,lines,total,paid:prepay?total:0,depositDue:0,bookingKind:prepay?'RESERVE':'WALK_IN',bookedRentTotal:total,prepaidRentTotal:prepay?total:0,...(prepay?{reservationPaymentProofId:paymentProofId}:{}),note,status:'RESERVED',createdAt:now,updatedAt:now,createdBy:me.uid,createdByName:me.name,history:[{action:'CREATE_HOURLY',at:now,by:me.uid,detail:'Đơn đã được tạo, chụp ảnh tại màn giao hàng của nhân viên'}]};
+   const record:Omit<RentalOrder,'id'>={code,rentalGroup:group,customerId:customer.id,customerName:customer.name,customerPhone:customer.phone,pickupDate:vnDayKey(pickupAt),returnDate:vnDayKey(returnAt),pickupAt,returnAt,pricingVersion:'GU_HOURLY_V1',photoTemplates,referencePhotos,rentalDays:blocks,lines,total,paid:prepay?total:0,depositDue:0,bookingKind:prepay?'RESERVE':'WALK_IN',bookedRentTotal:total,prepaidRentTotal:prepay?total:0,...(prepay?{reservationPaymentProofId:paymentProofId}:{}),note,status:'RESERVED',createdAt:now,updatedAt:now,createdBy:me.uid,createdByName:me.name,history:[{action:'CREATE_HOURLY',at:now,by:me.uid,detail:'Đơn đã được tạo, chụp ảnh tại màn giao hàng của nhân viên'}]};
    // A failed rental does not leave an orphan customer. Concurrent quick creation
    // is serialized on phoneIndex even when two staff members click at once.
    if(quick&&!customerSnap.exists)tx.create(resolvedCustomerRef,{name:quickName,phone:quickPhone,note:'',createdAt:now});

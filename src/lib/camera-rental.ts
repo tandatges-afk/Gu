@@ -1,7 +1,11 @@
 /** Camera rates attach to the contracted package, not the cheapest package after a late return. */
 export const CAMERA_MODELS=['Canon EOS R50','Canon M50'] as const;
 export type CameraModel=typeof CAMERA_MODELS[number];
-export function isCameraCategory(category:string):boolean {return /máy\s*ảnh|may\s*anh|camera/i.test(category);}
+export function isCameraCategory(category:string):boolean {
+ // Accessories (including camera accessories) must use the 24-hour accessory rental workflow.
+ if(/phụ\s*kiện|phu\s*kien|accessor/i.test(category))return false;
+ return /máy\s*ảnh|may\s*anh|camera/i.test(category);
+}
 export function isCameraModel(model:unknown):model is CameraModel{return CAMERA_MODELS.includes(model as CameraModel);}
 export const CAMERA_PRICE:Record<CameraModel,readonly [number,number,number,number]>={
  'Canon EOS R50':[110_000,130_000,190_000,350_000],

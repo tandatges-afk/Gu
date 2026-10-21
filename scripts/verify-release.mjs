@@ -100,7 +100,11 @@ const required = [
   'tests/gu-v537-cameras-deposits.test.ts',
   'docs/GU-v5.3.7-CAMERA-DEPOSIT-STORAGE.md',
   'docs/GU-v5.3.8-VISUAL-SEARCH-V2.md',
-  'tests/visual-search-v538.test.ts'
+  'tests/visual-search-v538.test.ts',
+  'src/lib/order-group.ts',
+  'src/components/GuRentalSeparation.module.css',
+  'tests/v539-split-rental-groups.test.ts',
+  'docs/GU-v5.3.9-SPLIT-RENTAL-ORDERS.md'
 ];
 const missing = required.filter(p => !existsSync(join(root,p)));
 const read = p => readFileSync(join(root,p),'utf8');
@@ -179,7 +183,7 @@ checks.push(['chụp ảnh cọc không chọn phương thức', /method:'PHOTO_
 checks.push(['lỗi upload Storage được phân loại', /classifyStorageFailure/, 'src/app/api/v5/secure-photo/route.ts']);
 const absent = checks.filter(([name,pattern,file]) => missing.includes(file) || !pattern.test(read(file))).map(([name])=>name);
 const pkg = JSON.parse(read('package.json'));
-if (pkg.version !== '5.3.8-beta.1') absent.push('phiên bản 5.3.8-beta.1 trong package.json');
+if (pkg.version !== '5.3.9-beta.1') absent.push('phiên bản 5.3.9-beta.1 trong package.json');
 if (missing.length || absent.length) {
   console.error('KHÔNG ĐỒNG BỘ. Thiếu tệp:', missing.join(', ') || 'không');
   console.error('Thiếu thành phần:', absent.join(', ') || 'không');

@@ -2,7 +2,8 @@ import {NextRequest,NextResponse,after} from 'next/server';
 import {db} from '@/lib/firebase-admin';
 import {staffUser,handleError,jsonBody,ApiError,requireAdmin,requirePcStaff} from '@/lib/http';
 import {billableBlocks,vnDayKey} from '@/lib/hourly-pricing';
-import {rentalCharge,cameraPackageSnapshot,isCameraCategory,isCameraModel} from '@/lib/camera-rental';
+import {rentalCharge,cameraPackageSnapshot,chosenCameraPackageSnapshot,isCameraCategory,isCameraModel} from '@/lib/camera-rental';
+import {orderGroup,itemsBelongToGroup} from '@/lib/order-group';
 import {approvedLineQuote} from '@/lib/v5-review-pricing';
 import {returnReconciliation} from '@/lib/settlement-ledger';
 import {completeProof,type PhotoProof,type Capture} from '@/lib/inspection-proof';
@@ -291,11 +292,21 @@ export async function PATCH(req:NextRequest,ctx:{params:Promise<{id:string}>}){
     const snaps=await Promise.all(refs.map(r=>tx.get(r)));
     if(snaps.some(s=>!s.exists||s.data()?.archivedAt||s.data()?.status!=='AVAILABLE'))throw new ApiError(409,'Có sản phẩm bổ sung chưa sẵn sàng.');
     if(snaps.some(s=>!Array.isArray(s.data()?.inspectionAngles)||!s.data()?.inspectionAngles.length))throw new ApiError(409,'Admin phải cấu hình góc chụp cho sản phẩm bổ sung trước khi giao.');
+    const existingGroup=orderGroup(order);
+    if(existingGroup==='LEGACY_MIXED')throw new ApiError(409,'Đơn cũ đang có đồ hỗn hợp; không thể thêm món. Hãy tạo đơn mới theo từng nhóm.');
+    if(!itemsBelongToGroup(snaps.map(s=>String(s.data()?.category||'')),existingGroup))throw new ApiError(409,'Không thể thêm máy ảnh vào đơn trang phục hoặc ngược lại. Hãy tạo đơn riêng.');
     const start=order.status==='RESERVED'?order.pickupAt:now;
     if(Date.parse(start)>=Date.parse(order.returnAt))throw new ApiError(409,'Đã qua giờ trả dự kiến. Cần gia hạn trước.');
     const slots=intervalRefs(ids,start,order.returnAt);
     const prior=await checkIntervalAvailability(tx,slots);
-    const extra=snaps.map(s=>{const i={id:s.id,...s.data()} as InventoryItem;const blocks=billableBlocks(start,order.returnAt!);return {itemId:i.id,name:i.name,sku:i.sku,hangerCode:i.hangerCode,size:i.size,category:i.category,cameraModel:i.cameraModel,cameraSerial:i.cameraSerial,...(isCameraCategory(i.category)&&isCameraModel(i.cameraModel)?cameraPackageSnapshot(i.cameraModel,start,order.returnAt!):{}),dailyRate:i.dailyRate,bufferDays:0,replacementValue:i.replacementValue,startAt:start,startDate:vnDayKey(start),lineTotal:rentalCharge(i,start,order.returnAt!)};});
+    const cameraTier=existingGroup==='CAMERA'?order.lines.find(l=>isCameraCategory(l.category||''))?.cameraPackageHours:undefined;
+    const extra=snaps.map(s=>{const i={id:s.id,...s.data()} as InventoryItem;billableBlocks(start,order.returnAt!);
+      let pkg={};if(isCameraCategory(i.category)){
+        if(!isCameraModel(i.cameraModel))throw new ApiError(409,'Máy ảnh chưa có mẫu máy hợp lệ.');
+        try{pkg=cameraTier?chosenCameraPackageSnapshot(i.cameraModel,start,order.returnAt!,cameraTier):cameraPackageSnapshot(i.cameraModel,start,order.returnAt!);}
+        catch(e){throw new ApiError(400,e instanceof Error?e.message:'Gói thuê bổ sung không hợp lệ.');}
+      }
+      return {itemId:i.id,name:i.name,sku:i.sku,hangerCode:i.hangerCode,size:i.size,category:i.category,cameraModel:i.cameraModel,cameraSerial:i.cameraSerial,...pkg,dailyRate:i.dailyRate,bufferDays:0,replacementValue:i.replacementValue,startAt:start,startDate:vnDayKey(start),lineTotal:rentalCharge({...i,...pkg},start,order.returnAt!)};});
     const nextLines=[...order.lines,...extra];const total=nextLines.reduce((sum,l)=>sum+l.lineTotal,0);
     const topup=order.bookingKind==='RESERVE'&&order.status==='RESERVED'?Math.max(0,total-order.paid):0;
     let paidAfter=order.paid;
