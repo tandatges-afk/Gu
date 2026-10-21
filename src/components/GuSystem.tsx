@@ -6,6 +6,7 @@ import {usageStatus,type UsageValue} from '@/lib/usage-metrics';
 type Api=<T=unknown>(path:string,init?:RequestInit)=>Promise<T>;
 type CloudinaryReport={source:'provider'|'unavailable';message?:string;updatedAt?:string|null;plan?:string;credits?:UsageValue;freeReferenceCredits?:number;resources?:number|null;storage?:UsageValue;bandwidth?:UsageValue;transformations?:UsageValue};
 type Response={cloudinary:CloudinaryReport;checkedAt:string;cacheMinutes:number};
+type StorageHealth={ok:boolean;bucket:string;location:string|null;projectId:string|null;writeVerified:boolean};
 const fmt=(value:number|null|undefined)=>value==null?'—':value>0&&value<0.01?'< 0,01':value.toLocaleString('vi-VN',{maximumFractionDigits:2});
 const fmtBytes=(value:number|null|undefined)=>value==null?'—':value<1024**2?`${(value/1024).toFixed(1)} KB`:`${(value/1024**3).toFixed(2)} GB`;
 function Measure({title,data,bytes=false}:{title:string;data?:UsageValue;bytes?:boolean}){
@@ -21,6 +22,8 @@ function Measure({title,data,bytes=false}:{title:string;data?:UsageValue;bytes?:
 export function GuSystem({api}:{api:Api}){
  const [data,setData]=useState<Response|null>(null);
  const [error,setError]=useState('');const [busy,setBusy]=useState(false);
+ const [storage,setStorage]=useState<StorageHealth|null>(null);const [storageError,setStorageError]=useState('');const [checkingStorage,setCheckingStorage]=useState(false);
+ const checkStorage=async(write=false)=>{setCheckingStorage(true);setStorageError('');setStorage(null);try{const result=await api<StorageHealth>('v5/storage-health',write?{method:'POST'}:undefined);setStorage(result);}catch(e){setStorageError(e instanceof Error?e.message:'Không kiểm tra được Storage.');}finally{setCheckingStorage(false);}};
  const load=async(refresh=false)=>{setBusy(true);try{setData(await api<Response>(refresh?'system?refresh=1':'system'));setError('');}catch(e){setError(e instanceof Error?e.message:'Không thể tải thống kê Cloudinary.');}finally{setBusy(false);}};
  useEffect(()=>{void load();},[]);
  const cloud=data?.cloudinary;
@@ -37,6 +40,15 @@ export function GuSystem({api}:{api:Api}){
    <div className="gu-system-detail"><HardDrive size={16}/><span>Số ảnh/tài nguyên: <b>{fmt(cloud?.resources)}</b></span></div>
    {cloud?.updatedAt&&<small className="gu-system-updated">Cập nhật: {formatVNDateTime(cloud.updatedAt)}</small>}
    <a href="https://console.cloudinary.com/" target="_blank" rel="noopener noreferrer" className="gu-system-source">Cloudinary Console <ExternalLink size={14}/></a>
+  </section>
+  <section className="panel gu-system-card" aria-label="Kiểm tra Firebase Storage bảo mật">
+   <div className="gu-system-heading"><HardDrive size={21}/><h2>Firebase Storage · Ảnh cọc</h2></div>
+   <div className="action-row">
+    <button type="button" className="btn btn-white" disabled={checkingStorage} onClick={()=>void checkStorage()}>{checkingStorage?'Đang kiểm tra…':'Kiểm tra bucket'}</button>
+    <button type="button" className="btn btn-white" disabled={checkingStorage} onClick={()=>void checkStorage(true)}>Thử ghi / xóa</button>
+   </div>
+   {storage&&<p role="status">Bucket: <b>{storage.bucket}</b> · Project: <b>{storage.projectId||'—'}</b> · Khu vực: <b>{storage.location||'—'}</b>{storage.writeVerified?' · Ghi/xóa: Đạt':''}</p>}
+   {storageError&&<p className="inline-alert danger-alert" role="alert">{storageError}</p>}
   </section>
  </>;
 }

@@ -23,7 +23,7 @@ export async function POST(req:NextRequest){
   // Firebase Storage is private. Never issue public download tokens for CCCD, receipts or deposits.
   const object=evidenceBucket().file(path);
   try{await object.save(bytes,{resumable:false,metadata:{contentType:f.type,cacheControl:'private,no-store'}});}
-  catch(error){const issue=classifyStorageFailure(error);if(issue)throw new ApiError(issue.status,issue.message,{code:issue.code});throw error;}
+  catch(error){const issue=classifyStorageFailure(error,'upload');if(issue)throw new ApiError(issue.status,issue.message,{code:issue.code});throw error;}
   try{await db().collection('secureEvidenceUploads').doc(id).create({ownerUid:me.uid,purpose,draftId,path,contentType:f.type,createdAt:new Date().toISOString(),consumedOrderId:null});}
   catch(error){
    // No Firestore reference was recorded. Remove an otherwise orphaned private upload.
@@ -42,7 +42,7 @@ export async function GET(req:NextRequest){
   const info=doc.data()!;const order=await db().collection('orders').doc(info.consumedOrderId).get();
   if(!order.exists)throw new ApiError(404,'Không tìm thấy đơn của ảnh.');
   let bytes:Buffer;try{[bytes]=await evidenceBucket().file(info.path).download();}
-  catch(error){const issue=classifyStorageFailure(error);if(issue)throw new ApiError(issue.status,issue.message,{code:issue.code});throw error;}
+  catch(error){const issue=classifyStorageFailure(error,'download');if(issue)throw new ApiError(issue.status,issue.message,{code:issue.code});throw error;}
   return new NextResponse(new Uint8Array(bytes),{headers:{'Content-Type':info.contentType,'Cache-Control':'private,no-store','X-Content-Type-Options':'nosniff','Content-Security-Policy':"default-src 'none'; sandbox"}});
  }catch(e){return handleError(e,'GET /api/v5/secure-photo');}
 }

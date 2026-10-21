@@ -183,7 +183,7 @@ checks.push(['chụp ảnh cọc không chọn phương thức', /method:'PHOTO_
 checks.push(['lỗi upload Storage được phân loại', /classifyStorageFailure/, 'src/app/api/v5/secure-photo/route.ts']);
 const absent = checks.filter(([name,pattern,file]) => missing.includes(file) || !pattern.test(read(file))).map(([name])=>name);
 const pkg = JSON.parse(read('package.json'));
-if (pkg.version !== '5.3.9-beta.1') absent.push('phiên bản 5.3.9-beta.1 trong package.json');
+if (pkg.version !== '5.4.0-beta.1') absent.push('phiên bản 5.4.0-beta.1 trong package.json');
 if (missing.length || absent.length) {
   console.error('KHÔNG ĐỒNG BỘ. Thiếu tệp:', missing.join(', ') || 'không');
   console.error('Thiếu thành phần:', absent.join(', ') || 'không');

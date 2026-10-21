@@ -103,7 +103,7 @@ export function GuVisualFinder({api,onChoose,active=true,isAdmin=false}:{api:Api
   finally{if(seq===token.current)setLoading(false);}
  };
  return <section className={styles.finder} aria-label="Tìm sản phẩm bằng ảnh">
-  <div className={styles.heading}><Search size={23}/><div><h3>Tìm sản phẩm bằng hình ảnh</h3><p>So sánh màu, dáng và đường nét của tối đa 5 ảnh mỗi món. Những kết quả không đủ gần sẽ được loại bỏ.</p></div></div>
+  <div className={styles.heading}><Search size={23}/><div><h3>Tìm sản phẩm bằng hình ảnh</h3></div></div>
   <div className={styles.actions}><label className="btn btn-white">Chọn ảnh<input hidden type="file" accept="image/*" onChange={e=>chooseFile(e.target.files?.[0]||null)}/></label>
    <label className="btn btn-white">Chụp ảnh<input hidden type="file" accept="image/*" capture="environment" onChange={e=>chooseFile(e.target.files?.[0]||null)}/></label>
    <button type="button" className="btn btn-white" onClick={()=>void pasteFile()}>Dán ảnh</button>
@@ -116,7 +116,6 @@ export function GuVisualFinder({api,onChoose,active=true,isAdmin=false}:{api:Api
    <div className={styles.filters}>
     <label>Danh mục cần tìm<select value={category} onChange={e=>{token.current++;setCategory(e.target.value);setResults([]);setChosen(null);setAvailability({});}}><option value="ALL">Tất cả danh mục</option>{categories.map(name=><option key={name} value={name}>{name}</option>)}</select></label>
     <label>Độ rộng tìm kiếm<select value={relaxed?'broad':'strict'} onChange={e=>{token.current++;setRelaxed(e.target.value==='broad');setResults([]);setChosen(null);setAvailability({});}}><option value="strict">Ưu tiên đúng / rất gần</option><option value="broad">Mở rộng kết quả gần giống</option></select></label>
-    <small>Chọn đúng danh mục sẽ giảm nhầm lẫn. Kết quả là gợi ý đối chiếu, không phải xác suất nhận dạng chính xác.</small>
    </div>
   </div>
   {file&&<small>Ảnh mẫu: {file.name}</small>}{progress&&<p className={styles.note}>{progress}</p>}

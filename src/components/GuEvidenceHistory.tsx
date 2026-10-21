@@ -14,7 +14,7 @@ export function GuEvidenceHistory({item,api,onClose}:{item:InventoryItem;api:Api
  const ret=order?.returnProof?.items.find(x=>x.itemId===item.id)?.shots||{};
  const angles=[...new Set([...Object.keys(hand),...Object.keys(ret)])];
  return <div className="modal-overlay" role="presentation"><div className="modal modal-wide" role="dialog" aria-modal="true" aria-label="Lịch sử ảnh giao nhận"><div className="modal-heading"><div><h2>Ảnh giao & nhận · {item.name}</h2><small>Mã sản phẩm: {item.hangerCode||item.sku} {item.cameraSerial?'· Serial '+item.cameraSerial:''}</small></div><button type="button" className="btn btn-white" onClick={onClose}>Đóng</button></div><div className="modal-body">
- <p>Giữ 7 lượt đã được duyệt gần nhất theo từng sản phẩm. Lượt thứ 8 sẽ loại ảnh lượt cũ nhất.</p>
+
  {info&&<p><b>{info.rounds.length}/{info.maxRounds} lượt ảnh</b>{info.pendingDelete>0?' · '+info.pendingDelete+' tác vụ xóa đang chờ':''}</p>}
  {error&&<p className="field-error">{error}</p>}
  {!info&&!error&&<p>Đang tải lịch sử ảnh…</p>}

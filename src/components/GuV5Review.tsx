@@ -30,7 +30,7 @@ export function GuV5Review({api,onChanged,active=true}:{api:ApiCall;onChanged:()
   }catch(e){setError(e instanceof Error?e.message:'Không cập nhật được.');}finally{setBusy(false);}
  };
  return <section className="gu-v5-review">
-  <div className="page-intro"><div><div className="eyebrow">ADMIN · HẬU KIỂM</div><h1>Kiểm tra ảnh giao / nhận</h1><p>Nhân viên đã hoàn kho khi nhận hàng. Việc xem ảnh không khóa lịch và không chặn đơn kế tiếp.</p></div><button className="btn btn-white" onClick={()=>void reload()}>Tải lại</button></div>
+  <div className="page-intro"><div><div className="eyebrow">ADMIN · HẬU KIỂM</div><h1>Kiểm tra ảnh giao / nhận</h1></div><button className="btn btn-white" onClick={()=>void reload()}>Tải lại</button></div>
   {error&&<p className="field-error">{error}</p>}{note&&<p className="inline-alert">{note}</p>}
   <div className="gu-v5-review-layout"><aside className="gu-v5-review-list"><h3>Chưa kiểm tra ({jobs.length})</h3>{jobs.map(j=><button key={j.orderId} className="gu-v5-job" onClick={()=>void open(j.orderId)}><b>{j.code}</b><span>{j.customerName}</span></button>)}{!jobs.length&&<p>Không có ảnh nhận trả đang chờ hậu kiểm.</p>}</aside>
   {order&&<article className="panel gu-v5-review-detail"><h2>{order.code} · {order.customerName}</h2><p><b>Nhân viên tạo:</b> {order.createdByName||'—'} · <b>Giao:</b> {order.handoverProof?.byName||'—'} · <b>Nhận:</b> {order.returnProof?.byName||'—'}</p><p><b>Trạng thái:</b> {order.status==='RETURNED'?'Đã nhận trả, kho không bị khóa':'Đơn cũ đang chờ hoàn tất thủ tục'}</p>
