@@ -35,5 +35,11 @@ export async function GET(req:NextRequest){return measureRoute('GET /api/debts',
   return NextResponse.json({...page,...global,indexed:true,cursor:next,hasMore:Boolean(next),pageSize:PAGE_SIZE,
     pageNote:'Danh sách công nợ tải theo trang; số tổng hợp lấy từ truy vấn SUM/COUNT trên toàn bộ sổ nợ.'},
     {headers:{'Cache-Control':'private,no-store'}});
- }catch(e){return handleError(e,'GET /api/debts');}
+ }catch(e){
+  // Indexes are remote Firestore resources. The checked-in JSON is not enough until deployed.
+  const failure=e as {code?:number|string;message?:string};
+  if((failure.code===9||failure.code==='9')&&/index/i.test(failure.message||''))
+   return handleError(new ApiError(503,'Firestore thiếu index debtLedger (kind ASC, outstanding ASC). Admin cần tạo index theo liên kết Firebase hoặc chạy firebase deploy --only firestore:indexes --project gugu-547e3.'),'GET /api/debts');
+  return handleError(e,'GET /api/debts');
+ }
 });}
