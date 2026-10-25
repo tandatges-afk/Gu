@@ -33,3 +33,11 @@ export function cropBounds(mode:CropMode):[number,number,number,number] {
     default:return [0,0,1,1];
   }
 }
+
+/** Auto-region choice: no manual crop selector. Full image is kept as a reference. */
+export function automaticVisualCrops(category:string):CropMode[]{
+ const normalized=category.normalize('NFC').toLocaleLowerCase('vi');
+ if(/chân\s*váy|quần|skirt|pants|short/.test(normalized))return ['lower','full'];
+ if(/\báo\b|áo|shirt|blouse|top/.test(normalized))return ['center','full'];
+ return ['full'];
+}

@@ -1,5 +1,5 @@
-/* GU v4.0 - privacy-first PWA, cache public assets only. */
-const STATIC_CACHE = 'gu-static-v5-4-0';
+/* GU v5.5.1 hotfix - cache only public offline icons; bypass all Next.js chunks. */
+const STATIC_CACHE = 'gu-static-v5-5-1';
 const PUBLIC_ASSETS = ['/offline.html','/icons/gu-192.png','/icons/gu-512.png','/favicon.svg'];
 self.addEventListener('install', event => {
   event.waitUntil(caches.open(STATIC_CACHE).then(cache=>cache.addAll(PUBLIC_ASSETS)).then(()=>self.skipWaiting()));
@@ -21,8 +21,11 @@ self.addEventListener('fetch', event => {
     return;
   }
   if (url.pathname.startsWith('/api/') || url.pathname.includes('auth')) return;
-  const isStatic = url.pathname.startsWith('/_next/static/') || PUBLIC_ASSETS.includes(url.pathname);
-  if(!isStatic)return;
+  // IMPORTANT: Never handle Next.js generated assets. They carry deployment hashes
+  // and must be served by the active Next.js deployment / Vercel CDN.
+  // Cache-first SW responses can cause cross-deployment JS version skew.
+  if (url.pathname.startsWith('/_next/')) return;
+  if (!PUBLIC_ASSETS.includes(url.pathname)) return;
   event.respondWith(caches.open(STATIC_CACHE).then(async cache=>{
     const cached=await cache.match(request);
     if(cached)return cached;

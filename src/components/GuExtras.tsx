@@ -58,8 +58,8 @@ export function ImageUploader({paths,onChange,disabled,onUploading}:{paths:strin
       <ProductImage paths={[path]} className="product-photo"/>
       {index===0&&<span className="gu-cover-badge">Ảnh bìa</span>}
       <div className="gu-tile-actions">
-        {index>0&&<button type="button" className="gu-tile-tool" disabled={disabled||uploading} onClick={()=>onChange([path,...paths.filter(x=>x!==path)])} aria-label={`Đặt ảnh ${index+1} làm ảnh bìa`} title="Đặt làm ảnh bìa"><ArrowUp size={15}/></button>}
-        <button className="gu-tile-tool gu-tile-remove" type="button" disabled={disabled||uploading} onClick={()=>onChange(paths.filter(x=>x!==path))} aria-label={`Xóa ảnh ${index+1}`} title="Xóa ảnh khỏi sản phẩm">×</button>
+        {index>0&&<button type="button" className="gu-tile-tool" disabled={disabled||uploading} onClick={()=>onChange([path,...paths.filter(x=>x!==path)])} aria-label={`Đặt ảnh ${index+1} làm ảnh bìa`}><ArrowUp size={15}/></button>}
+        <button className="gu-tile-tool gu-tile-remove" type="button" disabled={disabled||uploading} onClick={()=>onChange(paths.filter(x=>x!==path))} aria-label={`Xóa ảnh ${index+1}`}>×</button>
       </div>
     </div>)}</div>
     <div className="gu-photo-actions">

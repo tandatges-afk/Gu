@@ -1,0 +1,20 @@
+GU v5.5.0 Next.js 16 Webpack Build Hotfix
+
+Nguyen nhan: next.config.ts co webhook/webpack aliases phuc vu AI CLIP,
+Next.js 16 lai mac dinh dung Turbopack cho dev va build.
+
+Doi dung 2 scripts trong package.json:
+  dev: next dev --webpack
+  build: node scripts/check-local-imports.mjs && next build --webpack
+
+Ap dung:
+1. Sao luu package.json neu ban da tu chinh sua sau khi tai v5.5.0.
+2. Giai nen zip vao thu muc goc GU, cho phep ghi de package.json.
+3. npm.cmd run typecheck
+4. npm.cmd run build
+5. git add package.json
+6. git commit -m "fix: use Webpack in Next.js 16 GU v5.5.0"
+7. git push -u origin feature/gu-v5.5.0 (khi dang o nhanh nay)
+
+Khong thay doi dependency, logic kinh doanh, API ngan hang.
+Khong duoc xac nhan production build trong moi truong nay.
