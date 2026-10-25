@@ -1,20 +1,3 @@
-# GU v5.5.0 — AI Visual Search + Category Filter + VS Code Local
-
-**Bản phát triển** từ GU v5.4.0 Hotfix. Chưa đưa vào ngân hàng tự động thu cọc hoặc chi hoàn cọc.
-
-Đọc [hướng dẫn triển khai trên Windows và VS Code Local](docs/GU-v5.5.0-AI-VISUAL-SEARCH-VSCODE-LOCAL.md).
-
-```powershell
-npm install
-npm run verify:release
-npm run test
-npm run typecheck
-npm run build
-npm run dev
-```
-
----
-
 > **GU v5.4.0 – Firestore Read Optimization:** Giảm Reads cho tra cứu lịch, ca nhân viên, Dashboard, công nợ, báo cáo. Trước khi đưa lên Production, xem [hướng dẫn GU 5.4](docs/GU-v5.4.0-FIRESTORE-OPTIMIZATION.md).
 
 > **GU v5.3.0 Beta 1 — Đăng ký ca nhân viên:** Đăng ký Chủ nhật 12:00–20:00 cho tuần kế tiếp; 3 ca/ngày, 2 người/ca, ít nhất 5 ngày/tuần; nhân viên ngoài ca chỉ có quyền vào màn đăng ký, hết ca +15 phút tự đăng xuất. Trước khi deploy lên Vercel xem **[hướng dẫn chuyển đổi không khóa nhầm toàn bộ nhân viên](docs/GU-v5.3.0-CA-LAM-VIEC.md)**.
