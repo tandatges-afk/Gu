@@ -1,6 +1,6 @@
 {
   "name": "gu-thue-do-xinh",
-  "version": "5.4.0",
+  "version": "5.5.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -22,6 +22,7 @@
     "typecheck:tests": "tsc --noEmit -p tsconfig.tests.json"
   },
   "dependencies": {
+    "@huggingface/transformers": "^3.8.1",
     "firebase": "^12.0.0",
     "firebase-admin": "^13.0.0",
     "lucide-react": "^0.468.0",

@@ -3,6 +3,12 @@ import { join } from 'node:path';
 
 const root = process.cwd();
 const required = [
+  'src/lib/visual-search-v55.ts',
+  'src/lib/visual-ai-client.ts',
+  'src/app/api/v5/visual-catalog/route.ts',
+  'src/components/GuVisualFinder.tsx',
+  'docs/GU-v5.5.0-AI-VISUAL-SEARCH-VSCODE-LOCAL.md',
+  'scripts/check-v55-local.ps1',
   'src/app/page.tsx',
   'src/app/globals.css',
   'src/app/api/bootstrap/route.ts',
@@ -146,8 +152,12 @@ checks.push(['thu đủ tự động sau nhận trả', /Thu đủ \{money\(due\
 checks.push(['gợi ý SĐT nổi dưới ô nhập', /\.gu-v11-customer-results\{position:absolute/, 'src/app/globals.css']);
 checks.push(['hiển thị giờ giao và giờ nhận', /gu-calendar-cell-time/, 'src/app/page.tsx']);
 const absent = checks.filter(([name,pattern,file]) => missing.includes(file) || !pattern.test(read(file))).map(([name])=>name);
+checks.push(['API tìm ảnh lọc danh mục tại Firestore', /where\('category','==',category\)/, 'src/app/api/v5/visual-catalog/route.ts']);
+checks.push(['Tìm ảnh AI embedding', /visualAiEmbedding/, 'src/components/GuVisualFinder.tsx']);
+checks.push(['Tìm ảnh cache trình duyệt', /visualCacheKey/, 'src/components/GuVisualFinder.tsx']);
+checks.push(['Tìm ảnh theo danh mục', /categoryOptions/, 'src/components/GuVisualFinder.tsx']);
 const pkg = JSON.parse(read('package.json'));
-if (pkg.version !== '5.4.0') absent.push('phiên bản 5.4.0 trong package.json');
+if (pkg.version !== '5.5.0') absent.push('phiên bản 5.5.0 trong package.json');
 if (missing.length || absent.length) {
   console.error('KHÔNG ĐỒNG BỘ. Thiếu tệp:', missing.join(', ') || 'không');
   console.error('Thiếu thành phần:', absent.join(', ') || 'không');
