@@ -1103,3 +1103,8 @@ html,body{background:var(--paper);color:var(--ink)}
 .legend-dot.missed-pickup{background:#a46acf}
 .calendar-cell.cell-loading,.gu-calendar-mobile-cell.cell-loading{background:#f1f3f5;border:1px dashed #bdc6d0;color:#8592a0}
 @media(max-width:690px){.gu-calendar-pager-actions{width:100%;justify-content:space-between;margin-left:0}.gu-calendar-pager-actions .btn{padding:8px}.gu-calendar-page-number{padding:0 3px}}
+
+/* GU v5.5.3 — missed pickup is color only, no additional text row. */
+.calendar-cell.occupied-returned,.gu-calendar-mobile-cell.occupied-returned{background:#f0f3f6;border:2px solid #aeb7c0;color:#364c61;font-weight:750}
+.calendar-cell.gu-missed-pickup,.gu-calendar-mobile-cell.gu-missed-pickup{overflow:hidden}
+.calendar-cell.gu-missed-pickup .gu-calendar-cell-result,.gu-calendar-mobile-cell.gu-missed-pickup .gu-calendar-cell-result{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%}

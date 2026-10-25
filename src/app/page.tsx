@@ -32,8 +32,9 @@ import type {DebtSummary} from '@/lib/debts';
 import {mergeDebtPages} from '@/lib/debt-page-merge';
 import {GuPwaSetup,GuInstallApp} from '@/components/GuPwa';
 import {GuStaffShifts} from '@/components/GuStaffShifts';
-import {calendarItemState,type CalendarFilter} from '@/lib/smart-calendar';
-import {calendarOrdersForDay,hasMissedPickupAt17,overdueHeldOrder} from '@/lib/calendar-display';
+import type {CalendarFilter} from '@/lib/smart-calendar';
+import {ordersOnCalendarDay,itemDayState,isPickupWarning} from '@/lib/calendar-timeline';
+
 import {getProductCode} from '@/lib/hanger-code';
 import {orderCreatorName} from '@/lib/order-creator';
 
@@ -143,6 +144,8 @@ export default function Home() {
   const [calendarQuery,setCalendarQuery]=useState('');
   const [calendarReload,setCalendarReload]=useState(0);
   const [calendarOrderRows,setCalendarOrderRows]=useState<{key:string;orders:RentalOrder[]}|null>(null);
+  const [calendarCreatorOptions,setCalendarCreatorOptions]=useState<Array<{id:string;name:string}>>([]);
+  const [calendarTotal,setCalendarTotal]=useState(0);
   const [nearestLoading,setNearestLoading]=useState<string|null>(null);
   const [nearestResult,setNearestResult]=useState<{itemId:string;nextPickupDate:string|null;nextReturnDate:string|null;reason:string}|null>(null);
   const [taskView,setTaskView]=useState<'ALL'|'PICKUP_TODAY'|'RETURN_TODAY'|'OVERDUE'>('ALL');
@@ -318,27 +321,22 @@ export default function Home() {
   useEffect(()=>{
     if(!user||page!=='calendar')return;
     let cancelled=false;setCalendarLoaded(false);setCalendarOrderRows(null);
-    const catalogKey=calendarQuery+'|'+(calendarPageCursor||'');
+    const key=[calendarStart,calendarQuery.trim(),calendarCategory,calendarStatus,calendarCreator,calendarPageCursor||''].join('|');
     const timer=setTimeout(()=>{
-      const url='catalog?kind=items&size=25'+(calendarQuery.trim()?'&q='+encodeURIComponent(calendarQuery.trim()):'')+(calendarPageCursor?'&cursor='+encodeURIComponent(calendarPageCursor):'');
-      api<{results:InventoryItem[];cursor:string|null}>(url).then(r=>{if(!cancelled){setCalendarRemote(r.results.filter(i=>!i.archivedAt));setCalendarCatalogKey(catalogKey);setCalendarLoaded(true);setCalendarNext(r.cursor);}})
-        .catch(e=>{if(!cancelled)setErr(e instanceof Error?e.message:'Không tải được sản phẩm lịch.');});
+      const params=new URLSearchParams({start:calendarStart,category:calendarCategory,status:calendarStatus,creator:calendarCreator});
+      if(calendarQuery.trim())params.set('q',calendarQuery.trim());
+      if(calendarPageCursor)params.set('cursor',calendarPageCursor);
+      if(calendarReload)params.set('refresh',String(calendarReload));
+      api<{results:InventoryItem[];orders:RentalOrder[];creators:{id:string;name:string}[];cursor:string|null;total:number}>('calendar/view?'+params)
+       .then(result=>{if(cancelled)return;setCalendarRemote(result.results);setCalendarOrderRows({key,orders:result.orders});
+         setCalendarCreatorOptions(result.creators);setCalendarNext(result.cursor);setCalendarTotal(result.total);
+         setCalendarCatalogKey(key);setCalendarLoaded(true);})
+       .catch(e=>{if(cancelled)return;setCalendarLoaded(false);setCalendarOrderRows(null);setErr(e instanceof Error?e.message:'Không tải được lịch sản phẩm.');});
     },250);
     return()=>{cancelled=true;clearTimeout(timer);};
-  },[user,page,calendarQuery,calendarPageCursor,catalogReload,api]);
-  useEffect(()=>{setCalendarPageCursor(null);setCalendarCursorTrail([]);},[calendarQuery]);
-  useEffect(()=>{
-     if(!user||page!=='calendar'||!calendarLoaded||!calendarRemote.length){setCalendarOrderRows(null);return;}
-    let cancelled=false;
-     const ids=calendarRemote.map(i=>i.id).slice(0,30).join(',');
-     const requestKey=calendarStart+'|'+ids;
-     const fresh=calendarReload>0&&lastForcedCalendarReloadRef.current!==calendarReload;
-     if(fresh)lastForcedCalendarReloadRef.current=calendarReload;
-     api<{orders:RentalOrder[]}>('calendar?start='+encodeURIComponent(calendarStart)+'&ids='+encodeURIComponent(ids)+(fresh?'&fresh=1':''))
-       .then(r=>{if(!cancelled)setCalendarOrderRows({key:requestKey,orders:r.orders});})
-       .catch(e=>{if(!cancelled){setCalendarOrderRows(null);setErr(e instanceof Error?e.message:'Không lấy được trạng thái lịch.');}});
-     return()=>{cancelled=true;};
-   },[user,page,calendarStart,calendarRemote,calendarLoaded,calendarReload,api]);
+  },[user,page,calendarStart,calendarQuery,calendarCategory,calendarStatus,calendarCreator,calendarPageCursor,calendarReload,catalogReload,api]);
+  // Filter before paginating: any new filter restarts from page one.
+  useEffect(()=>{setCalendarPageCursor(null);setCalendarCursorTrail([]);},[calendarQuery,calendarCategory,calendarStatus,calendarCreator,calendarStart]);
   useEffect(()=>{if(!user)return;let live=true;const pull=async()=>{try{const r=await api<{risks:Array<{itemId:string;heldOrderId:string;nextOrderId:string}>;checkedAt:string}>('v5/return-risk');if(live){setRemoteRisks(r.risks);setRemoteRiskDay(vnCurrentTime(new Date(r.checkedAt)).today);}}catch{/* Do not affect renting when alert API fails. */}};
     void pull();const timer=setInterval(()=>void pull(),15*60_000);return()=>{live=false;clearInterval(timer);};},[user,api]);
   const items=(data?.items||[]).filter(i=>!i.archivedAt);
@@ -414,18 +412,14 @@ export default function Home() {
   },[reportDaily,reportMode,today]);
   const chartMax=Math.max(1,...chartRows.map(r=>r.value));
   const calendarDays=Array.from({length:7},(_,i)=>addDays(calendarStart,i));
-   // Never show stale booking data from an older page/date as free slots.
-   const catalogReady=calendarLoaded&&calendarCatalogKey===calendarQuery+'|'+(calendarPageCursor||'');
-   const calendarResponseKey=calendarStart+'|'+calendarRemote.map(i=>i.id).slice(0,30).join(',');
-   const calendarReady=catalogReady&&(!calendarRemote.length||calendarOrderRows?.key===calendarResponseKey);
-   const calendarActive=calendarReady?(calendarOrderRows?.orders||[]).filter(o=>o.status==='RESERVED'||o.status==='PICKED_UP'):[];
-   const calendarOverdue=calendarActive.filter(o=>o.status==='PICKED_UP'&&o.returnDate<today);
-  const calendarCreators=Array.from(new Map(calendarActive.filter(o=>Boolean(o.createdBy)).map(o=>[o.createdBy,orderCreatorName(o,data?.staffNames)] as const)).entries()).sort((a,b)=>a[1].localeCompare(b[1],'vi'));
+  const calendarKey=[calendarStart,calendarQuery.trim(),calendarCategory,calendarStatus,calendarCreator,calendarPageCursor||''].join('|');
+  const catalogReady=calendarLoaded&&calendarCatalogKey===calendarKey;
+  const calendarReady=catalogReady&&calendarOrderRows?.key===calendarKey;
+  const calendarActive=calendarReady?(calendarOrderRows?.orders||[]):[];
+  const calendarOverdue=calendarActive.filter(o=>o.status==='PICKED_UP'&&o.returnDate<today);
+  const calendarCreators=calendarCreatorOptions.map(x=>[x.id,x.name] as const);
   const creatorName=(o:RentalOrder)=>orderCreatorName(o,data?.staffNames);
-  const calendarItems=(catalogReady?calendarRemote:[]).filter(i=>(calendarCategory==='ALL'||i.category===calendarCategory)&&
-     (calendarCreator==='ALL'||calendarActive.some(o=>o.createdBy===calendarCreator&&o.lines.some(l=>l.itemId===i.id)&&o.pickupDate<=calendarDays[6]&&o.returnDate>=calendarStart))&&
-     (calendarStatus==='ALL'||(calendarReady&&calendarItemState(i,calendarActive,calendarStart,7,today)===calendarStatus))&&
-     matchesCalendarSearch(i,calendarActive,calendarQuery));
+  const calendarItems=calendarReady?calendarRemote:[];
   useEffect(()=>{setNearestResult(null);},[calendarStart,calendarPageCursor]);
   const findNearest=async(itemId:string)=>{
     setNearestLoading(itemId);setNearestResult(null);
@@ -439,29 +433,25 @@ export default function Home() {
   // Shared occupancy logic for desktop timeline and mobile product cards.
   // Keep both views on the exact same booking rules and click handlers.
   const renderCalendarCell=(item:InventoryItem,day:string,mobile=false)=>{
-     const matching=calendarOrdersForDay(calendarActive,item.id,day);
-     const order=matching[0];
-     const lateOrder=overdueHeldOrder(calendarActive,item.id,today);
-     // An overdue item is still physically out: never paint an empty green cell in the future.
-     const shown=order||((lateOrder&&day>=today)?lateOrder:undefined);
-     const late=Boolean(lateOrder&&shown?.id===lateOrder.id&&day>lateOrder.returnDate);
-     const nextDayRisk=Boolean(lateOrder&&riskIds.has(item.id)&&day===today);
-     const missedPickup=Boolean(shown&&day===today&&hasMissedPickupAt17(shown,new Date()));
-     const blocked=!shown&&(['LAUNDRY','MAINTENANCE','MISSING'].includes(item.status)||!(item.replacementValue>0)||(item.status==='RENTED'&&(!item.expectedReturnDate||day<=item.expectedReturnDate)));
-     const isPast=day<today;
-     const waiting=!calendarReady;
-     const title=waiting?'Đang tải trạng thái':shown?shown.customerName+' · '+shown.code+' · Tạo bởi: '+creatorName(shown)+(late?' · TRẢ TRỄ':'')+(missedPickup?' · SAU 17H CHƯA LẤY':'')+(nextDayRisk?' · MAI CÓ KHÁCH ĐẶT':''):blocked?statusLabels[item.status]||'Chưa được định giá':isPast?'Ngày đã qua':day===today?'Giao đồ ngay':'Đặt trước';
-     const date=new Date(day+'T00:00:00Z');
-     const week=['CN','T2','T3','T4','T5','T6','T7'][date.getUTCDay()];
-     const state=waiting?'cell-loading':missedPickup?'gu-missed-pickup':nextDayRisk?'gu-next-day-risk':late?'late-flash':shown?(shown.status==='PICKED_UP'?'occupied-picked':'occupied-reserved'):blocked?'cell-blocked':'cell-free';
-     return <button key={day} type="button" aria-label={`${prettyDay(day)}: ${title}`} className={'calendar-cell '+(mobile?'gu-calendar-mobile-cell ':'')+(day===today?'gu-calendar-cell-today ':'')+state} disabled={waiting||(!shown&&(blocked||isPast))} onClick={()=>matching.length>1?setCalendarMatches(matching):shown?openDetail(shown):openBooking(day===today?'PICKUP':'RESERVE',item.id,day)}>
-       {mobile&&<span className="gu-calendar-cell-date"><strong>{week}</strong><small>{day.slice(8,10)}/{day.slice(5,7)}</small></span>}
-       <span className="gu-calendar-cell-result">{waiting?'…':shown?<>{missedPickup?'⏰ ':nextDayRisk?'⚠ ':late?'⚠ ':''}{matching.length>1?matching.length+' lượt':shown.customerName.split(' ').slice(-1)[0]}</>:blocked?'—':isPast?'·':'+'}</span>
-       {missedPickup&&<span className="gu-calendar-pickup-warning">SAU 17H CHƯA LẤY</span>}
-       {shown&&<span className="gu-calendar-cell-time">{calendarCellTime(shown)}</span>}
-       {shown&&<span className="gu-calendar-cell-creator">NV: {creatorName(shown).split(/\s+/).slice(-1)[0]}</span>}
-     </button>;
-   };
+    const allMatches=ordersOnCalendarDay(calendarActive,item.id,day,today);
+    const shown=allMatches[0]?.order;
+    const state=calendarReady?itemDayState(item,calendarActive,day,today):'BLOCKED';
+    const missedPickup=Boolean(shown&&isPickupWarning(shown,day,new Date()));
+    const nextDayRisk=Boolean(shown&&riskIds.has(item.id)&&day===today);
+    const isPast=day<today;
+    const waiting=!calendarReady;
+    const dayStateLabel=state==='RETURNED'?'Đã trả':state==='OVERDUE'?'Trả trễ':state==='PICKED_UP'?'Đã giao':state==='RESERVED'?'Đã giữ':state==='FREE'?'Trống':statusLabels[item.status]||'Tạm khóa';
+    const title=waiting?'Đang tải trạng thái':shown?shown.customerName+' · '+shown.code+' · '+dayStateLabel+' · Tạo bởi: '+creatorName(shown)+(missedPickup?' · Quá giờ nhận':''):dayStateLabel;
+    const date=new Date(day+'T00:00:00Z');
+    const week=['CN','T2','T3','T4','T5','T6','T7'][date.getUTCDay()];
+    const cellClass=waiting?'cell-loading':missedPickup?'gu-missed-pickup':state==='OVERDUE'?'late-flash':nextDayRisk?'gu-next-day-risk':state==='RETURNED'?'occupied-returned':state==='PICKED_UP'?'occupied-picked':state==='RESERVED'?'occupied-reserved':state==='FREE'?'cell-free':'cell-blocked';
+    return <button key={day} type="button" aria-label={`${prettyDay(day)}: ${title}`} className={'calendar-cell '+(mobile?'gu-calendar-mobile-cell ':'')+(day===today?'gu-calendar-cell-today ':'')+cellClass} disabled={waiting||(!shown&&(state!=='FREE'||isPast))} onClick={()=>allMatches.length>1?setCalendarMatches(allMatches.map(x=>x.order)):shown?openDetail(shown):openBooking(day===today?'PICKUP':'RESERVE',item.id,day)}>
+      {mobile&&<span className="gu-calendar-cell-date"><strong>{week}</strong><small>{day.slice(8,10)}/{day.slice(5,7)}</small></span>}
+      <span className="gu-calendar-cell-result">{waiting?'…':shown?allMatches.length>1?allMatches.length+' lượt':shown.customerName.split(' ').slice(-1)[0]:state==='FREE'?(isPast?'·':'+'):'—'}</span>
+      {shown&&<span className="gu-calendar-cell-time">{calendarCellTime(shown)}</span>}
+      {shown&&<span className="gu-calendar-cell-creator">NV: {creatorName(shown).split(/\s+/).slice(-1)[0]}</span>}
+    </button>;
+  };
 
   useEffect(()=>{
     if(!notificationsEnabled||typeof Notification==='undefined'||Notification.permission!=='granted')return;
@@ -534,11 +524,11 @@ export default function Home() {
         </>}
         {page==='calendar'&&<>
           <div className="page-intro"><div><div className="eyebrow">LỊCH THEO NGÀY / THÁNG / NĂM</div><h1>Lịch cho thuê</h1></div><div className="action-row"><button className="btn btn-white" onClick={()=>openBooking('RESERVE')}><CalendarDays size={17}/> Đặt lịch trước</button><button className="btn btn-dark" onClick={()=>openBooking('PICKUP')}><Plus size={18}/> Giao ngay</button></div></div>
-          <div className="gu-catalog-pager"><div className="gu-search-wrap"><Search size={15}/><input className="input" value={calendarQuery} onChange={e=>setCalendarQuery(e.target.value)} placeholder="Tên, mã sản phẩm, tên khách hoặc SĐT…"/></div><nav className="gu-calendar-pager-actions" aria-label="Phân trang sản phẩm"><button type="button" className="btn btn-white" disabled={!calendarCursorTrail.length} onClick={()=>{setCalendarCursorTrail([]);setCalendarPageCursor(null);}}>Trang đầu</button><button type="button" className="btn btn-white" disabled={!calendarCursorTrail.length} onClick={()=>{setCalendarPageCursor(calendarCursorTrail[calendarCursorTrail.length-1]);setCalendarCursorTrail(history=>history.slice(0,-1));}}><ChevronLeft size={14}/> Trang trước</button><span className="gu-calendar-page-number">Trang {calendarCursorTrail.length+1}</span><button type="button" className="btn btn-white" disabled={!calendarNext||!catalogReady} onClick={()=>{setCalendarCursorTrail(history=>[...history,calendarPageCursor]);setCalendarPageCursor(calendarNext);}}>Trang sau <ChevronRight size={14}/></button></nav></div>
-          <section className="panel calendar-panel" aria-busy={!calendarReady}><div className="calendar-toolbar"><div><h3>Lịch sản phẩm</h3><div className="legend">{data.me.role==='admin'&&<span className="overdue-label"><i className="legend-dot maintenance"/>Chớp đỏ: trả trễ</span>}<span><i className="legend-dot reserved"/>Đã giữ</span><span><i className="legend-dot missed-pickup"/>Sau 17h chưa lấy</span><span><i className="legend-dot picked"/>Đã lấy</span><span><i className="legend-dot free"/>Còn trống</span></div></div><div className="gu-calendar-controls-viewport" role="region" aria-label="Bộ lọc và điều hướng lịch" tabIndex={0}><div className={"calendar-controls "+(data.me.role==='admin'?'gu-calendar-controls-admin':'gu-calendar-controls-staff')}>
-            <select className="input gu-calendar-cat" value={calendarCategory} onChange={e=>setCalendarCategory(e.target.value)}><option value="ALL">Tất cả danh mục</option>{Array.from(new Set(items.map(i=>i.category))).sort().map(c=><option value={c} key={c}>{c}</option>)}</select>
+          <div className="gu-catalog-pager"><div className="gu-search-wrap"><Search size={15}/><input className="input" value={calendarQuery} onChange={e=>setCalendarQuery(e.target.value)} placeholder="Tên, mã sản phẩm, tên khách hoặc SĐT…"/></div><nav className="gu-calendar-pager-actions" aria-label="Phân trang sản phẩm"><button type="button" className="btn btn-white" disabled={!calendarCursorTrail.length} onClick={()=>{setCalendarCursorTrail([]);setCalendarPageCursor(null);}}>Trang đầu</button><button type="button" className="btn btn-white" disabled={!calendarCursorTrail.length} onClick={()=>{setCalendarPageCursor(calendarCursorTrail[calendarCursorTrail.length-1]);setCalendarCursorTrail(history=>history.slice(0,-1));}}><ChevronLeft size={14}/> Trang trước</button><span className="gu-calendar-page-number">Trang {calendarCursorTrail.length+1}{calendarTotal>=0?' · '+calendarTotal+' món':''}</span><button type="button" className="btn btn-white" disabled={!calendarNext||!catalogReady} onClick={()=>{setCalendarCursorTrail(history=>[...history,calendarPageCursor]);setCalendarPageCursor(calendarNext);}}>Trang sau <ChevronRight size={14}/></button></nav></div>
+          <section className="panel calendar-panel" aria-busy={!calendarReady}><div className="calendar-toolbar"><div><h3>Lịch sản phẩm</h3><div className="legend">{data.me.role==='admin'&&<span className="overdue-label"><i className="legend-dot maintenance"/>Chớp đỏ: trả trễ</span>}<span><i className="legend-dot reserved"/>Đã giữ</span><span><i className="legend-dot picked"/>Đã lấy</span><span><i className="legend-dot free"/>Còn trống</span></div></div><div className="gu-calendar-controls-viewport" role="region" aria-label="Bộ lọc và điều hướng lịch" tabIndex={0}><div className={"calendar-controls "+(data.me.role==='admin'?'gu-calendar-controls-admin':'gu-calendar-controls-staff')}>
+            <select className="input gu-calendar-cat" value={calendarCategory} onChange={e=>setCalendarCategory(e.target.value)}><option value="ALL">Tất cả danh mục</option>{Array.from(new Set([...items.map(i=>i.category),...categories.map(c=>c.name)])).sort().map(c=><option value={c} key={c}>{c}</option>)}</select>
             <select className="input gu-calendar-status" aria-label="Lọc lịch theo tình trạng" value={calendarStatus} onChange={e=>setCalendarStatus(e.target.value as CalendarFilter)}>
-              <option value="ALL">Mọi trạng thái</option><option value="FREE">Còn trống</option><option value="RESERVED">Đã giữ</option><option value="PICKED_UP">Đã giao</option><option value="OVERDUE">Trả trễ</option><option value="LAUNDRY">Đang giặt</option><option value="MAINTENANCE">Bảo trì</option><option value="MISSING">Thất lạc</option><option value="UNPRICED">Chưa duyệt giá</option>
+              <option value="ALL">Mọi trạng thái</option><option value="FREE">Còn trống</option><option value="RESERVED">Đã giữ</option><option value="PICKED_UP">Đã giao</option><option value="RETURNED">Đã trả</option><option value="OVERDUE">Trả trễ</option><option value="LAUNDRY">Đang giặt</option><option value="MAINTENANCE">Bảo trì</option><option value="MISSING">Thất lạc</option><option value="UNPRICED">Chưa duyệt giá</option>
             </select>
             {data.me.role==='admin'&&<select className="input gu-calendar-creator" aria-label="Lọc theo nhân viên tạo đơn" value={calendarCreator} onChange={e=>setCalendarCreator(e.target.value)}><option value="ALL">Mọi nhân viên tạo</option>{calendarCreators.map(([uid,name])=><option key={uid} value={uid}>{name}</option>)}</select>}
             <button className="icon-btn boxed" aria-label="Lùi 1 ngày" onClick={()=>setCalendarStart(addDays(calendarStart,-1))}><ChevronLeft size={18}/></button>
@@ -552,14 +542,14 @@ export default function Home() {
               <div className="calendar-item"><ProductImage paths={item.imagePaths} className="gu-calendar-photo"/><div><strong>{item.name}</strong><span>{item.category} · Mã SP: {getProductCode(item)||"chưa cấp"}</span><button type="button" className="gu-nearest-link" disabled={nearestLoading===item.id} onClick={()=>void findNearest(item.id)}><CalendarSearch size={12}/> {nearestLoading===item.id?'Đang tìm…':'Ngày trống gần nhất'}</button>{nearestResult?.itemId===item.id&&<small className="gu-nearest-inline">{nearestResult.nextPickupDate?`Trống: ${prettyDay(nearestResult.nextPickupDate)}`:nearestResult.reason}</small>}</div></div>
               {calendarDays.map(day=>renderCalendarCell(item,day))}
             </div>)}
-            {!catalogReady?<div className="calendar-no-items">Đang tải sản phẩm…</div>:!calendarReady?<div className="calendar-no-items">Đang xác minh trạng thái lịch…</div>:!calendarItems.length&&<div className="calendar-no-items">Không có sản phẩm trong trang và bộ lọc này.</div>}
+            {!catalogReady?<div className="calendar-no-items">Đang tải sản phẩm…</div>:!calendarReady?<div className="calendar-no-items">Đang xác minh trạng thái lịch…</div>:!calendarItems.length&&<div className="calendar-no-items">Không có sản phẩm phù hợp trên toàn kho cho bộ lọc này.</div>}
           </div></div>
           <div className="gu-mobile-calendar" aria-label="Lịch thuê sản phẩm trên điện thoại">
             {calendarItems.map(item=><article className="gu-mobile-calendar-card" key={item.id}>
               <div className="gu-mobile-calendar-product"><ProductImage paths={item.imagePaths} className="gu-calendar-photo"/><div className="gu-mobile-calendar-product-info"><strong>{item.name}</strong><span>{item.category} · Mã SP: {getProductCode(item)||"chưa cấp"}</span><button type="button" className="gu-nearest-link" disabled={nearestLoading===item.id} onClick={()=>void findNearest(item.id)}><CalendarSearch size={13}/> {nearestLoading===item.id?'Đang tìm…':'Ngày trống gần nhất'}</button>{nearestResult?.itemId===item.id&&<small className="gu-nearest-inline">{nearestResult.nextPickupDate?`Trống: ${prettyDay(nearestResult.nextPickupDate)}`:nearestResult.reason}</small>}</div></div>
               <div className="gu-mobile-days-scroll" aria-label={'Cuộn ngày thuê của '+item.name} tabIndex={0}><div className="gu-mobile-days-grid">{calendarDays.map(day=>renderCalendarCell(item,day,true))}</div></div>
             </article>)}
-            {!catalogReady?<div className="calendar-no-items">Đang tải sản phẩm…</div>:!calendarReady?<div className="calendar-no-items">Đang xác minh trạng thái lịch…</div>:!calendarItems.length&&<div className="calendar-no-items">Không có sản phẩm trong trang và bộ lọc này.</div>}
+            {!catalogReady?<div className="calendar-no-items">Đang tải sản phẩm…</div>:!calendarReady?<div className="calendar-no-items">Đang xác minh trạng thái lịch…</div>:!calendarItems.length&&<div className="calendar-no-items">Không có sản phẩm phù hợp trên toàn kho cho bộ lọc này.</div>}
           </div>
           {nearestResult&&<div className="gu-nearest-result" aria-live="polite"><CalendarSearch size={19}/><div><strong>{items.find(i=>i.id===nearestResult.itemId)?.name||'Sản phẩm'}:</strong> {nearestResult.nextPickupDate?`trống từ ${prettyDay(nearestResult.nextPickupDate)} đến ${prettyDay(nearestResult.nextReturnDate!)}`:nearestResult.reason}</div>{nearestResult.nextPickupDate&&<button className="btn btn-dark" onClick={()=>openBooking(nearestResult.nextPickupDate===today?'PICKUP':'RESERVE',nearestResult.itemId,nearestResult.nextPickupDate!,nearestResult.nextReturnDate!)}>Đặt ngày này</button>}<button className="icon-btn" aria-label="Đóng kết quả" onClick={()=>setNearestResult(null)}><X size={16}/></button></div>}
           </section>

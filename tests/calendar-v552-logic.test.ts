@@ -35,7 +35,7 @@ test('giao diện bỏ bảng smart, phân trang có history, không hiển th�
  const src=readFileSync('src/app/page.tsx','utf8');
  assert.doesNotMatch(src,/className="panel gu-smart-calendar"/);
  assert.match(src,/calendarCursorTrail/);assert.match(src,/Trang đầu/);assert.match(src,/Trang trước/);assert.match(src,/Trang sau/);
- assert.match(src,/calendarResponseKey/);assert.match(src,/cell-loading/);assert.match(src,/hasMissedPickupAt17/);
+ assert.match(src,/calendarKey/);assert.match(src,/cell-loading/);assert.match(src,/isPickupWarning/);
 });
 test('cấu hình index khớp query SUM theo kind và outstanding ở công nợ',()=>{
  const indexes=JSON.parse(readFileSync('firestore.indexes.json','utf8'));

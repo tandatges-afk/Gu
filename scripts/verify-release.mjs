@@ -43,6 +43,9 @@ const required = [
   'src/lib/product-search.ts',
   'src/lib/return-risk.ts',
   'src/lib/calendar-display.ts',
+  'src/lib/calendar-timeline.ts',
+  'src/lib/calendar-view-data.ts',
+  'src/app/api/calendar/view/route.ts',
   'scripts/migrate-staff-unified.mjs',
   'src/app/api/v5/return-risk/route.ts',
   'scripts/migrate-product-names.mjs',
@@ -116,6 +119,8 @@ checks.push(['tìm tên ở giữa từ không dấu', /nameSearchBigrams/, 'src
 checks.push(['cảnh báo sau 17 giờ', /vnClock/, 'src/lib/return-risk.ts']);
 checks.push(['cảnh báo chưa nhận đơn riêng 17 giờ', /hasMissedPickupAt17/, 'src/lib/calendar-display.ts']);
 checks.push(['xóa gu-smart-calendar', /gu-calendar-pager-actions/, 'src/app/page.tsx']);
+checks.push(['lọc lịch trước phân trang', /const visible=items.filter/, 'src/app/api/calendar/view/route.ts']);
+checks.push(['chuyển trạng thái ngày lịch', /itemDayState/, 'src/app/page.tsx']);
 checks.push(['chỉ giữ Cloudinary trong giám sát Admin', /cloudinaryReport/, 'src/app/api/system/route.ts']);
 checks.push(['nút cập nhật bỏ cache', /system\?refresh=1/, 'src/components/GuSystem.tsx']);
 checks.push(['giá thuê theo 24h', /billableBlocks/, 'src/lib/hourly-pricing.ts']);
@@ -160,7 +165,7 @@ checks.push(['Tìm ảnh AI embedding', /visualAiEmbedding/, 'src/components/GuV
 checks.push(['Tìm ảnh cache trình duyệt', /visualCacheKey/, 'src/components/GuVisualFinder.tsx']);
 checks.push(['Tìm ảnh theo danh mục', /categoryOptions/, 'src/components/GuVisualFinder.tsx']);
 const pkg = JSON.parse(read('package.json'));
-if (pkg.version !== '5.5.2') absent.push('phiên bản 5.5.2 trong package.json');
+if (pkg.version !== '5.5.3') absent.push('phiên bản 5.5.3 trong package.json');
 if (missing.length || absent.length) {
   console.error('KHÔNG ĐỒNG BỘ. Thiếu tệp:', missing.join(', ') || 'không');
   console.error('Thiếu thành phần:', absent.join(', ') || 'không');
