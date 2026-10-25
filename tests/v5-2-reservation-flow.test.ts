@@ -48,12 +48,12 @@ test('Payment popup remains after return and offers auto-collection',()=>{
  assert.match(capture,/APPLY_SURCHARGE/);
  assert.match(capture,/GuSecurePhoto id=\{order\.handoverDepositProofId\}/);
 });
-test('Sensitive collateral images only use private bucket, authenticated GET',()=>{
+test('Sensitive collateral images only use authenticated Cloudinary and proxied GET',()=>{
  const route=read('src/app/api/v5/secure-photo/route.ts');
  assert.match(route,/await staffUser\(req\)/);
- assert.match(route,/evidenceBucket\(\)\.file\(path\)\.save/);
+ assert.match(route,/storePrivateEvidence\(bytes,f\.type,me\.uid,id\)/);
  assert.match(route,/Cache-Control':'private,no-store/);
- assert.doesNotMatch(route,/res\.cloudinary/);
+ assert.doesNotMatch(route,/secure_url/);
 });
 test('Calendar includes pickup/return times between guest and staff',()=>{
  const page=read('src/app/page.tsx');

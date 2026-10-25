@@ -47,9 +47,9 @@ test('lọc toàn kho trước khi phân trang và không đánh tráo 25 sản 
  assert.match(api,/matchesCalendarCreator/);
  assert.match(api,/calendarFastPage/);
 });
-test('lỗi storage 404 có phản hồi rõ nguyên nhân, không lưu CCCD vào nơi công khai',()=>{
+test('ảnh cọc/CCCD mới dùng Cloudinary authenticated, không dùng Firebase Storage',()=>{
  const src=readFileSync('src/lib/secure-evidence.ts','utf8');
- assert.match(src,/evidenceStorageError/);
- assert.match(src,/FIREBASE_STORAGE_BUCKET/);
- assert.doesNotMatch(src,/Cloudinary/);
+ assert.match(src,/uploadAuthenticatedEvidence/);
+ assert.match(src,/FIREBASE_STORAGE_BUCKET/); // backward-compatible legacy read only
+ assert.match(src,/Cloudinary/);
 });

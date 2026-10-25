@@ -1,3 +1,9 @@
+# GU v5.5.4 — Cloudinary Private Evidence (Firebase Spark compatible)
+
+Ảnh CCCD/chứng từ cọc mới được lưu Cloudinary `authenticated`, không cần Firebase Storage. Xem `docs/GU-v5.5.4-CLOUDINARY-PRIVATE-EVIDENCE.md` để cấu hình và kiểm tra an toàn trước khi triển khai.
+
+---
+
 # GU v5.5.0 — AI Visual Search + Category Filter + VS Code Local
 
 **Bản phát triển** từ GU v5.4.0 Hotfix. Chưa đưa vào ngân hàng tự động thu cọc hoặc chi hoàn cọc.

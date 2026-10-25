@@ -152,7 +152,7 @@ checks.push(['báo cáo theo khoảng', /range\(mode\)/, 'src/app/api/reports/ro
 checks.push(['đếm truy vấn API', /readMetrics/, 'src/app/api/system/read-metrics/route.ts']);
 checks.push(['đặt trước thu đủ tiền thuê có bằng chứng', /readVerifiedEvidence\(tx,paymentProofId/, 'src/app/api/v5/orders/route.ts']);
 checks.push(['sổ quỹ đặt trước', /kind:'PAYMENT',amount:total/, 'src/app/api/v5/orders/route.ts']);
-checks.push(['ảnh cọc lưu private', /evidenceBucket\(\)\.file\(path\)\.save/, 'src/app/api/v5/secure-photo/route.ts']);
+checks.push(['ảnh cọc lưu private', /storePrivateEvidence\(bytes,f\.type,me\.uid,id\)/, 'src/app/api/v5/secure-photo/route.ts']);
 checks.push(['nhận trả không cần Admin giải phóng kho', /status:'RETURNED' as const/, 'src/app/api/v5/orders/[id]/route.ts']);
 checks.push(['admin chỉ kiểm tra ảnh', /action==='REVIEW_PHOTOS'/, 'src/app/api/v5/orders/[id]/route.ts']);
 checks.push(['nhân viên xác nhận hoàn vật cọc', /action==='RETURN_COLLATERAL'/, 'src/app/api/v5/orders/[id]/route.ts']);
@@ -165,7 +165,7 @@ checks.push(['Tìm ảnh AI embedding', /visualAiEmbedding/, 'src/components/GuV
 checks.push(['Tìm ảnh cache trình duyệt', /visualCacheKey/, 'src/components/GuVisualFinder.tsx']);
 checks.push(['Tìm ảnh theo danh mục', /categoryOptions/, 'src/components/GuVisualFinder.tsx']);
 const pkg = JSON.parse(read('package.json'));
-if (pkg.version !== '5.5.3') absent.push('phiên bản 5.5.3 trong package.json');
+if (pkg.version !== '5.5.4') absent.push('phiên bản 5.5.4 trong package.json');
 if (missing.length || absent.length) {
   console.error('KHÔNG ĐỒNG BỘ. Thiếu tệp:', missing.join(', ') || 'không');
   console.error('Thiếu thành phần:', absent.join(', ') || 'không');
