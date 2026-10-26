@@ -306,11 +306,12 @@ export default function Home() {
         const visited=new Set<string>();
         do {
           // Server-side cursor pagination is retained; never issue an unbounded Firestore query.
-          const path='catalog?kind='+kind+'&size=50'+(cursor?'&cursor='+encodeURIComponent(cursor):'');
-          const result=await api<{results:Array<InventoryItem|Customer|RentalOrder>;cursor:string|null;hasMore:boolean}>(path,{signal:controller.signal});
+          const path: string = 'catalog?kind='+kind+'&size=50'+(cursor?'&cursor='+encodeURIComponent(cursor):'');
+          const result: {results:Array<InventoryItem|Customer|RentalOrder>;cursor:string|null;hasMore:boolean} =
+            await api<{results:Array<InventoryItem|Customer|RentalOrder>;cursor:string|null;hasMore:boolean}>(path,{signal:controller.signal});
           if(cancelled)return;
           for(const record of result.results||[]){if(!seen.has(record.id)){seen.add(record.id);all.push(record);}}
-          const next=result.hasMore?result.cursor:null;
+          const next: string|null = result.hasMore?result.cursor:null;
           if(next&&visited.has(next))throw new Error('Trang dữ liệu lặp lại; đã dừng để tránh tải vô hạn.');
           if(next)visited.add(next);
           cursor=next;
