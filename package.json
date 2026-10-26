@@ -1,11 +1,11 @@
 {
   "name": "gu-thue-do-xinh",
-  "version": "5.4.0",
+  "version": "5.5.4",
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "next dev",
-    "build": "node scripts/check-local-imports.mjs && next build",
+    "dev": "next dev --webpack",
+    "build": "node scripts/check-local-imports.mjs && next build --webpack",
     "start": "next start",
     "typecheck": "tsc --noEmit",
     "test": "node --experimental-strip-types --test tests/*.test.ts",
@@ -19,9 +19,12 @@
     "staff:unify-plan": "node --env-file=.env.local scripts/migrate-staff-unified.mjs",
     "staff:unify-apply": "node --env-file=.env.local scripts/migrate-staff-unified.mjs --execute --confirm=UNIFY-gugu-547e3",
     "verify:imports": "node scripts/check-local-imports.mjs",
-    "typecheck:tests": "tsc --noEmit -p tsconfig.tests.json"
+    "typecheck:tests": "tsc --noEmit -p tsconfig.tests.json",
+    "diagnose:storage": "node --env-file=.env.local scripts/check-private-evidence.mjs",
+    "migration:export": "node --env-file=.env.local deploy/migration/export-firestore.mjs ./private-backups/gu-export"
   },
   "dependencies": {
+    "@huggingface/transformers": "^3.8.1",
     "firebase": "^12.0.0",
     "firebase-admin": "^13.0.0",
     "lucide-react": "^0.468.0",

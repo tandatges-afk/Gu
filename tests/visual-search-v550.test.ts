@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {VISUAL_CACHE_MS,VISUAL_FAST_LIMIT,visualCategoryAllowed,visualCategoryQuery,visualCacheKey,normalizedVector,vectorSimilarity,cropBounds} from '../src/lib/visual-search-v55.ts';
+import {VISUAL_CACHE_MS,VISUAL_FAST_LIMIT,visualCategoryAllowed,visualCategoryQuery,visualCacheKey,normalizedVector,vectorSimilarity,cropBounds,automaticVisualCrops} from '../src/lib/visual-search-v55.ts';
 const read=(file:string)=>readFileSync(file,'utf8');
 test('visual category selection is required and server-side exact equality prevents catalog-wide reads',()=>{
  assert.throws(()=>visualCategoryQuery(''),/Danh mục/);
@@ -22,10 +22,10 @@ test('crop presets stay inside image and cache is isolated per uid and category'
  assert.notEqual(visualCacheKey('a','Chân váy'),visualCacheKey('b','Chân váy'));
  assert.equal(VISUAL_CACHE_MS,300000);assert.equal(VISUAL_FAST_LIMIT,60);
 });
-test('browser uses true CLIP embeddings and persistent cache while preserving fallback',()=>{
+test('browser always uses CLIP AI and an automatic shortlist',()=>{
  const finder=read('src/components/GuVisualFinder.tsx');
  const ai=read('src/lib/visual-ai-client.ts');
- assert.match(finder,/visualAiEmbedding\(pictureUrl\)/);
+ assert.match(finder,/visualAiEmbedding\(url\)/);
  assert.match(finder,/readVisualVector\(photoUrl\)/);
  assert.match(finder,/categoryOptions/);
  assert.match(finder,/setChosen\(item\)/);
@@ -39,4 +39,14 @@ test('visual catalog response never returns phone, rental or deposit information
  assert.match(code,/imagePaths/);
  assert.match(code,/no-store/);
  assert.doesNotMatch(code,/customerPhone|handoverDepositProofId|reservationPaymentProofId/);
+});
+
+test('automatic crop selection uses the chosen category without manual controls',()=>{
+ assert.deepEqual(automaticVisualCrops('Chân váy'),['lower','full']);
+ assert.deepEqual(automaticVisualCrops('Áo'),['center','full']);
+ assert.deepEqual(automaticVisualCrops('Phụ kiện'),['full']);
+ const finder=read('src/components/GuVisualFinder.tsx');
+ assert.doesNotMatch(finder,/2 · Tập trung vào phần ảnh cần tìm|3 · Cách so sánh|Quét kỹ toàn danh mục/);
+ assert.match(finder,/automaticVisualCrops\(category\)/);
+ assert.doesNotMatch(finder,/useState<\s*'ai'\|'basic'/);
 });

@@ -16,3 +16,10 @@ service-account*.json
 
 # Private exports, never push client records to GitHub
 private-backups/
+# VPS migration secrets and customer-identifying data
+deploy/vps/.env
+deploy/vps/config/
+deploy/migration/exports/
+deploy/migration/.env
+*.dump
+*.jsonl

@@ -3,7 +3,7 @@
  */
 import {addDays,daysInclusive,parseDate} from './rental.ts';
 import type {InventoryItem,RentalOrder} from './types.ts';
-export type CalendarFilter='ALL'|'FREE'|'RESERVED'|'PICKED_UP'|'OVERDUE'|'LAUNDRY'|'MAINTENANCE'|'MISSING'|'UNPRICED';
+export type CalendarFilter='ALL'|'FREE'|'RESERVED'|'PICKED_UP'|'RETURNED'|'BLOCKED'|'OVERDUE'|'LAUNDRY'|'MAINTENANCE'|'MISSING'|'UNPRICED';
 export function calendarItemState(item:InventoryItem, orders:RentalOrder[], start:string, days=7, today:string):Exclude<CalendarFilter,'ALL'> {
   const end=addDays(start,days-1);
   const relevant=orders.filter(o=>['RESERVED','PICKED_UP'].includes(o.status)&&o.lines.some(l=>l.itemId===item.id));

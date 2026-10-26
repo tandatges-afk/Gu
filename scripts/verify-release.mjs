@@ -3,6 +3,12 @@ import { join } from 'node:path';
 
 const root = process.cwd();
 const required = [
+  'src/lib/visual-search-v55.ts',
+  'src/lib/visual-ai-client.ts',
+  'src/app/api/v5/visual-catalog/route.ts',
+  'src/components/GuVisualFinder.tsx',
+  'docs/GU-v5.5.0-AI-VISUAL-SEARCH-VSCODE-LOCAL.md',
+  'scripts/check-v55-local.ps1',
   'src/app/page.tsx',
   'src/app/globals.css',
   'src/app/api/bootstrap/route.ts',
@@ -36,6 +42,10 @@ const required = [
   'src/lib/product-name.ts',
   'src/lib/product-search.ts',
   'src/lib/return-risk.ts',
+  'src/lib/calendar-display.ts',
+  'src/lib/calendar-timeline.ts',
+  'src/lib/calendar-view-data.ts',
+  'src/app/api/calendar/view/route.ts',
   'scripts/migrate-staff-unified.mjs',
   'src/app/api/v5/return-risk/route.ts',
   'scripts/migrate-product-names.mjs',
@@ -107,6 +117,10 @@ checks.push(['giá thuê dùng tiền định dạng', /GuMoneyInput required/, 
 checks.push(['không có trang /mobile', /GuOrderCapture/, 'src/app/page.tsx']);
 checks.push(['tìm tên ở giữa từ không dấu', /nameSearchBigrams/, 'src/app/api/catalog/route.ts']);
 checks.push(['cảnh báo sau 17 giờ', /vnClock/, 'src/lib/return-risk.ts']);
+checks.push(['cảnh báo chưa nhận đơn riêng 17 giờ', /hasMissedPickupAt17/, 'src/lib/calendar-display.ts']);
+checks.push(['xóa gu-smart-calendar', /gu-calendar-pager-actions/, 'src/app/page.tsx']);
+checks.push(['lọc lịch trước phân trang', /const visible=items.filter/, 'src/app/api/calendar/view/route.ts']);
+checks.push(['chuyển trạng thái ngày lịch', /itemDayState/, 'src/app/page.tsx']);
 checks.push(['chỉ giữ Cloudinary trong giám sát Admin', /cloudinaryReport/, 'src/app/api/system/route.ts']);
 checks.push(['nút cập nhật bỏ cache', /system\?refresh=1/, 'src/components/GuSystem.tsx']);
 checks.push(['giá thuê theo 24h', /billableBlocks/, 'src/lib/hourly-pricing.ts']);
@@ -138,7 +152,7 @@ checks.push(['báo cáo theo khoảng', /range\(mode\)/, 'src/app/api/reports/ro
 checks.push(['đếm truy vấn API', /readMetrics/, 'src/app/api/system/read-metrics/route.ts']);
 checks.push(['đặt trước thu đủ tiền thuê có bằng chứng', /readVerifiedEvidence\(tx,paymentProofId/, 'src/app/api/v5/orders/route.ts']);
 checks.push(['sổ quỹ đặt trước', /kind:'PAYMENT',amount:total/, 'src/app/api/v5/orders/route.ts']);
-checks.push(['ảnh cọc lưu private', /evidenceBucket\(\)\.file\(path\)\.save/, 'src/app/api/v5/secure-photo/route.ts']);
+checks.push(['ảnh cọc lưu private', /storePrivateEvidence\(bytes,f\.type,me\.uid,id\)/, 'src/app/api/v5/secure-photo/route.ts']);
 checks.push(['nhận trả không cần Admin giải phóng kho', /status:'RETURNED' as const/, 'src/app/api/v5/orders/[id]/route.ts']);
 checks.push(['admin chỉ kiểm tra ảnh', /action==='REVIEW_PHOTOS'/, 'src/app/api/v5/orders/[id]/route.ts']);
 checks.push(['nhân viên xác nhận hoàn vật cọc', /action==='RETURN_COLLATERAL'/, 'src/app/api/v5/orders/[id]/route.ts']);
@@ -146,8 +160,12 @@ checks.push(['thu đủ tự động sau nhận trả', /Thu đủ \{money\(due\
 checks.push(['gợi ý SĐT nổi dưới ô nhập', /\.gu-v11-customer-results\{position:absolute/, 'src/app/globals.css']);
 checks.push(['hiển thị giờ giao và giờ nhận', /gu-calendar-cell-time/, 'src/app/page.tsx']);
 const absent = checks.filter(([name,pattern,file]) => missing.includes(file) || !pattern.test(read(file))).map(([name])=>name);
+checks.push(['API tìm ảnh lọc danh mục tại Firestore', /where\('category','==',category\)/, 'src/app/api/v5/visual-catalog/route.ts']);
+checks.push(['Tìm ảnh AI embedding', /visualAiEmbedding/, 'src/components/GuVisualFinder.tsx']);
+checks.push(['Tìm ảnh cache trình duyệt', /visualCacheKey/, 'src/components/GuVisualFinder.tsx']);
+checks.push(['Tìm ảnh theo danh mục', /categoryOptions/, 'src/components/GuVisualFinder.tsx']);
 const pkg = JSON.parse(read('package.json'));
-if (pkg.version !== '5.4.0') absent.push('phiên bản 5.4.0 trong package.json');
+if (pkg.version !== '5.5.4') absent.push('phiên bản 5.5.4 trong package.json');
 if (missing.length || absent.length) {
   console.error('KHÔNG ĐỒNG BỘ. Thiếu tệp:', missing.join(', ') || 'không');
   console.error('Thiếu thành phần:', absent.join(', ') || 'không');

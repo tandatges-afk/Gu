@@ -1,0 +1,11 @@
+{$GU_DOMAIN} {
+    encode zstd gzip
+    reverse_proxy app:3000 {
+        header_up X-Forwarded-Proto {scheme}
+    }
+    header {
+        X-Content-Type-Options nosniff
+        Referrer-Policy strict-origin-when-cross-origin
+        -Server
+    }
+}
