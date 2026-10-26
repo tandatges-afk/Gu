@@ -1,6 +1,6 @@
 {
   "name": "gu-vps-postgresql",
-  "version": "6.0.0-beta.1",
+  "version": "6.1.0-rc.1",
   "private": true,
   "type": "module",
   "engines": {
@@ -18,18 +18,18 @@
     "db:smoke": "node --env-file=.env.local scripts/pg-smoke-test.mjs"
   },
   "dependencies": {
-    "argon2": "^0.44.0",
-    "lucide-react": "^0.468.0",
     "next": "16.4.3",
-    "pg": "^8.16.3",
     "react": "19.2.0",
-    "react-dom": "19.2.0"
+    "react-dom": "19.2.0",
+    "pg": "^8.16.3",
+    "argon2": "^0.44.0",
+    "lucide-react": "^0.468.0"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
-    "@types/pg": "^8.15.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
+    "@types/pg": "^8.15.0",
     "typescript": "^5.8.0"
   }
 }

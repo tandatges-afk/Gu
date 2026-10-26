@@ -9,3 +9,11 @@ out/
 .vscode/
 *.tsbuildinfo
 uploads/
+# Server/database secrets and deployment artifacts
+*.pem
+*.key
+*.dump
+*.tar.gz
+*.zip
+backup/
+backups/

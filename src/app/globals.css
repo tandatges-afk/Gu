@@ -2,3 +2,9 @@
 @media(max-width:1100px){.stats{grid-template-columns:repeat(2,1fr)}.panels{grid-template-columns:1fr}.side{width:210px}.main{padding:25px 20px}}@media(max-width:750px){.side{display:none}.mobileBar{display:flex;position:fixed;bottom:0;z-index:20;background:#fff;border-top:1px solid #e5ebe2;width:100%;overflow:auto;padding:7px;gap:5px;box-shadow:0 -4px 20px #0001}.mobileBar button{min-width:80px;display:flex;flex-direction:column;align-items:center;gap:4px;border:0;background:none;color:#647b68;padding:8px;font-size:11px}.mobileBar button.active{color:#244c33;font-weight:800}.main{padding:20px 13px 95px}.top{align-items:flex-start;flex-direction:column}.stats{gap:8px}.stat{padding:15px}.stat .num{font-size:21px}.panel{padding:14px}.authPage{display:block;background:#f3f5f0}.authHero{min-height:30vh;padding:30px}.authHero h1{font-size:42px}.authPane{padding:24px}.authBox{padding:26px}.formgrid{grid-template-columns:1fr}.span2{grid-column:span 1}.day{min-height:72px;padding:3px;border-radius:5px}.dayNum{font-size:10px}.event{font-size:9px;padding:2px 3px}.modalBackdrop{align-items:flex-start;padding:10px}.modal{max-height:96vh}}
 
 .mobileSelect{display:none}@media(max-width:750px){.mobileSelect{display:block;flex:1;max-width:170px}}
+
+/* 6.1 operational focus: conspicuous warnings after 17:00 VN. */
+.handoverRiskPanel{border:1px solid #e7ae5b;background:#fff7e8;margin-bottom:20px;}
+.handoverRiskPanel .panelHead h2{color:#8a4c00;}
+.riskOrder{background:#fff3e1;}
+.riskOrder .badge{margin-left:8px;}

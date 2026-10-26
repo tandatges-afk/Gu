@@ -1,3 +1,7 @@
+# Phiên bản 6.1 RC1
+
+Xem [README-UPGRADE-6.1-VI.md](README-UPGRADE-6.1-VI.md) để cập nhật GU VPS PostgreSQL 6.1 và đối chiếu tính năng với GU V5.
+
 # GU VPS PostgreSQL v2 – Hướng dẫn triển khai
 
 Đây là **ứng dụng Next.js độc lập không dùng Firebase/Vercel**, cài cùng `gu_db` PostgreSQL trên Ubuntu 24.04. Mã mới là bản xây dựng lại phần nghiệp vụ cốt lõi, không khẳng định giữ được mọi tính năng phụ của GU v5 (AI tìm bằng ảnh, soát xét chứng từ nhiều cấp, quy tắc giá máy ảnh, báo cáo mở rộng). **Không thay thế website Vercel production khi chưa kiểm thử nghiệp vụ đầy đủ.**
