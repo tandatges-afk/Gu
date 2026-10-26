@@ -1,0 +1,3 @@
+*.sh text eol=lf
+vps/gu-release-deploy text eol=lf
+*.yml text eol=lf

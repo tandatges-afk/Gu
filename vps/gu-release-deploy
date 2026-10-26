@@ -1,0 +1,90 @@
+#!/usr/bin/env bash
+# Run only via tightly-scoped sudo as root.
+set -Eeuo pipefail
+umask 027
+
+if [[ $# -ne 1 || ! "$1" =~ ^[0-9]+-[0-9]+$ ]]; then
+  echo 'Usage: gu-release-deploy <github-run-id>-<attempt>' >&2
+  exit 2
+fi
+
+id="$1"
+base='/var/www/gu-pg'
+source_dir="/home/gu-deploy/incoming/$id"
+releases="$base/releases"
+release="$releases/$id"
+link="$base/current"
+envfile="$base/gu-pg/.env.local"
+
+exec 9>/run/lock/gu-release-deploy.lock
+flock -n 9 || { echo 'Another GU deployment is running' >&2; exit 1; }
+
+[[ -f "$source_dir/package.json" && -f "$source_dir/package-lock.json" && -f "$source_dir/src/app/api/version/route.ts" ]] || {
+  echo 'Missing package.json / package-lock.json in staged release' >&2
+  exit 1
+}
+[[ -f "$envfile" && -r "$envfile" ]] || {
+  echo 'Missing existing production .env.local' >&2
+  exit 1
+}
+[[ -L "$link" ]] || { echo 'current symlink is missing; run prepare-vps.sh first' >&2; exit 1; }
+[[ ! -e "$release" ]] || { echo 'Release already exists' >&2; exit 1; }
+old_release="$(readlink -f "$link")"
+
+mkdir -p "$release"
+# This code is trusted only to the same extent as the GitHub repository and its maintainers.
+cp -a "$source_dir"/. "$release"/
+rm -f "$release/.env.local"
+ln -s "$envfile" "$release/.env.local"
+chown -R guapp:guapp "$release"
+
+# Build and test before changing the live symlink. Do not run schema migrations automatically.
+runuser -u guapp -- /bin/bash -c '
+  set -Eeuo pipefail
+  cd "$1"
+  npm ci
+  npm run typecheck
+  npm test
+  npm run db:check
+  npm run build
+  test -s .next/BUILD_ID
+' gu-build "$release"
+
+# Atomic symlink switch, then health-check; revert if the new server does not respond.
+ln -s "$release" "$base/.current.$id"
+mv -Tf "$base/.current.$id" "$link"
+
+if ! systemctl restart gu-pg; then
+  echo 'Service restart failed, reverting' >&2
+  ln -s "$old_release" "$base/.current.rollback.$id"
+  mv -Tf "$base/.current.rollback.$id" "$link"
+  systemctl restart gu-pg || true
+  exit 1
+fi
+
+ok=0
+for _ in 1 2 3 4 5 6 7 8 9 10; do
+  # Validate a fresh deployment by checking the commit shown by the new app.
+  if curl --silent --fail --max-time 4 http://127.0.0.1:3200/ -o /dev/null; then
+    response="$(curl --silent --fail --max-time 4 http://127.0.0.1:3200/api/version || true)"
+    sha="$(cat "$release/.gu-deploy-commit")"
+    if [[ "$response" == *"$sha"* ]]; then
+      ok=1
+      break
+    fi
+  fi
+  sleep 2
+done
+
+if [[ "$ok" -ne 1 ]]; then
+  echo 'New release failed HTTP health check; rolling back' >&2
+  ln -s "$old_release" "$base/.current.rollback.$id"
+  mv -Tf "$base/.current.rollback.$id" "$link"
+  systemctl restart gu-pg || true
+  exit 1
+fi
+
+echo "DEPLOY OK: $id (previous: $old_release)"
+if [[ -f "$release/.gu-deploy-commit" ]]; then
+  echo "COMMIT: $(cat "$release/.gu-deploy-commit")"
+fi

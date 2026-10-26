@@ -1,0 +1,88 @@
+name: GU main - Check and deploy VPS
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: gu-main-production
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Verify PostgreSQL application and package lock
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f package-lock.json
+          test -f db/003_v2.sql
+          test -f src/app/api/version/route.ts
+          node -e 'const p=require("./package.json"); if(!/^6\./.test(p.version)) {console.error("Not GU PostgreSQL 6.x"); process.exit(1)}'
+      - name: Install and test
+        run: |
+          npm ci
+          npm run typecheck
+          npm test
+        env:
+          CI: 'true'
+
+  deploy:
+    needs: validate
+    # Manual deploy must succeed before enabling push-based deploys.
+    # Repository variable GU_PRODUCTION_DEPLOY=enabled enables production deploys on push.
+    if: github.event_name == 'workflow_dispatch' || vars.GU_PRODUCTION_DEPLOY == 'enabled'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup SSH securely
+        shell: bash
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.GU_DEPLOY_SSH_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.GU_SSH_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          test -n "$SSH_PRIVATE_KEY"
+          test -n "$SSH_KNOWN_HOSTS"
+          install -d -m 700 "$HOME/.ssh"
+          printf '%s\n' "$SSH_PRIVATE_KEY" > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          printf '%s\n' "$SSH_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+          chmod 600 "$HOME/.ssh/known_hosts"
+      - name: Stage, build, deploy and verify commit
+        shell: bash
+        env:
+          VPS_HOST: '103.176.25.226'
+        run: |
+          set -euo pipefail
+          RELEASE_ID="${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          REMOTE="gu-deploy@${VPS_HOST}"
+          SSH_ARGS="-i $HOME/.ssh/id_ed25519 -o BatchMode=yes -o StrictHostKeyChecking=yes"
+          printf '%s\n' "${GITHUB_SHA}" > .gu-deploy-commit
+          ssh $SSH_ARGS "$REMOTE" "mkdir -p /home/gu-deploy/incoming/$RELEASE_ID"
+          rsync -az --delete \
+            -e "ssh $SSH_ARGS" \
+            --exclude='.git/' \
+            --exclude='.github/' \
+            --exclude='.env*' \
+            --exclude='.next/' \
+            --exclude='node_modules/' \
+            --exclude='*.tsbuildinfo' \
+            ./ "$REMOTE:/home/gu-deploy/incoming/$RELEASE_ID/"
+          ssh $SSH_ARGS "$REMOTE" "sudo -n /usr/local/sbin/gu-release-deploy $RELEASE_ID"
+          echo "DEPLOYED MAIN COMMIT: $GITHUB_SHA"

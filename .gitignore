@@ -17,3 +17,16 @@ uploads/
 *.zip
 backup/
 backups/
+
+# Private data and build outputs
+.env
+.env.*
+!.env.example
+node_modules/
+.next/
+*.dump
+*.pem
+*.key
+*.tar.gz
+uploads/
+backups/
