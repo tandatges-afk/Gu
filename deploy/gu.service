@@ -1,0 +1,18 @@
+[Unit]
+Description=GU Rental PostgreSQL Next.js
+After=network-online.target postgresql.service
+Wants=network-online.target
+[Service]
+Type=simple
+User=guapp
+Group=guapp
+WorkingDirectory=/var/www/gu-pg/gu-pg
+Environment=NODE_ENV=production
+ExecStart=/usr/bin/npm run start -- -H 127.0.0.1 -p 3100
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+ProtectHome=true
+PrivateTmp=true
+[Install]
+WantedBy=multi-user.target

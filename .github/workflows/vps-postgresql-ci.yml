@@ -1,0 +1,36 @@
+name: GU PostgreSQL checks
+
+on:
+  push:
+    branches: ["vps-postgresql", "vps-postgresql-*"]
+  pull_request:
+    branches: ["vps-postgresql", "vps-postgresql-*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install dependencies
+        run: |
+          if [ -f package-lock.json ]; then npm ci; else npm install --no-audit --no-fund; fi
+      - name: Check TypeScript
+        run: npm run typecheck
+      - name: Run tests
+        run: npm test
+      - name: Build Next.js
+        run: npm run build
+        env:
+          DATABASE_URL: postgresql://placeholder:placeholder@127.0.0.1:5432/gu_ci
+          APP_URL: https://guthuedo.io.vn
+          GU_UPLOAD_DIR: /tmp/gu-ci-uploads
+      - name: Dependency security check
+        run: npm audit --omit=dev --audit-level=high

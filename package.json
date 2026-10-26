@@ -1,41 +1,35 @@
 {
-  "name": "gu-thue-do-xinh",
-  "version": "5.4.0",
+  "name": "gu-vps-postgresql",
+  "version": "6.1.0-rc.1",
   "private": true,
   "type": "module",
+  "engines": {
+    "node": ">=22 <23"
+  },
   "scripts": {
     "dev": "next dev",
-    "build": "node scripts/check-local-imports.mjs && next build",
+    "build": "next build",
     "start": "next start",
     "typecheck": "tsc --noEmit",
     "test": "node --experimental-strip-types --test tests/*.test.ts",
-    "diagnose:firebase": "node --env-file=.env.local scripts/diagnose-firebase.mjs",
-    "verify:release": "node scripts/verify-release.mjs && node scripts/check-local-imports.mjs",
-    "data:plan": "node --env-file=.env.local scripts/reset-demo-data.mjs --plan",
-    "data:backup": "node --env-file=.env.local scripts/reset-demo-data.mjs --backup",
-    "diagnose:monitoring": "node --experimental-strip-types --env-file=.env.local scripts/diagnose-monitoring.mjs",
-    "data:index-names": "node --experimental-strip-types --env-file=.env.local scripts/migrate-product-names.mjs --plan",
-    "data:apply-names": "node --experimental-strip-types --env-file=.env.local scripts/migrate-product-names.mjs --execute --confirm=INDEX-gugu-547e3",
-    "staff:unify-plan": "node --env-file=.env.local scripts/migrate-staff-unified.mjs",
-    "staff:unify-apply": "node --env-file=.env.local scripts/migrate-staff-unified.mjs --execute --confirm=UNIFY-gugu-547e3",
-    "verify:imports": "node scripts/check-local-imports.mjs",
-    "typecheck:tests": "tsc --noEmit -p tsconfig.tests.json"
+    "db:migrate": "node --env-file=.env.local scripts/migrate.mjs",
+    "db:check": "node --env-file=.env.local scripts/check-db.mjs",
+    "admin:create": "node --env-file=.env.local scripts/create-admin.mjs",
+    "db:smoke": "node --env-file=.env.local scripts/pg-smoke-test.mjs"
   },
   "dependencies": {
-    "firebase": "^12.0.0",
-    "firebase-admin": "^13.0.0",
-    "lucide-react": "^0.468.0",
-    "next": "^16.0.0",
-    "react": "^19.2.0",
-    "react-dom": "^19.2.0"
+    "next": "16.4.3",
+    "react": "19.2.0",
+    "react-dom": "19.2.0",
+    "pg": "^8.16.3",
+    "argon2": "^0.44.0",
+    "lucide-react": "^0.468.0"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
+    "@types/pg": "^8.15.0",
     "typescript": "^5.8.0"
-  },
-  "engines": {
-    "node": "22.x"
   }
 }

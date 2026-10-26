@@ -6,13 +6,14 @@ out/
 !.env.example
 *.log
 .DS_Store
+.vscode/
 *.tsbuildinfo
-service-account*.json
-firebase-adminsdk*.json
-
-# Credentials downloaded from Firebase Console
-*-firebase-adminsdk-*.json
-service-account*.json
-
-# Private exports, never push client records to GitHub
-private-backups/
+uploads/
+# Server/database secrets and deployment artifacts
+*.pem
+*.key
+*.dump
+*.tar.gz
+*.zip
+backup/
+backups/
