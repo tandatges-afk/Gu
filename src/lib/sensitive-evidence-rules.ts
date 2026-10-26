@@ -1,12 +1,15 @@
-/** Data-retention decisions are pure and testable without any provider connection. */
-export const ORPHAN_EVIDENCE_AGE_MS=24*60*60*1000;
+/** Fail-closed policy for sensitive evidence. Automatic deletion remains opt-in
+ * until an administrator explicitly approves it and confirms retention rules.
+ */
 export function cleanupAllowed(order:Record<string,unknown>):boolean {
- if(order.status==='CANCELLED'||order.status==='VOIDED')return true;
- if(order.status!=='RETURNED'||order.photoReviewStatus==='PENDING')return false;
- return order.photoReviewStatus==='REVIEWED'||Boolean(order.reviewedAt&&order.returnStage==='APPROVED');
+  return order.status==='RETURNED'
+    && order.sensitiveEvidenceCleanupApproved===true
+    && typeof order.sensitiveEvidenceCleanupApprovedAt==='string'
+    && Number.isFinite(Date.parse(order.sensitiveEvidenceCleanupApprovedAt));
 }
 export function orphanOldEnough(createdAt:unknown,now=Date.now()):boolean {
- if(typeof createdAt!=='string')return false;
- const time=Date.parse(createdAt);
- return Number.isFinite(time)&&time<=now-ORPHAN_EVIDENCE_AGE_MS;
+  if(process.env.GU_ALLOW_ORPHAN_CLEANUP!=='1')return false;
+  if(typeof createdAt!=='string')return false;
+  const at=Date.parse(createdAt);
+  return Number.isFinite(at)&&at<now-30*86400000&&at<=now;
 }

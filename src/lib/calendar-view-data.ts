@@ -6,8 +6,8 @@ import type {Query,QueryDocumentSnapshot} from 'firebase-admin/firestore';
 import {cached,countQuery} from './read-optimization';
 import type {InventoryItem,RentalOrder} from './types';
 import {addDays} from './rental';
-export const MAX_CALENDAR_ITEMS=3000;
-export const MAX_CALENDAR_ORDERS=5000;
+export const MAX_CALENDAR_ITEMS=Number(process.env.GU_MAX_CALENDAR_ITEMS||20000);
+export const MAX_CALENDAR_ORDERS=Number(process.env.GU_MAX_CALENDAR_ORDERS||40000);
 async function loadCollection<T>(q:Query,limit:number):Promise<T[]>{
  const results:T[]=[];
  let cursor:QueryDocumentSnapshot|undefined;
@@ -50,8 +50,8 @@ export async function calendarFastPage(category:string,offset:number){
  let scanned=0;
  let more=true;
  // Each query is bounded; cursors identify the next *source* document, not the next filtered row.
- while(collected.length<26&&more&&scanned<250){
-  const limit=Math.min(50,250-scanned);
+ while(collected.length<26&&more){
+  const limit=50;
   const snap=countQuery(await query.offset(offset+scanned).limit(limit).get());
   for(let j=0;j<snap.size;j++){
    const d=snap.docs[j];
@@ -60,7 +60,6 @@ export async function calendarFastPage(category:string,offset:number){
   scanned+=snap.size;
   more=snap.size===limit;
  }
- if(scanned===250&&collected.length<=25)throw Error('CALENDAR_TOO_MANY_ROWS');
  const last=collected[24];
  return {items:collected.slice(0,25).map(x=>x.item),next:last&&(collected.length>25||more)?String(last.index+1):null};
 }

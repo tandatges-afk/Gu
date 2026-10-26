@@ -15,7 +15,7 @@ test('admin system is Cloudinary only; no Monitoring or Firestore collection cou
 test('no redundant angles or search hints or undefined catalog pagination text',()=>{
  assert.doesNotMatch(page,/Chưa có góc chụp\. Admin cần thêm trước khi tạo lịch thuê/);
  assert.doesNotMatch(page,/catalogData\?\.results\.length\+'/);
- assert.match(page,/catalogData\?`\$\{catalogData\.results\?\.length \?\? 0\} kết quả`/);
+ assert.match(page,/Đã tải \$\{catalogData\.results\.length\} dòng/);
  assert.doesNotMatch(finder,/Chụp trực tiếp hoặc chọn ảnh từ điện thoại/);
  assert.doesNotMatch(finder,/Chưa phải AI; cần xác nhận/);
 });

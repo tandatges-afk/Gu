@@ -16,7 +16,7 @@ test('Finder and product form do not show unnecessary hints or undefined results
  assert.doesNotMatch(home,/Chưa có góc chụp\. Admin cần thêm trước khi tạo lịch thuê\./);
  assert.doesNotMatch(finder,/Chụp trực tiếp hoặc chọn ảnh từ điện thoại\/máy tính\./);
  assert.doesNotMatch(home,/catalogData\?\.results.length\+'/);
- assert.match(home,/catalogData\.results\?\.length \?\? 0/);
+ assert.match(home,/Đã tải \$\{catalogData\.results\.length\} dòng/);
 });
 test('Firestore and Cloudinary operations remain intact despite removing Firestore usage panel',()=>{
  assert.match(read('src/app/api/items/route.ts'),/db\(\)\.collection\('items'\)/);

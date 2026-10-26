@@ -31,7 +31,7 @@ export async function GET(req:NextRequest){return measureRoute('GET /api/calenda
   if(creator!=='ALL'&&!/^[\w-]{10,128}$/.test(creator))throw new ApiError(400,'Mã nhân viên không hợp lệ.');
   const query=String(p.get('q')||'').trim().slice(0,80);
   const offset=Number(p.get('cursor')||'0');
-  if(!Number.isSafeInteger(offset)||offset<0||offset>3000||offset!==Math.trunc(offset))throw new ApiError(400,'Vị trí trang không hợp lệ.');
+  if(!Number.isSafeInteger(offset)||offset<0||offset>1000000||offset!==Math.trunc(offset))throw new ApiError(400,'Vị trí trang không hợp lệ.');
   const fast=creator==='ALL'&&status==='ALL'&&!query;
   const fresh=p.has('refresh');
   const [{items:loadedItems,orders},fastPage]=await Promise.all([calendarData(start,fresh,!fast),fast?calendarFastPage(category,offset):Promise.resolve(null)]);

@@ -1,6 +1,7 @@
 import type { NextConfig } from 'next';
 const nextConfig: NextConfig = {
   reactStrictMode: true,
+  output: 'standalone',
   // Transformers.js CLIP runs in the browser. Never bundle native Node ONNX into the client.
   webpack(config) {
     config.resolve.alias = {

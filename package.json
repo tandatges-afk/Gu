@@ -20,7 +20,8 @@
     "staff:unify-apply": "node --env-file=.env.local scripts/migrate-staff-unified.mjs --execute --confirm=UNIFY-gugu-547e3",
     "verify:imports": "node scripts/check-local-imports.mjs",
     "typecheck:tests": "tsc --noEmit -p tsconfig.tests.json",
-    "diagnose:storage": "node --env-file=.env.local scripts/check-private-evidence.mjs"
+    "diagnose:storage": "node --env-file=.env.local scripts/check-private-evidence.mjs",
+    "migration:export": "node --env-file=.env.local deploy/migration/export-firestore.mjs ./private-backups/gu-export"
   },
   "dependencies": {
     "@huggingface/transformers": "^3.8.1",
