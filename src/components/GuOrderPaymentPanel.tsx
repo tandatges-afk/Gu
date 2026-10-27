@@ -31,7 +31,7 @@ export function GuOrderPaymentPanel({order,api,onPaid}:{order:RentalOrder;api:Ap
  };
  return <section className={styles.panel} aria-label="Thu tiền đơn thuê">
   <div className={styles.heading}><Wallet size={20}/><strong>Đối soát và thu tiền</strong></div>
-  <div className={styles.metrics}><span>Tiền thuê <b>{money(order.total)}</b></span><span>Phụ thu/đền bù <b>{money((order.compensationTotal||0)+(order.otherFeeTotal||0)+(order.lateFeeTotal||0))}</b></span><span>Đã nhận ròng <b>{money(order.paid)}</b></span></div>
+  <details className="gu-optional-details"><summary>Chi tiết tiền thuê và phụ phí</summary><div className={styles.metrics}><span>Tiền thuê <b>{money(order.total)}</b></span><span>Phụ thu/đền bù <b>{money((order.compensationTotal||0)+(order.otherFeeTotal||0)+(order.lateFeeTotal||0))}</b></span><span>Đã thu <b>{money(order.paid)}</b></span></div></details>
   {clothingPolicy&&order.handoverCashCollateralAmount&&!order.collateralReturnedAt&&<p>Tiền cọc đang giữ {money(order.handoverCashCollateralAmount)} sẽ được cấn trừ khi xác nhận trả cọc; không cần thu lại phần này.</p>}
   {due>0?<><div className={styles.remaining}>Còn cần thu <strong>{money(due)}</strong></div>
    {!clothingPolicy&&<div className={styles.fields}><label>Phương thức<select className="input" value={method} onChange={e=>{setMethod(e.target.value as 'CASH'|'TRANSFER');pending.current=null;}}><option value="CASH">Tiền mặt</option><option value="TRANSFER">Chuyển khoản</option></select></label>

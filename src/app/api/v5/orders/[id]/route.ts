@@ -94,6 +94,7 @@ export async function PATCH(req:NextRequest,ctx:{params:Promise<{id:string}>}){
     const depositEvidence=depositProofId?await readVerifiedEvidence(tx,depositProofId,me.uid,'deposit',String(b.depositDraftId||'')):null;
     const clothingPolicy=order.settlementPolicyVersion===CLOTHING_SETTLEMENT_VERSION&&orderGroup(order)==='CLOTHING';
     if(clothingPolicy&&(!depositProofId||!['CASH','CCCD'].includes(depositKind)))throw new ApiError(400,'Phải chọn tiền cọc hoặc CCCD và chụp chứng từ trước khi giao đồ.');
+    if(orderGroup(order)==='CAMERA'&&(!depositProofId||!['CASH','CCCD','OTHER'].includes(depositKind)))throw new ApiError(400,'Phải chụp chứng từ cọc/CCCD của máy ảnh trước khi bàn giao. Số tiền cọc do cửa hàng đối soát trực tiếp.');
     const collateralRequired=clothingPolicy?collateralForLines(order.lines):0;
     const cashCollateral=clothingPolicy&&depositKind==='CASH'?collateralRequired:0;
     if(clothingPolicy&&Number(b.collateralAmount)!==cashCollateral)throw new ApiError(409,`Tiền cọc mỗi món: trang phục 300.000đ, phụ kiện 200.000đ; tổng cọc phải thu là ${cashCollateral.toLocaleString('vi-VN')}đ.`);
@@ -199,6 +200,7 @@ export async function PATCH(req:NextRequest,ctx:{params:Promise<{id:string}>}){
     if(order.status!=='RETURNED'||!(order.handoverDepositProofId||order.hadHandoverDeposit))throw new ApiError(409,'Đơn chưa trả hoặc không có vật cọc cần hoàn lại.');
     if(order.collateralReturnedAt)throw new ApiError(409,'Vật cọc đã được xác nhận hoàn lại.');
     if(b.confirmReturned!==true)throw new ApiError(400,'Chưa xác nhận đã trao trả vật cọc.');
+    if(orderGroup(order)==='CAMERA'&&Math.max(0,order.total+(order.otherFeeTotal||0)+(order.compensationTotal||0)+(order.lateFeeTotal||0)-order.paid)>0)throw new ApiError(409,'Phải thu đủ tiền thuê/phụ phí máy ảnh trước khi xác nhận trả cọc hoặc CCCD. Cửa hàng tự quyết số cọc hoàn, GU không tự khấu trừ.');
     if(order.settlementPolicyVersion===CLOTHING_SETTLEMENT_VERSION&&orderGroup(order)==='CLOTHING'){
       const kind=order.handoverDepositKind;
       if(kind!=='CCCD'&&kind!=='CASH')throw new ApiError(409,'Đơn không có loại cọc hợp lệ. Cần Admin đối soát.');
@@ -219,6 +221,7 @@ export async function PATCH(req:NextRequest,ctx:{params:Promise<{id:string}>}){
       tx.update(ref,{collateralReturnedAt:now,collateralReturnedBy:me.uid,updatedAt:now,history:[...order.history,{action:'COLLATERAL_RETURNED',by:me.uid,at:now,detail:`Đã hoàn lại trực tiếp vật cọc loại ${order.handoverDepositKind||'OTHER'}, không chụp lại`}]});
     }
    }else if(action==='REFUND_RESERVATION'){
+    if(order.bookingKind==='RESERVE')throw new ApiError(409,'Tiền giữ lịch đã thu không hoàn khi khách bỏ lịch. Admin dùng Hủy lịch (giữ tiền đã thu).');
     if(order.status!=='RESERVED'||order.paid<=0)throw new ApiError(409,'Chỉ hoàn trước khi hủy lịch có tiền đã thu.');
     const method=String(b.method||'');const reference=String(b.reference||'').trim().slice(0,100);
     if(b.confirmRefund!==true||!['CASH','TRANSFER'].includes(method)||method==='TRANSFER'&&reference.length<4)throw new ApiError(400,'Chỉ ghi nhận sau khi đã hoàn đủ tiền cho khách.');
@@ -303,13 +306,15 @@ export async function PATCH(req:NextRequest,ctx:{params:Promise<{id:string}>}){
    }else if(action==='VOID'||action==='CANCEL'){
     if(action==='CANCEL'&&order.status!=='RESERVED')throw new ApiError(409,'Đơn đã giao, chỉ Admin được hủy có kiểm nhận vật lý.');
     if(action==='VOID'&&b.confirmCleanItems!==true)throw new ApiError(400,'Admin phải xác nhận tất cả đồ đã được kiểm nhận và sạch trước khi hủy.');
-    if(order.paid>0)throw new ApiError(409,'Đơn đã thu tiền: cần hoàn tiền/đối soát trước khi xóa.');
+    if(action==='VOID'&&order.paid>0)throw new ApiError(409,'Đơn đã thu tiền: cần hoàn tiền/đối soát trước khi xóa.');
+    if(action==='CANCEL'&&order.paid>0&&order.bookingKind!=='RESERVE')throw new ApiError(409,'Đơn có tiền đã thu nhưng không phải đặt trước. Admin cần đối soát thủ công trước khi hủy.');
     const snaps=await Promise.all(itemRefs.map(r=>tx.get(r)));
     if(snaps.some(s=>!s.exists)|| (action==='VOID'&&snaps.some(s=>s.data()?.currentOrderId&&s.data()?.currentOrderId!==id)))throw new ApiError(409,'Trạng thái kho đã thay đổi, không thể xóa.');
     const release=await removeOrderIntervals(tx,order);
     const newStatus=action==='VOID'?'VOIDED':'CANCELLED';
     queueSensitiveEvidenceCleanup(tx,id,now);
-    tx.update(ref,{status:newStatus,voidedAt:action==='VOID'?now:null,voidedBy:action==='VOID'?me.uid:null,updatedAt:now,history:[...order.history,{action:action==='VOID'?'ADMIN_VOID':'CANCEL',by:me.uid,at:now,detail:action==='VOID'?'Đã xác nhận thu đủ đồ sạch, khóa đơn và hoàn kho':'Hủy lịch chưa giao'}]});
+    tx.update(ref,{status:newStatus,voidedAt:action==='VOID'?now:null,voidedBy:action==='VOID'?me.uid:null,updatedAt:now,history:[...order.history,{action:action==='VOID'?'ADMIN_VOID':'CANCEL',by:me.uid,at:now,amount:action==='CANCEL'?order.paid:0,detail:action==='VOID'?'Đã xác nhận thu đủ đồ sạch, khóa đơn và hoàn kho':order.paid>0?'Khách bỏ lịch, giữ lại toàn bộ tiền thuê đã thu; không phát sinh hoàn tiền':'Hủy lịch chưa giao'}]});
+    if(action==='CANCEL'&&order.paid>0)tx.create(ref.collection('cashMovements').doc(),{orderId:id,kind:'RESERVATION_FORFEITED',amount:order.paid,actorUid:me.uid,actorName:me.name,createdAt:now,description:'Tiền thuê giữ lịch không hoàn khi khách không nhận đồ; khoản tiền đã thu trước, không cộng doanh thu tiền mặt lần hai'});
     if(action==='VOID')itemRefs.forEach(r=>tx.update(r,{status:'AVAILABLE',currentOrderId:null,expectedReturnDate:null,laundryCompletedAt:now}));
     release?.();tx.set(job,{stage:'DONE',updatedAt:now},{merge:true});
     syncDebtIndex(tx,db(),{...order,status:newStatus,updatedAt:now});

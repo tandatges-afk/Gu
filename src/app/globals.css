@@ -1153,3 +1153,20 @@ html,body{background:var(--paper);color:var(--ink)}
  .gu-calendar-toolbar-v532 .gu-calendar-date-actions>.boxed:last-child{order:2!important}
  .gu-calendar-toolbar-v532 .gu-calendar-date-actions>.gu-calendar-today{order:3!important;flex:1 1 100%!important}
 }
+
+/* FIX8: giao/nhận ưu tiên hành động, thu gọn dữ liệu phụ trên điện thoại. */
+.gu-quick-money{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:10px 0}
+.gu-quick-money>span{border:1px solid #d9e5ec;border-radius:12px;padding:11px 12px;background:#f7fafc;display:grid;gap:4px;min-width:0}
+.gu-quick-money small{font-size:11px;color:#5d7284}.gu-quick-money strong{font-size:16px;color:#18344c;overflow-wrap:anywhere}
+.gu-quick-money>span:last-child{background:#eaf5ee;border-color:#badfca}.gu-quick-money>span:last-child strong{color:#21633f}
+.gu-compact-meta,.gu-mini-note{font-size:12px;color:#5a7186;line-height:1.45;margin:6px 0 10px}
+.gu-mini-note{background:#f5f8fb;padding:9px 12px;border-radius:10px}
+.gu-optional-details{padding:10px 12px;border:1px solid #dce5eb;border-radius:11px;margin:10px 0;background:#fff;min-width:0}
+.gu-optional-details summary{font-size:13px;font-weight:700;color:#244866;cursor:pointer;min-height:24px}
+.gu-optional-details[open] summary{margin-bottom:9px}
+.gu-v52-settlement{gap:8px;padding:14px}.gu-v52-settlement h3{margin:0;font-size:19px}
+.gu-v52-settlement .gu-v52-deposit-panel{margin:5px 0;padding:12px;border-radius:12px}
+.gu-capture-dialog{width:min(100%,710px)}.gu-capture-header{padding:12px 16px}.gu-capture-header h2{font-size:20px}
+.gu-capture-angle{padding:9px;margin:9px 0}.gu-capture-photo-grid{gap:8px}.gu-capture-photo-grid img,.gu-capture-placeholder{aspect-ratio:5/3}
+.gu-capture-progress{padding:10px 15px}.gu-capture-item{margin:8px 14px;padding:12px}.gu-capture-footer{padding:10px 14px}
+@media(max-width:650px){.gu-quick-money{grid-template-columns:1fr;gap:6px}.gu-quick-money>span{display:flex;align-items:center;justify-content:space-between;padding:9px 12px}.gu-quick-money strong{font-size:15px}.gu-capture-item{margin:7px;padding:9px}.gu-capture-photo-grid img,.gu-capture-placeholder{aspect-ratio:4/3}}
