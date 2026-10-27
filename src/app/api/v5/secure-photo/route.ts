@@ -3,6 +3,7 @@ import {randomUUID} from 'node:crypto';
 import {db} from '@/lib/firebase-admin';
 import {staffUser,handleError,ApiError} from '@/lib/http';
 import {validEvidenceId} from '@/lib/secure-evidence';
+import {cleanupAllowed} from '@/lib/sensitive-evidence-rules';
 import {uploadSecureCloudinary,downloadSecureCloudinary,deleteSecureCloudinary,securePhotoPublicId,type SecureCloudinaryImage} from '@/lib/cloudinary-secure';
 export const runtime='nodejs';export const preferredRegion='sin1';
 const limits={reservation:3*1024*1024,deposit:3*1024*1024};
@@ -48,7 +49,7 @@ export async function GET(req:NextRequest){
   if(!snap.exists||!info?.consumedOrderId)throw new ApiError(404,'Ảnh chưa thuộc đơn đã xác nhận.');
   const order=await db().collection('orders').doc(info.consumedOrderId).get();
   if(!order.exists)throw new ApiError(404,'Không tìm thấy đơn của ảnh.');
-  if(['DELETING','PURGED'].includes(String(order.data()?.sensitiveEvidenceStatus||''))||order.data()?.photoReviewStatus==='REVIEWED'||order.data()?.reviewedAt||['CANCELLED','VOIDED'].includes(String(order.data()?.status||'')))throw new ApiError(410,'Ảnh đã hết thời hạn lưu giữ sau khi duyệt.');
+  if(['DELETING','PURGED'].includes(String(order.data()?.sensitiveEvidenceStatus||''))||cleanupAllowed(order.data()||{}))throw new ApiError(410,'Chứng từ đã hết thời hạn lưu giữ 5 ngày từ khi hoàn tất đơn.');
   if(!canReadEvidence(me,order.data()||{}))throw new ApiError(403,'Bạn không có quyền xem chứng từ của đơn này.');
   let bytes:Buffer;
   if(info.provider==='local'){

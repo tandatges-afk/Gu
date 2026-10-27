@@ -39,6 +39,19 @@ export function registrationPeriod(now:Date){
  const weekStart=addShiftDays(sunday,1);
  return {isOpen,weekStart,weekEnd:addShiftDays(weekStart,6),opensAt:sunday+'T12:00:00+07:00',closesAt:sunday+'T20:00:00+07:00'};
 }
+/** Admin can open registration early for the UPCOMING week, in exactly one 8-hour window. */
+export type EarlyRegistrationWindow={weekStart:string;opensAt:string;closesAt:string};
+export function upcomingRegistrationWeek(now:Date){return addShiftDays(isoWeekMonday(vnDate(now)),7);}
+export function earlyWindow(now:Date,weekStart:string):EarlyRegistrationWindow{
+ if(weekStart!==upcomingRegistrationWeek(now))throw Error('Chỉ được mở sớm cho tuần sau.');
+ return {weekStart,opensAt:now.toISOString(),closesAt:new Date(now.getTime()+8*60*60*1000).toISOString()};
+}
+export function effectiveRegistrationPeriod(now:Date,override?:EarlyRegistrationWindow|null){
+ const normal=registrationPeriod(now);
+ if(override&&override.weekStart===upcomingRegistrationWeek(now)&&Date.parse(override.opensAt)<=now.getTime()&&now.getTime()<Date.parse(override.closesAt))
+  return {...normal,isOpen:true,weekStart:override.weekStart,weekEnd:addShiftDays(override.weekStart,6),opensAt:override.opensAt,closesAt:override.closesAt,early:true};
+ return {...normal,early:false};
+}
 export function uniqueSelections(ids:unknown,monday:string){
  if(!Array.isArray(ids)||ids.length>21||ids.some(v=>typeof v!=='string'))throw Error('Danh sách ca đăng ký không hợp lệ.');
  const slots=new Set(shiftSlots(monday).map(s=>s.key));

@@ -162,7 +162,8 @@ export async function PATCH(req:NextRequest,ctx:{params:Promise<{id:string}>}){
        : (l.startAt||order.handoverProof!.at||order.pickupAt!),endTime));
     const pendingCameraIds=order.lines.flatMap((l,i)=>quote[i].pendingCameraLatePricing?[l.itemId]:[]);
     const quoted=quote.reduce((sum,v)=>sum+v.amount,0);
-    const rent=finalRent({bookedRent:order.bookedRentTotal||order.total,quotedRent:quoted,prepaid:order.bookingKind==='RESERVE',scheduledReturn:order.returnAt||now,actualReturn:endTime});
+    const wasExtended=orderGroup(order)==='CLOTHING'&&order.history.some(h=>h.action==='EXTEND');
+    const rent=finalRent({bookedRent:order.total,quotedRent:quoted,prepaid:order.bookingKind==='RESERVE'||wasExtended,scheduledReturn:order.returnAt||now,actualReturn:endTime});
     const compensation=proofs.reduce((sum,p)=>sum+(p.condition==='MISSING'?Number(order.lines.find(l=>l.itemId===p.itemId)?.replacementValue||0):0),0);
     if(proofs.some(p=>p.condition==='MISSING'&&!order.lines.find(l=>l.itemId===p.itemId)?.replacementValue))throw new ApiError(409,'Món thiếu chưa được định giá đền bù.');
     const nextDue=rent+compensation+(order.otherFeeTotal||0);
@@ -171,27 +172,27 @@ export async function PATCH(req:NextRequest,ctx:{params:Promise<{id:string}>}){
     const actualBlocks=billableBlocks(order.handoverProof!.at||order.pickupAt!,endTime);
     const returnProof={status:'SUBMITTED' as const,by:me.uid,byName:me.name,at:endTime,items:proofs};
     const revised={...order,status:'RETURNED' as const,returnStage:'APPROVED' as const,returnProof,total:rent,compensationTotal:compensation,lateFeeTotal:0,rentalDays:actualBlocks,returnedAt:now,refundPending,photoReviewStatus:'PENDING' as const,cameraLatePendingItemIds:pendingCameraIds,cameraLateFeePending:pendingCameraIds.length>0,cameraOvertimeFeeTotal:quote.reduce((sum,v)=>sum+v.cameraLateFee,0),updatedAt:now};
+    // Register each completed handover+return pair immediately upon physical return.
+    const trackerRefs=order.lines.map(l=>db().collection('inspectionEvidence').doc(l.itemId));
+    const trackers=await Promise.all(trackerRefs.map(r=>tx.get(r)));
+    trackerRefs.forEach((trackerRef,i)=>{
+      const itemId=order.lines[i].itemId;
+      const hasHandover=Object.values(order.handoverProof?.items.find(p=>p.itemId===itemId)?.shots||{}).some(shot=>Boolean(shot.url));
+      const hasReturn=Object.values(proofs.find(p=>p.itemId===itemId)?.shots||{}).some(shot=>Boolean(shot.url));
+      if(!hasHandover||!hasReturn)return;
+      const result=addCompletedRound((trackers[i].data()?.rounds||[]) as InspectionRound[],{orderId:id,completedAt:now});
+      tx.set(trackerRef,{itemId,rounds:result.keep,updatedAt:now});
+      for(const old of result.expired)tx.set(db().collection('inspectionCleanup').doc(itemId+'_'+old.orderId),{itemId,orderId:old.orderId,triggerOrderId:id,createdAt:now},{merge:true});
+    });
     syncDebtIndex(tx,db(),revised);
     tx.update(ref,{status:'RETURNED',returnStage:'APPROVED',returnProof,total:rent,compensationTotal:compensation,lateFeeTotal:0,rentalDays:actualBlocks,returnedAt:now,refundPending,photoReviewStatus:'PENDING',cameraLatePendingItemIds:pendingCameraIds,cameraLateFeePending:pendingCameraIds.length>0,cameraOvertimeFeeTotal:revised.cameraOvertimeFeeTotal,updatedAt:now,history:[...order.history,{action:'STAFF_RETURN_COMPLETE',at:now,by:me.uid,detail:'Đã nhận và hoàn kho độc lập với Admin; ảnh lưu chờ kiểm tra hậu kiểm'}]});
     itemRefs.forEach((r,i)=>{const p=proofs.find(v=>v.itemId===order.lines[i].itemId);const item=snaps[i].data() as InventoryItem;const state=p?.condition==='MISSING'?'MISSING':p?.condition==='ISSUE'?'MAINTENANCE':item.requiresLaundry===false?'AVAILABLE':'LAUNDRY';tx.update(r,{status:state,currentOrderId:null,expectedReturnDate:null,...(state==='LAUNDRY'?{laundryStartedAt:now,laundryCompletedAt:null}:{})});});
     release?.();tx.set(job,{stage:'REVIEW',orderId:id,code:order.code,customerName:order.customerName,updatedAt:now},{merge:true});
    }else if(action==='REVIEW_PHOTOS'){
     if(order.status!=='RETURNED'||order.photoReviewStatus!=='PENDING'||!order.returnProof)throw new ApiError(409,'Không có ảnh trả hàng chờ kiểm tra.');
-    if(order.settlementPolicyVersion===CLOTHING_SETTLEMENT_VERSION&&!order.collateralReturnedAt)throw new ApiError(409,'Phải hoàn cọc/CCCD và xác nhận xong mới được xóa ảnh chứng từ nhạy cảm.');
-    // Preserve seven complete handover+return photo rounds per physical item;
-    // an employee's RECEIVE alone is not an Admin-approved round.
-    const trackerRefs=order.lines.map(l=>db().collection('inspectionEvidence').doc(l.itemId));
-    const trackers=await Promise.all(trackerRefs.map(r=>tx.get(r)));
-    trackerRefs.forEach((trackerRef,i)=>{
-     const itemId=order.lines[i].itemId;
-     const hasHandover=Object.values(order.handoverProof?.items.find(p=>p.itemId===itemId)?.shots||{}).some(s=>!!s.url);
-     const hasReturn=Object.values(order.returnProof?.items.find(p=>p.itemId===itemId)?.shots||{}).some(s=>!!s.url);
-     if(!hasHandover||!hasReturn)return;
-     const result=addCompletedRound((trackers[i].data()?.rounds||[]) as InspectionRound[],{orderId:id,completedAt:now});
-     tx.set(trackerRef,{itemId,rounds:result.keep,updatedAt:now});
-     for(const old of result.expired)tx.set(db().collection('inspectionCleanup').doc(itemId+'_'+old.orderId),{itemId,orderId:old.orderId,triggerOrderId:id,createdAt:now},{merge:true});
-    });
-    tx.update(ref,{photoReviewStatus:'REVIEWED',photoReviewedBy:me.uid,photoReviewedAt:now,sensitiveEvidenceStatus:'DELETING',updatedAt:now,history:[...order.history,{action:'PHOTO_REVIEWED',by:me.uid,at:now,detail:'Admin duyệt ảnh; đã lập lệnh xóa chứng từ nhạy cảm khỏi Cloudinary'}]});
+    if(order.settlementPolicyVersion===CLOTHING_SETTLEMENT_VERSION&&!order.collateralReturnedAt)throw new ApiError(409,'Phải hoàn cọc/CCCD và xác nhận xong mới được duyệt hậu kiểm.');
+    // Seven-round evidence retention is triggered when RECEIVE succeeds, not on later Admin approval.
+    tx.update(ref,{photoReviewStatus:'REVIEWED',photoReviewedBy:me.uid,photoReviewedAt:now,updatedAt:now,history:[...order.history,{action:'PHOTO_REVIEWED',by:me.uid,at:now,detail:'Admin duyệt ảnh; chứng từ nhạy cảm được tự động xóa sau 5 ngày kể từ khi hoàn tất đơn và trả vật cọc'}]});
     queueSensitiveEvidenceCleanup(tx,id,now);
     tx.set(job,{stage:'DONE',updatedAt:now},{merge:true});
    }else if(action==='RETURN_COLLATERAL'){
@@ -253,7 +254,9 @@ export async function PATCH(req:NextRequest,ctx:{params:Promise<{id:string}>}){
     const quote=order.lines.map(l=>approvedLineQuote(l,l.startAt||order.handoverProof!.at||order.pickupAt!,order.returnProof!.at!));
     const pendingCameraIds=order.lines.flatMap((l,i)=>quote[i].pendingCameraLatePricing?[l.itemId]:[]);
     const cameraOvertimeFeeTotal=quote.reduce((sum,q)=>sum+q.cameraLateFee,0);
-    const rent=quote.reduce((sum,p)=>sum+p.amount,0);
+    const quotedRent=quote.reduce((sum,p)=>sum+p.amount,0);
+    const wasExtended=orderGroup(order)==='CLOTHING'&&order.history.some(h=>h.action==='EXTEND');
+    const rent=finalRent({bookedRent:order.total,quotedRent,prepaid:order.bookingKind==='RESERVE'||wasExtended,scheduledReturn:order.returnAt!,actualReturn:order.returnProof!.at!});
     const compensation=order.returnProof.items.reduce((sum,p,i)=>sum+(p.condition==='MISSING'?Number(order.lines.find(l=>l.itemId===p.itemId)?.replacementValue||0):0),0);
     if(order.returnProof.items.some(p=>p.condition==='MISSING'&&!order.lines.find(l=>l.itemId===p.itemId)?.replacementValue))throw new ApiError(409,'Có sản phẩm thiếu nhưng chưa định giá đền bù.');
     const otherFee=Number(b.otherFeeTotal||0);if(!Number.isSafeInteger(otherFee)||otherFee<0||otherFee>100_000_000)throw new ApiError(400,'Phụ phí khác không hợp lệ.');
@@ -279,7 +282,7 @@ export async function PATCH(req:NextRequest,ctx:{params:Promise<{id:string}>}){
     // v5 stores actual rental amount as total, not total + separate late charge.
     const revised={...order,total:rent,paid:netPaid,refundTotal:(order.refundTotal||0)+refundDue,status,compensationTotal:compensation,otherFeeTotal:otherFee,lateFeeTotal:0,rentalDays:actualBlocks,cameraLateFeePending:pendingCameraIds.length>0,cameraLatePendingItemIds:pendingCameraIds,cameraOvertimeFeeTotal,returnStage:'APPROVED' as const,updatedAt:now};
     syncDebtIndex(tx,db(),revised);
-    tx.update(ref,{total:rent,paid:netPaid,refundTotal:(order.refundTotal||0)+refundDue,status,compensationTotal:compensation,otherFeeTotal:otherFee,lateFeeTotal:0,rentalDays:actualBlocks,cameraLateFeePending:pendingCameraIds.length>0,cameraLatePendingItemIds:pendingCameraIds,cameraOvertimeFeeTotal,returnStage:'APPROVED',reviewedBy:me.uid,reviewedByName:me.name,reviewedAt:now,returnedAt:order.returnProof.at,sensitiveEvidenceStatus:'DELETING',updatedAt:now,history:[...order.history,{action:'ADMIN_APPROVE_RETURN',by:me.uid,at:now,amount:rent,detail:`Duyệt nhận; thuê ${rent}, tăng thời gian ${lateFeeTotal}, đền bù ${compensation}, phụ phí ${otherFee} (${note}), hoàn thực tế ${refundDue} (${refundMethod||'không có'}); phí máy ảnh ${cameraOvertimeFeeTotal}`}]});
+    tx.update(ref,{total:rent,paid:netPaid,refundTotal:(order.refundTotal||0)+refundDue,status,compensationTotal:compensation,otherFeeTotal:otherFee,lateFeeTotal:0,rentalDays:actualBlocks,cameraLateFeePending:pendingCameraIds.length>0,cameraLatePendingItemIds:pendingCameraIds,cameraOvertimeFeeTotal,returnStage:'APPROVED',reviewedBy:me.uid,reviewedByName:me.name,reviewedAt:now,returnedAt:order.returnProof.at,updatedAt:now,history:[...order.history,{action:'ADMIN_APPROVE_RETURN',by:me.uid,at:now,amount:rent,detail:`Duyệt nhận; thuê ${rent}, tăng thời gian ${lateFeeTotal}, đền bù ${compensation}, phụ phí ${otherFee} (${note}), hoàn thực tế ${refundDue} (${refundMethod||'không có'}); phí máy ảnh ${cameraOvertimeFeeTotal}`}]});
     itemRefs.forEach((r,i)=>{const missing=order.returnProof?.items.find(p=>p.itemId===order.lines[i].itemId)?.condition==='MISSING';const item=snaps[i].data() as InventoryItem;const issue=order.returnProof?.items.find(p=>p.itemId===order.lines[i].itemId)?.condition==='ISSUE';const state=missing?'MISSING':issue?'MAINTENANCE':item.requiresLaundry===false?'AVAILABLE':'LAUNDRY';tx.update(r,{status:state,currentOrderId:null,expectedReturnDate:null,...(state==='LAUNDRY'?{laundryStartedAt:now,laundryCompletedAt:null}:{})});});
     // A completed handover+return is ONE round per individual physical asset.
     trackerRefs.forEach((trackerRef,i)=>{
@@ -306,7 +309,7 @@ export async function PATCH(req:NextRequest,ctx:{params:Promise<{id:string}>}){
     const release=await removeOrderIntervals(tx,order);
     const newStatus=action==='VOID'?'VOIDED':'CANCELLED';
     queueSensitiveEvidenceCleanup(tx,id,now);
-    tx.update(ref,{sensitiveEvidenceStatus:'DELETING',status:newStatus,voidedAt:action==='VOID'?now:null,voidedBy:action==='VOID'?me.uid:null,updatedAt:now,history:[...order.history,{action:action==='VOID'?'ADMIN_VOID':'CANCEL',by:me.uid,at:now,detail:action==='VOID'?'Đã xác nhận thu đủ đồ sạch, khóa đơn và hoàn kho':'Hủy lịch chưa giao'}]});
+    tx.update(ref,{status:newStatus,voidedAt:action==='VOID'?now:null,voidedBy:action==='VOID'?me.uid:null,updatedAt:now,history:[...order.history,{action:action==='VOID'?'ADMIN_VOID':'CANCEL',by:me.uid,at:now,detail:action==='VOID'?'Đã xác nhận thu đủ đồ sạch, khóa đơn và hoàn kho':'Hủy lịch chưa giao'}]});
     if(action==='VOID')itemRefs.forEach(r=>tx.update(r,{status:'AVAILABLE',currentOrderId:null,expectedReturnDate:null,laundryCompletedAt:now}));
     release?.();tx.set(job,{stage:'DONE',updatedAt:now},{merge:true});
     syncDebtIndex(tx,db(),{...order,status:newStatus,updatedAt:now});
@@ -387,7 +390,7 @@ export async function PATCH(req:NextRequest,ctx:{params:Promise<{id:string}>}){
     }
     createIntervalWrites(tx,slots,prior,id);
     const pending=order.status==='PICKED_UP'?[...ids]:[];
-    tx.update(ref,{lines:nextLines,total,bookedRentTotal:order.bookingKind==='RESERVE'?total:order.bookedRentTotal||order.total,paid:paidAfter,prepaidRentTotal:order.bookingKind==='RESERVE'&&order.status==='RESERVED'?paidAfter:order.prepaidRentTotal||0,pendingExtraItemIds:pending,referencePhotos:{...order.referencePhotos,...Object.fromEntries(snaps.map(s=>[s.id,s.data()?.referenceShots||{}]))},photoTemplates:{...requiredTemplates(order),...Object.fromEntries(snaps.map(s=>[s.id,(s.data()?.inspectionAngles as string[]|undefined)||[]]))},updatedAt:now,history:[...order.history,{action:'ADD_ITEMS',at:now,by:me.uid,detail:`Thêm ${ids.length} món; ${pending.length?'chờ chụp ảnh giao':'chờ chụp ảnh khi giao đơn'}`} ]});
+    tx.update(ref,{lines:nextLines,total,bookedRentTotal:total,paid:paidAfter,prepaidRentTotal:order.bookingKind==='RESERVE'&&order.status==='RESERVED'?paidAfter:order.prepaidRentTotal||0,pendingExtraItemIds:pending,referencePhotos:{...order.referencePhotos,...Object.fromEntries(snaps.map(s=>[s.id,s.data()?.referenceShots||{}]))},photoTemplates:{...requiredTemplates(order),...Object.fromEntries(snaps.map(s=>[s.id,(s.data()?.inspectionAngles as string[]|undefined)||[]]))},updatedAt:now,history:[...order.history,{action:'ADD_ITEMS',at:now,by:me.uid,detail:`Thêm ${ids.length} món; ${pending.length?'chờ chụp ảnh giao':'chờ chụp ảnh khi giao đơn'}`} ]});
     if(pending.length)tx.set(job,{stage:'HANDOVER',updatedAt:now},{merge:true});
     syncDebtIndex(tx,db(),{...order,lines:nextLines,total,paid:paidAfter,updatedAt:now});
    }else if(action==='EXTEND'){
@@ -413,12 +416,12 @@ export async function PATCH(req:NextRequest,ctx:{params:Promise<{id:string}>}){
       paidAfter+=topup;
     }
     createIntervalWrites(tx,more,prior,id);
-    tx.update(ref,{returnAt:next,returnDate:vnDayKey(next),rentalDays:blocks,lines,total,bookedRentTotal:order.bookingKind==='RESERVE'?total:order.bookedRentTotal||order.total,paid:paidAfter,prepaidRentTotal:order.bookingKind==='RESERVE'&&order.status==='RESERVED'?paidAfter:order.prepaidRentTotal||0,updatedAt:now,history:[...order.history,{action:'EXTEND',at:now,by:me.uid,amount:total-order.total,detail:'Gia hạn theo chu kỳ 24 giờ'}]});
+    tx.update(ref,{returnAt:next,returnDate:vnDayKey(next),rentalDays:blocks,lines,total,bookedRentTotal:total,paid:paidAfter,prepaidRentTotal:order.bookingKind==='RESERVE'&&order.status==='RESERVED'?paidAfter:order.prepaidRentTotal||0,updatedAt:now,history:[...order.history,{action:'EXTEND',at:now,by:me.uid,amount:total-order.total,detail:'Gia hạn theo chu kỳ 24 giờ'}]});
     tx.set(job,{returnAt:next,updatedAt:now},{merge:true});syncDebtIndex(tx,db(),{...order,returnAt:next,returnDate:vnDayKey(next),rentalDays:blocks,lines,total,paid:paidAfter,updatedAt:now});
    }
    auditInTransaction(tx,me,'V5_'+action,'order',id,`${order.code} / ${me.name}`);
   });
-  if(['REVIEW_PHOTOS','APPROVE_RETURN','FINALIZE_LEGACY_RETURN','CANCEL','VOID'].includes(action)){
+  if(['RECEIVE','REVIEW_PHOTOS','APPROVE_RETURN','FINALIZE_LEGACY_RETURN','CANCEL','VOID'].includes(action)){
     // Durable job is saved in Firestore; this runs after the HTTP response, and Cron retries failures.
     after(async()=>{try{await Promise.all([runEvidenceCleanup(8),runSensitiveEvidenceCleanup(8)]);}catch(error){console.error('Deferred evidence cleanup',error);}});
   }

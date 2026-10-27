@@ -7,7 +7,7 @@ import {formatVNDateTime} from '@/lib/vn-datetime';
 
 type Slot = {date:string;id:ShiftId;start:string;end:string;label:string;key:string;members:ShiftSeat[];remaining:number};
 type Week = {weekStart:string;weekEnd:string;slots:Slot[];selected:string[];canEdit:boolean;
- period:{isOpen:boolean;weekStart:string;opensAt:string;closesAt:string};stats?:{uid:string;name:string;days:number;shifts:number;compliant:boolean}[]};
+ period:{isOpen:boolean;early?:boolean;weekStart:string;opensAt:string;closesAt:string};stats?:{uid:string;name:string;days:number;shifts:number;compliant:boolean}[]};
 type Caller=<T=unknown>(path:string,init?:RequestInit)=>Promise<T>;
 const dayLabel=(date:string)=>new Date(date+'T00:00:00Z').toLocaleDateString('vi-VN',{weekday:'short',day:'2-digit',month:'2-digit',timeZone:'UTC'});
 const prettyDateTime=(iso:string)=>formatVNDateTime(iso);
@@ -17,6 +17,7 @@ export function GuStaffShifts({api,isAdmin=false,registrationOnly=false,active=t
  const [draft,setDraft]=useState<string[]>([]);
  const [loading,setLoading]=useState(true);
  const [saving,setSaving]=useState(false);
+ const [opening,setOpening]=useState(false);
  const [error,setError]=useState('');
  const [message,setMessage]=useState('');const lastLoaded=useRef(0);
  const load=useCallback(async()=>{
@@ -37,6 +38,7 @@ export function GuStaffShifts({api,isAdmin=false,registrationOnly=false,active=t
   if(slot.remaining===0){setError('Ca này đã đủ 2 nhân viên. Vui lòng chọn ca khác.');return;}
   setDraft([...draft,slot.key]);
  };
+ const openEarly=async()=>{setOpening(true);setError('');setMessage('');try{await api('shifts',{method:'POST',body:JSON.stringify({action:'OPEN_EARLY'})});setView('next');await load();setMessage('Đã mở đăng ký sớm trong 8 giờ cho tuần sau.');}catch(e){setError(e instanceof Error?e.message:'Không mở được đăng ký sớm.');}finally{setOpening(false);}};
  const submit=async()=>{
   if(!week?.canEdit||saving||!changed)return;
   if(distinctDays<MIN_WORK_DAYS){setError('Bạn phải chọn ít nhất 5 ngày khác nhau trong tuần trước khi lưu.');return;}
@@ -52,11 +54,12 @@ export function GuStaffShifts({api,isAdmin=false,registrationOnly=false,active=t
    <div className="gu-shifts-header-buttons">
     {!registrationOnly&&<><button className={'btn '+(view==='current'?'btn-dark':'btn-white')} type="button" onClick={()=>setView('current')}>Tuần này</button>
     <button className={'btn '+(view==='next'?'btn-dark':'btn-white')} type="button" onClick={()=>setView('next')}>Tuần sau</button></>}
+    {isAdmin&&view==='next'&&<button className="btn btn-dark" type="button" disabled={opening||Boolean(week?.period.isOpen&&week.period.early)} onClick={()=>void openEarly()}>{opening?'Đang mở…':'Mở đăng ký sớm · 8 giờ'}</button>}
     <button className="btn btn-white" type="button" onClick={()=>void load()} disabled={loading} aria-label="Tải lại lịch ca"><RefreshCcw size={16}/> Làm mới</button>
    </div></div>
   {loading&&!week&&<div className="center-screen"><LoaderCircle className="spin"/> Đang tải lịch…</div>}
   {week&&<>
-   <div className="gu-shifts-info"><Clock3 size={18}/><div><b>Tuần {dayLabel(week.weekStart)} – {dayLabel(week.weekEnd)}</b><span>Đăng ký Chủ nhật từ {prettyDateTime(week.period.opensAt)} đến trước {prettyDateTime(week.period.closesAt)} (giờ Việt Nam).</span></div></div>
+   <div className="gu-shifts-info"><Clock3 size={18}/><div><b>Tuần {dayLabel(week.weekStart)} – {dayLabel(week.weekEnd)}</b><span>{week.period.early?'Admin đã mở sớm:':'Đăng ký Chủ nhật từ'}  {prettyDateTime(week.period.opensAt)} đến trước {prettyDateTime(week.period.closesAt)} (giờ Việt Nam).</span></div></div>
    {!isAdmin&&<p className="gu-shifts-rules"><ShieldCheck size={17}/>{week.canEdit?'Đang mở đăng ký. Chọn đủ ít nhất 5 ngày rồi xác nhận. Ai lưu thành công trước sẽ giữ chỗ trước.':'Ngoài giờ đăng ký, lịch chỉ để xem. Ca đã đủ 2 người sẽ tự đóng.'}</p>}
    <div className="gu-shifts-grid">
     {days.map(day=><div className="gu-shifts-day" key={day}><strong>{dayLabel(day)}</strong>

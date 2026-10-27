@@ -1,0 +1,8 @@
+[Unit]
+Description=GU V5 production photo retention cleanup hourly
+[Timer]
+OnCalendar=hourly
+Persistent=true
+Unit=gu-v546-prod-cleanup.service
+[Install]
+WantedBy=timers.target
