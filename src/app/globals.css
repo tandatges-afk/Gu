@@ -1138,3 +1138,18 @@ html,body{background:var(--paper);color:var(--ink)}
 .gu-late-pickup-dismiss:focus-visible,.gu-late-pickup-list>button:focus-visible{outline:2px solid #2378ac;outline-offset:2px}
 .gu-late-pickup-badge{background:#d9f0fb!important;color:#0b5f86!important;border:1px solid #69accc!important}
 @media(max-width:650px){.gu-late-pickup-banner{padding:14px 48px 14px 12px;gap:8px}.gu-late-pickup-list{grid-template-columns:1fr;max-height:280px}}
+
+/* GU VPS: prevent the compound date input from becoming a stretched blank control. */
+.gu-calendar-toolbar-v532 .gu-calendar-date-actions{display:flex!important;align-items:center!important;flex-wrap:nowrap!important;gap:8px!important}
+.gu-calendar-toolbar-v532 .gu-calendar-date-actions>.gu-vn-date-only{display:flex!important;flex:1 1 210px!important;min-width:0!important;max-width:none!important;width:auto!important;height:46px!important;border:0!important;background:transparent!important;padding:0!important;gap:7px!important}
+.gu-calendar-toolbar-v532 .gu-calendar-date-actions>.gu-vn-date-only>.gu-date-nav{flex:1 1 auto!important;min-width:0!important;max-width:none!important;width:100%!important;height:46px!important;border:1px solid #d9e1e8!important;border-radius:10px!important}
+.gu-calendar-toolbar-v532 .gu-calendar-date-actions>.gu-vn-date-only>button{flex:0 0 44px!important;min-width:44px!important;width:44px!important;height:46px!important;border:1px solid #d9e1e8!important;border-radius:10px!important}
+.gu-calendar-toolbar-v532 .gu-calendar-date-actions>.boxed{flex:0 0 44px!important;width:44px!important}
+.gu-calendar-toolbar-v532 .gu-calendar-date-actions>.gu-calendar-today{flex:0 0 auto!important;width:auto!important;min-width:75px!important}
+@media(max-width:520px){
+ .gu-calendar-toolbar-v532 .gu-calendar-date-actions{flex-wrap:wrap!important}
+ .gu-calendar-toolbar-v532 .gu-calendar-date-actions>.gu-vn-date-only{flex-basis:calc(100% - 104px)!important;order:1!important}
+ .gu-calendar-toolbar-v532 .gu-calendar-date-actions>.boxed:first-child{order:0!important}
+ .gu-calendar-toolbar-v532 .gu-calendar-date-actions>.boxed:last-child{order:2!important}
+ .gu-calendar-toolbar-v532 .gu-calendar-date-actions>.gu-calendar-today{order:3!important;flex:1 1 100%!important}
+}

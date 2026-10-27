@@ -17,8 +17,10 @@ export type ApiCall = <T=unknown>(path:string,init?:RequestInit)=>Promise<T>;
 export function ProductImage({paths,className='product-photo'}:{paths?:string[];className?:string}){
   const url=paths?.[0]||'';
   const fallbackClassName=['photo-fallback',className==='product-photo'?'':className].filter(Boolean).join(' ');
-  return url.startsWith('https://res.cloudinary.com/')?
-    <img src={thumbCloudinaryUrl(url,className.includes("detail")?1024:360)} alt="Ảnh sản phẩm" className={className} loading="lazy" decoding="async" referrerPolicy="no-referrer"/>:
+  const imageUrl=url.startsWith('/api/local-media/products/')?url:
+    url.startsWith('https://res.cloudinary.com/')?thumbCloudinaryUrl(url,className.includes('detail')?1024:360):'';
+  return imageUrl?
+    <img src={imageUrl} alt="Ảnh sản phẩm" className={className} loading="lazy" decoding="async" referrerPolicy="no-referrer"/>:
     <span className={fallbackClassName} role="img" aria-label="Chưa có ảnh sản phẩm"><ImageIcon size={21}/></span>;
 }
 /** GU Mobile v3: explicit Camera and Library actions instead of an ambiguous file picker. */

@@ -1,5 +1,6 @@
 import {NextRequest,NextResponse} from 'next/server';
-import {type Query} from '@/lib/pg-firestore';
+import {type Query,pgPool} from '@/lib/pg-firestore';
+import {buildSubstringCatalogQuery} from '@/lib/pg-catalog-search';
 import {db} from '@/lib/firebase-admin';
 import {staffUser,handleError,ApiError} from '@/lib/http';
 import {productSearchText,matchesProductSearch} from '@/lib/product-search';
@@ -31,6 +32,26 @@ export async function GET(req:NextRequest){
   const requestedCategory=kind==='items'?String(u.searchParams.get('category')||'ALL'):'ALL';
   if(!['ALL','AVAILABLE','RENTED','LAUNDRY','MAINTENANCE','MISSING'].includes(requestedStatus)||requestedCategory.length>50)throw new ApiError(400,'Bộ lọc kho không hợp lệ.');
   const inventoryMatches=(entry:Record<string,unknown>)=>!entry.archivedAt&&(requestedStatus==='ALL'||entry.status===requestedStatus)&&(requestedCategory==='ALL'||entry.category===requestedCategory)&&(requestedRentalGroup==='ALL'||productGroup(String(entry.category||''))===requestedRentalGroup);
+  if(term&&(kind==='items'||kind==='customers')){
+   // PostgreSQL substring search: names without accents, names containing
+   // numbers, partial telephone numbers and partial GU product codes.
+   // Unlike a search-gram index, it works on existing records immediately.
+   let afterId:string|undefined;
+   if(token){
+    try{
+     const decoded=JSON.parse(Buffer.from(token,'base64url').toString('utf8')) as unknown;
+     if(!Array.isArray(decoded)||decoded.length!==3||decoded[0]!=='contains'||decoded[1]!==kind+':'+term||typeof decoded[2]!=='string'||!/^[\w-]{1,128}$/.test(decoded[2]))throw Error();
+     afterId=decoded[2];
+    }catch{throw new ApiError(400,'Trang tìm kiếm không hợp lệ. Hãy tìm lại.');}
+   }
+   const {sql,params}=buildSubstringCatalogQuery({kind,term,take,afterId,mode,status:requestedStatus,category:requestedCategory,rentalGroup:requestedRentalGroup});
+   const response=await pgPool().query<{id:string;data:Record<string,unknown>}>(sql,params);
+   const docs=response.rows.slice(0,take);
+   const hasMore=response.rows.length>take;
+   const cursor=hasMore&&docs.length?Buffer.from(JSON.stringify(['contains',kind+':'+term,docs.at(-1)!.id])).toString('base64url'):null;
+   return NextResponse.json({kind,results:docs.map(d=>({id:d.id,...d.data})),cursor,hasMore,pageSize:take},
+    {headers:{'Cache-Control':'private,no-store'}});
+  }
   let collection:Query=db().collection(kind),field=kind==='orders'?'createdAt':kind==='customers'?'name':'name';
   // Indexed code values cannot perform substring searches with Firestore startAt.
   // Scan an ordered, bounded page of codes and carry a cursor for the last scanned doc.

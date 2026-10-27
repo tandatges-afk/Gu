@@ -20,14 +20,15 @@ function StatusInfo({info,pending}:{info:VisualAvailabilityState|undefined;pendi
   </div>}
  </div>;
 }
-export function GuVisualFinder({api,onChoose,active=true,isAdmin=false}:{api:ApiCall;onChoose?:(item:InventoryItem)=>void;active?:boolean;isAdmin?:boolean}){
+export function GuVisualFinder({api,onChoose,active=true,isAdmin=false,availableCategories=[]}:{api:ApiCall;onChoose?:(item:InventoryItem)=>void;active?:boolean;isAdmin?:boolean;availableCategories?:string[]}){
  const [file,setFile]=useState<File|null>(null);const [chosen,setChosen]=useState<InventoryItem|null>(null);
  const [copyNote,setCopyNote]=useState('');const [results,setResults]=useState<Hit[]>([]);
  const [loading,setLoading]=useState(false);
  const [availabilityLoading,setAvailabilityLoading]=useState(false);const [availability,setAvailability]=useState<Record<string,VisualAvailabilityState>>({});
  const [availabilityError,setAvailabilityError]=useState('');const [note,setNote]=useState('');
  const [category,setCategory]=useState('ALL');
- const [categories,setCategories]=useState<string[]>([]);
+ const categories=Array.from(new Set(availableCategories.filter(Boolean))).sort((a,b)=>a.localeCompare(b,'vi'));
+ useEffect(()=>{if(category!=='ALL'&&!categories.includes(category))setCategory('ALL');},[availableCategories.join('\u0000')]);
  const indexRef=useRef<{rows:IndexRow[];checked:number}|null>(null);
  const token=useRef(0);const availabilityLastChecked=useRef(0);
  const [preview,setPreview]=useState<string|null>(null);
@@ -41,7 +42,7 @@ export function GuVisualFinder({api,onChoose,active=true,isAdmin=false}:{api:Api
   for(let page=0;page<120;page++){
    const response:{results:IndexRow[];cursor:string|null}=await api('v5/visual-catalog'+(cursor?'?cursor='+encodeURIComponent(cursor):''));
    rows.push(...response.results);cursor=response.cursor;
-   if(!cursor){indexRef.current={rows,checked:Date.now()};setCategories(Array.from(new Set(rows.map(row=>row.category).filter(Boolean))).sort((a,b)=>a.localeCompare(b,'vi')));return rows;}
+   if(!cursor){indexRef.current={rows,checked:Date.now()};return rows;}
   }
   throw Error('Chỉ mục quá lớn để đọc đủ. Liên hệ Admin tối ưu chia trang.');
  };
