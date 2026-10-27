@@ -1,0 +1,8 @@
+[Unit]
+Description=GU 5.4.6 VPS evidence cleanup
+After=gu-v546.service
+[Service]
+Type=oneshot
+User=guapp
+WorkingDirectory=/var/www/gu-v546
+ExecStart=/usr/bin/node --env-file=.env.local scripts/run-cleanup.mjs

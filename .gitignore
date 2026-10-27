@@ -1,32 +1,22 @@
 node_modules/
 .next/
-out/
 .env
 .env.*
 !.env.example
-*.log
+!.env.vps.example
+!.env.vps.production.example
 .DS_Store
-.vscode/
 *.tsbuildinfo
-uploads/
-# Server/database secrets and deployment artifacts
 *.pem
 *.key
 *.dump
 *.tar.gz
-*.zip
-backup/
-backups/
 
-# Private data and build outputs
-.env
-.env.*
-!.env.example
-node_modules/
-.next/
-*.dump
-*.pem
-*.key
-*.tar.gz
-uploads/
+# Production secrets, media, and backup
+.env.production*
+*.backup
+*.sql.gz
+*.zip
 backups/
+uploads/
+.vscode/

@@ -1,0 +1,22 @@
+[Unit]
+Description=GU 5.4.6 VPS staging (PostgreSQL + local media)
+After=network-online.target postgresql.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=guapp
+Group=guapp
+WorkingDirectory=/var/www/gu-v546
+Environment=NODE_ENV=production
+ExecStart=/usr/bin/npm run start -- -H 127.0.0.1 -p 3301
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=yes
+ProtectSystem=strict
+ReadWritePaths=/var/lib/gu-v546 /var/www/gu-v546/.next
+PrivateTmp=yes
+LimitNOFILE=65535
+
+[Install]
+WantedBy=multi-user.target

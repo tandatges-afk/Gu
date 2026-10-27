@@ -1,0 +1,72 @@
+#!/usr/bin/env bash
+# Root entrypoint; sudo permission is granted ONLY for this named script.
+set -Eeuo pipefail
+umask 027
+[[ $# == 2 ]] || { echo 'Usage: gu-v5-release stage|prod RUN_ID-ATTEMPT' >&2; exit 2; }
+target="$1"; id="$2"
+[[ "$target" == stage || "$target" == prod ]] || exit 2
+[[ "$id" =~ ^[0-9]+-[0-9]+$ ]] || exit 2
+[[ $(id -u) == 0 ]] || exit 2
+
+base="/var/www/gu-v546-${target}-deploy"
+release="$base/releases/$id"
+link="$base/current"
+incoming="/home/gu-deploy/v5-incoming/$target/$id"
+envfile="/etc/gu-v546/${target}.env"
+service="gu-v546-${target}"
+if [[ "$target" == stage ]]; then
+  port=3301
+else
+  port=3302
+  [[ -f /etc/gu-v546/PRODUCTION_APPROVED ]] || { echo 'Production cutover not approved; refusing.' >&2; exit 1; }
+fi
+exec 9>"/run/lock/gu-v5-$target-deploy.lock"
+flock -n 9 || { echo 'Deploy already running'; exit 1; }
+[[ -f "$incoming/package.json" && -f "$incoming/package-lock.json" && -f "$incoming/.gu-deploy-commit" ]] || { echo 'Incomplete staged source'; exit 1; }
+[[ ! -L "$incoming" && ! -L "$incoming/package.json" ]] || { echo 'Symlink source not accepted'; exit 1; }
+[[ -r "$envfile" ]] || { echo "Missing $envfile"; exit 1; }
+[[ ! -e "$release" ]] || { echo 'Release id already deployed'; exit 1; }
+[[ -f /etc/systemd/system/$service.service ]] || { echo 'Service not installed'; exit 1; }
+old=''
+if [[ -L "$link" ]]; then old="$(readlink -f "$link")"; fi
+mkdir -p "$release"
+cp -a "$incoming"/. "$release"/
+rm -f "$release/.env.local"
+ln -s "$envfile" "$release/.env.local"
+chown -R guapp:guapp "$release"
+runuser -u guapp -- /bin/bash -c '
+  set -Eeuo pipefail
+  cd "$1"
+  npm ci --no-audit --no-fund
+  npm run verify:imports
+  npm run typecheck
+  npm test
+  if [[ "$2" == stage ]]; then npm run stage:check; else npm run prod:check; fi
+  if [[ "$2" == stage ]]; then npm run db:init; fi
+  npm run db:check
+  npm run build
+  test -s .next/BUILD_ID
+' gu-v5-build "$release" "$target"
+
+ln -s "$release" "$base/.current.new.$id"
+mv -Tf "$base/.current.new.$id" "$link"
+if ! systemctl restart "$service"; then
+  echo 'Restart failed; rollback...' >&2
+  if [[ -n "$old" ]]; then ln -s "$old" "$base/.rollback.$id"; mv -Tf "$base/.rollback.$id" "$link"; systemctl restart "$service" || true
+  else systemctl stop "$service" || true; rm -f "$link"; fi
+  exit 1
+fi
+ok=0
+sha="$(cat "$release/.gu-deploy-commit")"
+for n in $(seq 1 20); do
+  if curl --silent --fail --max-time 3 "http://127.0.0.1:$port/api/version" | grep -Fq "$sha"; then ok=1; break; fi
+  sleep 2
+done
+if [[ "$ok" != 1 ]]; then
+  echo 'Version health check failed; rollback...' >&2
+  if [[ -n "$old" ]]; then ln -s "$old" "$base/.rollback.$id"; mv -Tf "$base/.rollback.$id" "$link"; systemctl restart "$service" || true
+  else systemctl stop "$service" || true; rm -f "$link"; fi
+  exit 1
+fi
+systemctl enable "$service" >/dev/null
+echo "GU V5 DEPLOY OK: $target $id $sha port=$port"

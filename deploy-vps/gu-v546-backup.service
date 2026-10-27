@@ -1,0 +1,5 @@
+[Unit]
+Description=GU 5.4.6 VPS PostgreSQL and media backup
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/gu-v546-backup.sh
