@@ -1,6 +1,6 @@
 'use client';
 import {useEffect,useRef,useState} from 'react';
-import {RefreshCcw,Search,Database,AlertCircle} from 'lucide-react';
+import {RefreshCcw,Search,AlertCircle} from 'lucide-react';
 import {imageSignature} from '@/lib/visual-image';
 import {rankVisualCandidates,type VisualIndexEntry} from '@/lib/visual-index';
 import {ProductImage,type ApiCall} from './GuExtras';
@@ -23,10 +23,10 @@ function StatusInfo({info,pending}:{info:VisualAvailabilityState|undefined;pendi
 export function GuVisualFinder({api,onChoose,active=true,isAdmin=false}:{api:ApiCall;onChoose?:(item:InventoryItem)=>void;active?:boolean;isAdmin?:boolean}){
  const [file,setFile]=useState<File|null>(null);const [chosen,setChosen]=useState<InventoryItem|null>(null);
  const [copyNote,setCopyNote]=useState('');const [results,setResults]=useState<Hit[]>([]);
- const [loading,setLoading]=useState(false);const [indexing,setIndexing]=useState(false);const [progress,setProgress]=useState('');
+ const [loading,setLoading]=useState(false);
  const [availabilityLoading,setAvailabilityLoading]=useState(false);const [availability,setAvailability]=useState<Record<string,VisualAvailabilityState>>({});
  const [availabilityError,setAvailabilityError]=useState('');const [note,setNote]=useState('');
- const [category,setCategory]=useState('ALL');const [relaxed,setRelaxed]=useState(false);
+ const [category,setCategory]=useState('ALL');
  const [categories,setCategories]=useState<string[]>([]);
  const indexRef=useRef<{rows:IndexRow[];checked:number}|null>(null);
  const token=useRef(0);const availabilityLastChecked=useRef(0);
@@ -58,36 +58,17 @@ export function GuVisualFinder({api,onChoose,active=true,isAdmin=false}:{api:Api
  const pasteFile=async()=>{try{const clips=await navigator.clipboard.read();for(const clip of clips){const mime=clip.types.find(x=>x.startsWith('image/'));
    if(mime){const blob=await clip.getType(mime);chooseFile(new File([blob],'anh-dan.'+(mime.split('/')[1]||'png'),{type:mime}));return;}}
    throw Error('Clipboard chưa có ảnh.');}catch(e){setNote(e instanceof Error?e.message:'Không thể dán ảnh.');}};
- const backfill=async()=>{
-  setIndexing(true);setNote('');setProgress('Đang đọc danh sách ảnh cũ…');try{
-   const entries=await loadIndex(true);
-   const missing=entries.flatMap(row=>(row.missingImages||[]).map(imagePath=>({id:row.id,imagePath})));
-   let completed=0,updated=0,failed=0;
-   for(let i=0;i<missing.length;i+=12){
-    const slice=missing.slice(i,i+12);const signatures=await Promise.all(slice.map(async row=>{
-      try{return {...row,signature:await imageSignature(row.imagePath)};}
-      catch{return null;}
-    }));
-    const valid=signatures.filter((x):x is NonNullable<typeof x>=>x!==null);
-    failed+=slice.length-valid.length;
-    if(valid.length){const response=await api<{updated:number}>('v5/visual-catalog',{method:'POST',body:JSON.stringify({entries:valid})});updated+=response.updated;}
-    completed+=slice.length;setProgress(`${completed}/${missing.length} ảnh · đã tạo ${updated} chỉ mục`);
-   }
-   await loadIndex(true);setNote(missing.length?`Đã tạo ${updated} chỉ mục ảnh V2. ${failed} ảnh không thể truy cập; cần kiểm tra đường dẫn Cloudinary.`:'Tất cả ảnh sản phẩm đã có chỉ mục V2.');
-  }catch(e){setNote(e instanceof Error?e.message:'Không thể lập chỉ mục.');}
-  finally{setIndexing(false);}
- };
  const scan=async()=>{
   if(!file)return;const seq=++token.current;setLoading(true);setAvailability({});setAvailabilityError('');setResults([]);setChosen(null);setNote('');
   try{
    const [needle,rows]=await Promise.all([imageSignature(file),loadIndex()]);
    const candidates=rows.map(row=>({id:row.id,category:row.category,signatures:(row.signatures||[]).map(x=>x.signature)}))
     .filter(row=>row.signatures.length);
-   if(!candidates.length)throw Error('Kho chưa có chỉ mục ảnh V2. Admin cần bấm “Lập chỉ mục ảnh cũ” trước khi tìm.');
-   const ranked=rankVisualCandidates(candidates,needle,{category,relaxed,take:relaxed?10:6});
+   if(!candidates.length)throw Error('Kho chưa có ảnh tham chiếu để tìm. Hãy thêm hoặc cập nhật ảnh sản phẩm trong Kho sản phẩm.');
+   const ranked=rankVisualCandidates(candidates,needle,{category,relaxed:false,take:6});
    if(seq!==token.current)return;
    if(!ranked.length){
-    setNote('Chưa tìm thấy sản phẩm đủ giống ảnh mẫu. Thử ảnh chụp rõ toàn bộ món, chọn đúng danh mục hoặc bật chế độ “Mở rộng”. GU không hiển thị những món chỉ xếp gần nhất nhưng không liên quan.');
+    setNote('Chưa tìm thấy sản phẩm đủ giống ảnh mẫu. Thử ảnh chụp rõ toàn bộ món và chọn đúng danh mục. GU không hiển thị những món chỉ xếp gần nhất nhưng không liên quan.');
     return;
    }
    const response=await api<{results:InventoryItem[]}>('catalog?kind=items&ids='+encodeURIComponent(ranked.map(x=>x.row.id).join(',')));
@@ -95,9 +76,7 @@ export function GuVisualFinder({api,onChoose,active=true,isAdmin=false}:{api:Api
    const hits=ranked.filter(x=>byId.has(x.row.id)).map(x=>({item:byId.get(x.row.id)!,distance:x.distance,referenceCount:x.referenceCount}));
    if(seq!==token.current)return;
    setResults(hits);
-   const unindexed=rows.filter(row=>(row.missingImages||[]).length).length;
-   if(!hits.length)setNote('Không tìm được món đang hoạt động có chỉ mục hợp lệ.');
-   else if(unindexed)setNote(`${unindexed} món còn thiếu một số ảnh tham chiếu; Admin có thể chạy “Lập chỉ mục ảnh cũ” để tăng độ chính xác.`);
+   if(!hits.length)setNote('Không tìm được món đang hoạt động có ảnh tham chiếu hợp lệ.');
    await loadAvailability(hits.map(hit=>hit.item),seq);
   }catch(e){if(seq===token.current)setNote(e instanceof Error?e.message:'Không thể tìm theo ảnh.');}
   finally{if(seq===token.current)setLoading(false);}
@@ -107,18 +86,16 @@ export function GuVisualFinder({api,onChoose,active=true,isAdmin=false}:{api:Api
   <div className={styles.actions}><label className="btn btn-white">Chọn ảnh<input hidden type="file" accept="image/*" onChange={e=>chooseFile(e.target.files?.[0]||null)}/></label>
    <label className="btn btn-white">Chụp ảnh<input hidden type="file" accept="image/*" capture="environment" onChange={e=>chooseFile(e.target.files?.[0]||null)}/></label>
    <button type="button" className="btn btn-white" onClick={()=>void pasteFile()}>Dán ảnh</button>
-   <button type="button" className="btn btn-dark" disabled={!file||loading||indexing} onClick={()=>void scan()}>{loading?'Đang đối chiếu…':'Tìm sản phẩm'}</button>
-   <button type="button" className="btn btn-white" disabled={loading||indexing} onClick={()=>{indexRef.current=null;setNote('Đã làm mới bộ đệm. Lần tìm tiếp theo sẽ đọc chỉ mục ảnh mới.');}}>Làm mới chỉ mục</button>
-   {isAdmin&&<button type="button" className="btn btn-white" disabled={loading||indexing} onClick={()=>void backfill()}><Database size={15}/>{indexing?'Đang lập chỉ mục…':'Lập chỉ mục ảnh cũ'}</button>}
+   <button type="button" className="btn btn-dark" disabled={!file||loading} onClick={()=>void scan()}>{loading?'Đang đối chiếu…':'Tìm sản phẩm'}</button>
+
   </div>
   <div className={styles.searchSettings}>
    {preview&&<img src={preview} alt="Ảnh mẫu dùng tìm kiếm" className={styles.preview}/>}
    <div className={styles.filters}>
     <label>Danh mục cần tìm<select value={category} onChange={e=>{token.current++;setCategory(e.target.value);setResults([]);setChosen(null);setAvailability({});}}><option value="ALL">Tất cả danh mục</option>{categories.map(name=><option key={name} value={name}>{name}</option>)}</select></label>
-    <label>Độ rộng tìm kiếm<select value={relaxed?'broad':'strict'} onChange={e=>{token.current++;setRelaxed(e.target.value==='broad');setResults([]);setChosen(null);setAvailability({});}}><option value="strict">Ưu tiên đúng / rất gần</option><option value="broad">Mở rộng kết quả gần giống</option></select></label>
    </div>
   </div>
-  {file&&<small>Ảnh mẫu: {file.name}</small>}{progress&&<p className={styles.note}>{progress}</p>}
+  {file&&<small>Ảnh mẫu: {file.name}</small>}
   {note&&<p className={styles.note} role="status"><AlertCircle size={16}/>{note}</p>}
   {availabilityError&&<div className="inline-alert danger-alert" role="alert">{availabilityError} <button type="button" className="btn btn-white" onClick={()=>void loadAvailability(results.map(r=>r.item),token.current)}>Thử lại</button></div>}
   {!!results.length&&<div className={styles.toolbar}><strong>{results.length} món vượt ngưỡng tương đồng</strong><button className="btn btn-white" type="button" disabled={availabilityLoading} onClick={()=>void loadAvailability(results.map(r=>r.item),token.current)}><RefreshCcw size={15}/> Cập nhật tình trạng</button></div>}

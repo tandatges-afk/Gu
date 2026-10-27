@@ -3,6 +3,8 @@ export type ServerFailure={code:string;status:number;message:string};
 export function classifyServerFailure(error:unknown):ServerFailure|null{
  if(!error||typeof error!=='object')return null;
  const e=error as {code?:unknown;message?:unknown};const code=String(e.code||'');
+ if(['EACCES','EPERM','EROFS'].includes(code))return {code:'GU_UPLOAD_PERMISSION',status:503,message:'Thư mục lưu ảnh trên VPS chưa có quyền ghi. Quản trị viên cần kiểm tra GU_UPLOAD_DIR và quyền của guapp.'};
+ if(code==='ENOSPC')return {code:'GU_UPLOAD_STORAGE_FULL',status:507,message:'Dung lượng lưu ảnh trên VPS đã đầy. Quản trị viên cần kiểm tra ổ đĩa.'};
  if(code==='23505'||/Document already exists/.test(String(e.message)))return {code:'GU_DB_DUPLICATE',status:409,message:'Dữ liệu đã tồn tại. Hãy tải lại danh sách trước khi thử lại.'};
  if(code==='23503')return {code:'GU_DB_REFERENCE',status:409,message:'Dữ liệu liên quan không tồn tại hoặc đã bị thay đổi.'};
  if(['40001','40P01','55P03'].includes(code))return {code:'GU_DB_CONFLICT',status:409,message:'Giao dịch đang bị khóa hoặc thay đổi đồng thời. Vui lòng thử lại.'};

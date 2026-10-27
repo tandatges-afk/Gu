@@ -16,21 +16,22 @@ function canReadEvidence(me:{uid:string;role:string},order:Record<string,unknown
 export async function POST(req:NextRequest){
  try{
   const me=await staffUser(req);
-  if(Number(req.headers.get('content-length')||0)>3*1024*1024+64000)throw new ApiError(413,'Ảnh tối đa 3 MB.');
-  const form=await req.formData(),file=form.get('file'),purpose=form.get('purpose'),draftId=form.get('draftId');
+  if(Number(req.headers.get('content-length')||0)>3*1024*1024)throw new ApiError(413,'Ảnh tối đa 3 MB.');
+  const purpose=req.headers.get('x-gu-upload-purpose'),draftId=req.headers.get('x-gu-draft-id');
+  const type=String(req.headers.get('content-type')||'').toLowerCase();
   if(purpose!=='reservation'&&purpose!=='deposit')throw new ApiError(400,'Loại ảnh không hợp lệ.');
-  if(!(file instanceof File)||!file.size||file.size>limits[purpose])throw new ApiError(413,'Ảnh tối đa 3 MB.');
-  if(typeof draftId!=='string'||!validEvidenceId(draftId))throw new ApiError(400,'Mã lượt chụp không hợp lệ.');
-  if(!validMime.includes(file.type))throw new ApiError(400,'Chỉ hỗ trợ ảnh JPEG, PNG, WebP.');
-  const bytes=Buffer.from(await file.arrayBuffer());
+  if(!validEvidenceId(draftId))throw new ApiError(400,'Mã lượt chụp không hợp lệ.');
+  if(!validMime.includes(type))throw new ApiError(400,'Chỉ hỗ trợ ảnh JPEG, PNG, WebP.');
+  const bytes=Buffer.from(await req.arrayBuffer());
+  if(!bytes.length||bytes.length>limits[purpose])throw new ApiError(413,'Ảnh tối đa 3 MB.');
   const isJpg=bytes[0]===0xff&&bytes[1]===0xd8&&bytes[2]===0xff;
   const isPng=bytes.subarray(0,8).equals(Buffer.from([137,80,78,71,13,10,26,10]));
   const isWebp=bytes.toString('ascii',0,4)==='RIFF'&&bytes.toString('ascii',8,12)==='WEBP';
-  if(!(file.type==='image/jpeg'&&isJpg||file.type==='image/png'&&isPng||file.type==='image/webp'&&isWebp))throw new ApiError(400,'Dữ liệu ảnh không đúng định dạng.');
+  if(!(type==='image/jpeg'&&isJpg||type==='image/png'&&isPng||type==='image/webp'&&isWebp))throw new ApiError(400,'Dữ liệu ảnh không đúng định dạng.');
   const id=randomUUID();
-  const stored=await uploadSecureCloudinary(bytes,file.type,me.uid,id);
+  const stored=await uploadSecureCloudinary(bytes,type,me.uid,id);
   try{
-   await db().collection('secureEvidenceUploads').doc(id).create({ownerUid:me.uid,purpose,draftId,provider:'local',publicId:stored.publicId,format:stored.format,contentType:file.type,createdAt:new Date().toISOString(),consumedOrderId:null});
+   await db().collection('secureEvidenceUploads').doc(id).create({ownerUid:me.uid,purpose,draftId,provider:'local',publicId:stored.publicId,format:stored.format,contentType:type,createdAt:new Date().toISOString(),consumedOrderId:null});
   }catch(error){
    // Keep the DB failure as the primary error; try to remove the unreferenced authenticated image.
    try{await deleteSecureCloudinary(stored.publicId);}catch{console.error('[GU_LOCAL_ORPHAN_CLEANUP_FAILED]',id);}

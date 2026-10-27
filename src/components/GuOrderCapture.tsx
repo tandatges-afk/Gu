@@ -1,4 +1,5 @@
 'use client';
+import {uploadImageToApi} from '@/lib/upload-client';
 import {useEffect,useMemo,useState} from 'react';
 import {Camera,CheckCircle2,X} from 'lucide-react';
 import {clientAuth} from '@/lib/firebase-client';
@@ -50,10 +51,10 @@ export function GuOrderCapture({orderId,api,onClose,onDone}:{orderId:string;api:
   const key=itemId+'|'+angle;setSending(key);setError('');
   try{
    const current=clientAuth().currentUser;if(!current)throw Error('Bạn chưa đăng nhập.');
-   const resized=await preparePhonePhoto(file);const body=new FormData();body.set('file',resized);body.set('purpose',phase==='RETURN'?'return':'handover');body.set('orderId',order.id);
-   const response=await fetch('/api/uploads',{method:'POST',headers:{Authorization:'Bearer '+await current.getIdToken()},body});
-   const data=await response.json();if(!response.ok)throw Error(data.error||'Không thể tải ảnh lên.');
-   setPictures(old=>({...old,[key]:data.path}));
+   const resized=await preparePhonePhoto(file);
+   const data=await uploadImageToApi('/api/uploads',resized,await current.getIdToken(),{purpose:phase==='RETURN'?'return':'handover',orderId:order.id});
+   if(typeof data.path!=='string')throw Error('Phản hồi ảnh không hợp lệ.');
+   setPictures(old=>({...old,[key]:data.path as string}));
   }catch(e){setError(e instanceof Error?e.message:'Không thể tải ảnh.');}finally{setSending(null);}
  };
  const submit=async()=>{

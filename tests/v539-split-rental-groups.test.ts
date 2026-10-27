@@ -43,11 +43,15 @@ test('API bảo vệ phân nhóm ngay cả khi client gửi dữ liệu khác lo
  assert.match(modification,/itemsBelongToGroup\(snaps\.map\(s=>String\(s\.data\(\)\?\.category\|\|''\)\),existingGroup\)/);
  assert.match(modification,/LEGACY_MIXED/);
 });
-test('catalog phân trang độc lập hai loại đơn; có tab quản lý máy ảnh',()=>{
+test('đơn chung, lịch trang phục/phụ kiện và lịch máy ảnh tách riêng',()=>{
  const page=code('src/app/page.tsx');
  const catalog=code('src/app/api/catalog/route.ts');
- assert.match(page,/id:'camera-orders'/);
- assert.match(page,/rentalGroup='\+\(page==='camera-orders'\?'CAMERA':'CLOTHING'\)/);
+ assert.match(page,/id:'camera-calendar',label:'Lịch máy ảnh'/);
+ assert.match(page,/id:'orders',label:'Đơn thuê'/);
+ assert.doesNotMatch(page,/id:'camera-orders'/);
+ assert.match(page,/kind==='orders'\?'&rentalGroup=ALL'/);
+ assert.match(page,/const calendarFilteredItems=calendarSearchPool\.filter\(i=>productGroup\(i\.category\)/);
+ assert.match(page,/rentalGroup='\+\(page==='camera-calendar'\?'CAMERA':'CLOTHING'\)/);
  assert.match(catalog,/kind==='orders'&&requestedRentalGroup!=='ALL'/);
  assert.match(catalog,/collection=collection\.startAfter\(scan\.docs\[scan\.docs\.length-1\]\)/);
 });

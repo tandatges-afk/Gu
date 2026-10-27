@@ -1,4 +1,5 @@
 'use client';
+import {uploadImageToApi} from '@/lib/upload-client';
 import {formatVNDateTime} from '@/lib/vn-datetime';
 import {useEffect,useState, type FormEvent} from 'react';
 import {clientAuth} from '@/lib/firebase-client';
@@ -39,19 +40,12 @@ export function ImageUploader({paths,onChange,disabled,onUploading}:{paths:strin
       if(!user)throw new Error('Hãy đăng nhập trước khi tải ảnh.');
       for(const original of selected){
         const file=await preparePhonePhoto(original);
-        const form=new FormData();form.append('file',file);
-        const send=async(forceRefresh:boolean)=>{
-          const token=await user.getIdToken(forceRefresh);
-          return fetch('/api/uploads',{method:'POST',headers:{Authorization:`Bearer ${token}`},body:form});
-        };
-        let res=await send(false);
-        if(res.status===401)res=await send(true);
-        const body=await res.json().catch(()=>({error:'Phản hồi tải ảnh không hợp lệ.'}));
-        if(!res.ok||typeof body.path!=='string')throw new Error(body.error||'Tải ảnh lên không thành công.');
+        const body=await uploadImageToApi('/api/uploads',file,await user.getIdToken(),{purpose:'product'});
+        if(typeof body.path!=='string')throw Error('Phản hồi ảnh không có đường dẫn.');
         uploaded.push(body.path);
         onChange([...uploaded]);
       }
-    }catch(e){setError(e instanceof Error?e.message:'Không thể tải ảnh lên Cloudinary.');}
+    }catch(e){setError(e instanceof Error?e.message:'Không thể tải ảnh lên VPS.');}
     finally{setUploading(false);onUploading?.(false);}
   };
   return <div className="uploader gu-v3-uploader">

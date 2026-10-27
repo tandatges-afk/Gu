@@ -1,4 +1,5 @@
 'use client';
+import {uploadImageToApi} from '@/lib/upload-client';
 import {useState} from 'react';
 import {clientAuth} from '@/lib/firebase-client';
 import {preparePhonePhoto} from '@/lib/mobile-images';
@@ -8,9 +9,9 @@ export function GuSecureUpload({purpose,draftId,onUploaded,label}:{purpose:'rese
   if(!file)return;setUploading(true);setError('');setDone(false);onUploaded('');
   try{
    const user=clientAuth().currentUser;if(!user)throw Error('Vui lòng đăng nhập lại');
-   const resized=await preparePhonePhoto(file);const body=new FormData();body.set('file',resized);body.set('purpose',purpose);body.set('draftId',draftId);
-   const res=await fetch('/api/v5/secure-photo',{method:'POST',headers:{Authorization:'Bearer '+await user.getIdToken()},body});
-   const data=await res.json();if(!res.ok)throw Error(data.error||'Không thể lưu ảnh cọc');
+   const resized=await preparePhonePhoto(file);
+   const data=await uploadImageToApi('/api/v5/secure-photo',resized,await user.getIdToken(),{purpose,draftId});
+   if(typeof data.id!=='string')throw Error('Máy chủ không trả mã ảnh.');
    onUploaded(data.id);setDone(true);
   }catch(e){setError(e instanceof Error?e.message:'Lỗi tải ảnh.');}finally{setUploading(false);}
  };

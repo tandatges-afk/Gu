@@ -22,8 +22,7 @@ export async function GET(req:NextRequest){
   const results=docs.filter(d=>!d.data()?.archivedAt&&Array.isArray(d.data()?.imagePaths)&&d.data()!.imagePaths.length).map(d=>{
     const data=d.data()!;const imagePaths=(data.imagePaths as string[]).slice(0,5);
     const indexed=data.visualImagePath===imagePaths[0]&&validVisualSignature(data.visualSignature);
-    const rawSignatures: VisualIndexEntry[]=validVisualIndexEntries(data.visualSignatures)
-     ? data.visualSignatures : [];
+    const rawSignatures:VisualIndexEntry[]=validVisualIndexEntries(data.visualSignatures)?data.visualSignatures:[];
     const signatures=rawSignatures.filter(entry=>imagePaths.includes(entry.imagePath));
     const missingImages=imagePaths.filter(path=>!signatures.some(entry=>entry.imagePath===path));
     return {id:d.id,category:String(data.category||''),signatures,
