@@ -20,3 +20,5 @@ node_modules/
 backups/
 uploads/
 .vscode/
+!/src/app/api/uploads/
+!/src/app/api/uploads/route.ts
