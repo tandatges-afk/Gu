@@ -85,7 +85,7 @@ export function imageSignature(source:File|string):Promise<VisualSignatureV2>{
    }catch(e){reject(e instanceof Error?e:Error('Không thể phân tích ảnh.'));}
    finally{if(objectUrl)URL.revokeObjectURL(objectUrl);}
   };
-  img.onerror=()=>{if(objectUrl)URL.revokeObjectURL(objectUrl);reject(Error('Không tải được ảnh để đối chiếu. Kiểm tra kết nối/Cloudinary CORS.'));};
+  img.onerror=()=>{if(objectUrl)URL.revokeObjectURL(objectUrl);reject(Error('Không tải được ảnh để đối chiếu. Kiểm tra kết nối và quyền truy cập ảnh trên VPS.'));};
   img.src=objectUrl||thumbCloudinaryUrl(source as string,500);
  });
 }

@@ -19,6 +19,7 @@ node_modules/
 *.zip
 backups/
 uploads/
+# Keep the Next.js uploads API route in Git despite the uploads/ media exclusion.
+!src/app/api/uploads/
+!src/app/api/uploads/route.ts
 .vscode/
-!/src/app/api/uploads/
-!/src/app/api/uploads/route.ts

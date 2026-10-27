@@ -16,9 +16,9 @@ import {runEvidenceCleanup} from '@/lib/evidence-retention';
 import {queueSensitiveEvidenceCleanup,runSensitiveEvidenceCleanup} from '@/lib/sensitive-evidence-cleanup';
 import {finalRent,handoverBillingStart} from '@/lib/gu-v52-workflow';
 import {readVerifiedEvidence} from '@/lib/secure-evidence';
+import {parseInspectionPhotoUrl} from '@/lib/inspection-photo-url';
 import type {RentalOrder,InventoryItem} from '@/lib/types';
 export const runtime='nodejs';
-const cloud=()=>process.env.CLOUDINARY_CLOUD_NAME||'';
 function readProof(raw:unknown,order:RentalOrder,uid:string,name:string,phase:'HANDOVER'|'RETURN',now:string):PhotoProof[]{
  const targetIds=phase==='HANDOVER'&&order.pendingExtraItemIds?.length?order.pendingExtraItemIds:order.lines.map(l=>l.itemId);
  if(!Array.isArray(raw)||raw.length!==targetIds.length)throw new ApiError(400,'Phải chụp đủ mọi sản phẩm trong đợt giao/nhận.');
@@ -34,10 +34,10 @@ function readProof(raw:unknown,order:RentalOrder,uid:string,name:string,phase:'H
   const shots=Object.fromEntries(slots.map(angle=>{
    const url=(p.shots as Record<string,unknown>|undefined)?.[angle];
    // URL belongs to the authenticated uploader and this order. Public URLs alone cannot be trusted.
-   const prefix=`https://res.cloudinary.com/${cloud()}/image/upload/`;
    if(missing&&!url)return null;
-   if(typeof url!=='string'||!url.startsWith(prefix)||!new RegExp(`/gu/inspections/${uid}/${order.id}/${phase.toLowerCase()}/[a-f0-9-]{36}\\.(?:jpg|png|webp)$`).test(url))throw new ApiError(400,`Ảnh ${angle} chưa được tải lên đúng đơn hoặc đúng nhân viên.`);
-   return [angle,{url,at:now,by:uid,byName:name} satisfies Capture];
+   const uploaded=parseInspectionPhotoUrl(url,process.env.APP_URL);
+   if(!uploaded||uploaded.uid!==uid)throw new ApiError(400,`Ảnh ${angle} không khớp tài khoản đang bàn giao. Hãy chụp lại góc ${angle} bằng tài khoản hiện tại.`);
+   return [angle,{url:uploaded.url,at:now,by:uid,byName:name} satisfies Capture];
   }).filter((entry):entry is [string,Capture]=>entry!==null));
   return {itemId:id,shots,condition,note:typeof p.note==='string'?p.note.slice(0,500):''};
  });
@@ -47,10 +47,10 @@ function readProof(raw:unknown,order:RentalOrder,uid:string,name:string,phase:'H
 async function verifyProofUploads(tx:Transaction,proofs:PhotoProof[],phase:'handover'|'return',uid:string,orderId:string){
  const paths=proofs.flatMap(p=>Object.values(p.shots).filter(Boolean).map(c=>c.url));
  if(new Set(paths).size!==paths.length)throw new ApiError(400,'Không dùng một ảnh cho nhiều góc chụp.');
- const ids=paths.map(url=>url.match(/\/([a-f0-9-]{36})\.(?:jpg|jpeg|png|webp)$/)?.[1]);
- if(ids.some(x=>!x))throw new ApiError(400,'Đường dẫn ảnh kiểm nhận không hợp lệ.');
- const uploads=await Promise.all(ids.map(x=>tx.get(db().collection('proofUploads').doc(x!))));
- if(uploads.some((s,i)=>!s.exists||s.data()?.url!==paths[i]||s.data()?.uid!==uid||s.data()?.orderId!==orderId||s.data()?.phase!==phase))throw new ApiError(400,'Ảnh chưa được tải lên từ tài khoản và đơn này.');
+ const parsed=paths.map(path=>parseInspectionPhotoUrl(path,process.env.APP_URL));
+ if(parsed.some(p=>!p))throw new ApiError(400,'Đường dẫn ảnh kiểm nhận không hợp lệ.');
+ const uploads=await Promise.all(parsed.map(p=>tx.get(db().collection('proofUploads').doc(p!.id))));
+ if(uploads.some((s,i)=>!s.exists||s.data()?.url!==parsed[i]!.url||s.data()?.uid!==uid||s.data()?.orderId!==orderId||s.data()?.phase!==phase))throw new ApiError(400,'Có ảnh chưa được ghi nhận cho đúng đơn và nhân viên. Hãy chụp lại ảnh bị lỗi bằng tài khoản hiện tại.');
 }
 export async function GET(req:NextRequest,ctx:{params:Promise<{id:string}>}){
  try{const me=await staffUser(req);const {id}=await ctx.params;if(!simpleId(id))throw new ApiError(400,'Mã đơn không hợp lệ.');

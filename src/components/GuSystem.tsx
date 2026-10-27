@@ -24,7 +24,7 @@ export function GuSystem({api}:{api:Api}){
  const [error,setError]=useState('');const [busy,setBusy]=useState(false);
  const [storage,setStorage]=useState<StorageHealth|null>(null);const [storageError,setStorageError]=useState('');const [checkingStorage,setCheckingStorage]=useState(false);
  const checkStorage=async(write=false)=>{setCheckingStorage(true);setStorageError('');setStorage(null);try{const result=await api<StorageHealth>('v5/storage-health',write?{method:'POST'}:undefined);setStorage(result);}catch(e){setStorageError(e instanceof Error?e.message:'Không kiểm tra được Storage.');}finally{setCheckingStorage(false);}};
- const load=async(refresh=false)=>{setBusy(true);try{setData(await api<Response>(refresh?'system?refresh=1':'system'));setError('');}catch(e){setError(e instanceof Error?e.message:'Không thể tải thống kê Cloudinary.');}finally{setBusy(false);}};
+ const load=async(refresh=false)=>{setBusy(true);try{setData(await api<Response>(refresh?'system?refresh=1':'system'));setError('');}catch(e){setError(e instanceof Error?e.message:'Không thể tải thống kê lưu trữ VPS.');}finally{setBusy(false);}};
  useEffect(()=>{void load();},[]);
  const cloud=data?.cloudinary;
  return <>
@@ -40,7 +40,7 @@ export function GuSystem({api}:{api:Api}){
    <div className="gu-system-detail"><HardDrive size={16}/><span>Số ảnh/tài nguyên: <b>{fmt(cloud?.resources)}</b></span></div>
    {cloud?.updatedAt&&<small className="gu-system-updated">Cập nhật: {formatVNDateTime(cloud.updatedAt)}</small>}
   </section>
-  <section className="panel gu-system-card" aria-label="Kiểm tra Cloudinary bảo mật">
+  <section className="panel gu-system-card" aria-label="Kiểm tra lưu trữ ảnh bảo mật trên VPS">
    <div className="gu-system-heading"><HardDrive size={21}/><h2>VPS · Ảnh cọc</h2></div>
    <div className="action-row">
     <button type="button" className="btn btn-white" disabled={checkingStorage} onClick={()=>void checkStorage()}>{checkingStorage?'Đang kiểm tra…':'Kiểm tra kết nối'}</button>
