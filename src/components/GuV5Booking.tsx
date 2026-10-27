@@ -124,10 +124,10 @@ export function GuV5Booking({items,customers,api,initial,onClose,onSuccess,onCus
   {cameraPackageHours!==''&&cameraItems.map(item=>isCameraModel(item.cameraModel)?<p key={item.id} className="gu-camera-package-preview">{item.name} · {item.hangerCode||item.cameraSerial} · Gói {cameraPackageHours}h: {money(cameraBasePrice(item.cameraModel,cameraPackageHours))}. Quá hạn thực tế: +10.000đ mỗi giờ trễ bắt đầu.</p>:<p key={item.id} className="field-error">{item.name} chưa có mẫu máy hợp lệ.</p>)}</section>}
   {quoteError&&<div className="inline-alert danger-alert">Có sản phẩm không đủ thông tin để tính giá. Kiểm tra mẫu máy ảnh hoặc khoảng giờ thuê.</div>}
   <div className={`booking-total ${ui.summary}`}><div><b>{selected.length} sản phẩm · {rentalGroup==='CAMERA'?(cameraPackageHours?`Gói máy ảnh ${cameraPackageHours} giờ`:'Chưa chọn gói máy ảnh'):`${blocks||'—'} chu kỳ 24 giờ`}</b></div><strong>{money(total)}</strong></div>
-  {needsPrepay&&<section className={`gu-v52-prepay ${ui.prepay}`}><strong>ĐẶT LỊCH TRƯỚC · ẢNH XÁC NHẬN TIỀN CỌC</strong><div className="booking-total"><span>Khách cần thanh toán ngay</span><strong>{money(total)}</strong></div>
-<GuSecureUpload purpose="reservation" draftId={paymentDraftId} onUploaded={setReservationProofId} label="Chụp ảnh xác nhận tiền cọc"/></section>}
+  {needsPrepay&&<section className={`gu-v52-prepay ${ui.prepay}`}><strong>ĐẶT TRƯỚC · THU TRƯỚC TIỀN THUÊ ĐỂ GIỮ LỊCH</strong><div className="booking-total"><span>Khách cần thanh toán ngay</span><strong>{money(total)}</strong></div>{rentalGroup==='CLOTHING'&&<p>Giá thuê: trang phục từ 50.000đ, phụ kiện từ 20.000đ cho 24 giờ đầu mỗi món. Khi khách đến lấy vẫn phải nhận thêm cọc tài sản 300.000đ/trang phục, 200.000đ/phụ kiện hoặc giữ CCCD. Cọc tài sản không phải tiền thuê.</p>}
+<GuSecureUpload purpose="reservation" draftId={paymentDraftId} onUploaded={setReservationProofId} label="Chụp chứng từ tiền thuê đã nhận"/></section>}
   <label className={`${ui.field} ${ui.noteField}`}><span>Ghi chú đơn</span><input className="input" value={note} onChange={e=>setNote(e.target.value)}/></label>
   {incomplete&&<p className="gu-booking-blockers" role="status">{incomplete}</p>}
-  <div className={`modal-actions ${ui.actions}`}><button type="button" className="btn btn-white" onClick={onClose}>Đóng</button><button type="submit" className="btn btn-dark" disabled={busy}>{busy?'Đang tạo…':needsPrepay?'Lưu ảnh cọc & giữ lịch':'Tạo đơn giao ngay'}</button></div>
+  <div className={`modal-actions ${ui.actions}`}><button type="button" className="btn btn-white" onClick={onClose}>Đóng</button><button type="submit" className="btn btn-dark" disabled={busy}>{busy?'Đang tạo…':needsPrepay?'Thu tiền thuê & giữ lịch':'Tạo đơn chờ bàn giao'}</button></div>
  </form>;
 }

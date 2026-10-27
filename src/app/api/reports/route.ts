@@ -17,7 +17,8 @@ export async function GET(req:NextRequest){
   const sums=new Map<string,{date:string;amount:number;payments:number}>();
   for(const doc of [...snap.docs,...history.docs]){
     const row=sums.get(doc.id)||{date:doc.id,amount:0,payments:0};
-    row.amount+=Number(doc.data().amount||0);row.payments+=Number(doc.data().payments||0);sums.set(doc.id,row);
+    // Exclude refundable cash collateral from revenue; recognize only the applied part at return.
+    row.amount+=Number(doc.data().amount||0)-Number(doc.data().collateralReceived||0)+Number(doc.data().collateralRefunded||0)+Number(doc.data().collateralApplied||0);row.payments+=Number(doc.data().payments||0);sums.set(doc.id,row);
   }
   const rows=[...sums.values()].sort((a,b)=>a.date.localeCompare(b.date));
   return NextResponse.json({rows,since:'GU 4.2',historicalImported:migration.data()?.completed===true,

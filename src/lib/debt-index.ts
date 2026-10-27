@@ -1,16 +1,22 @@
 import type {RentalOrder} from './types';
+import {CLOTHING_SETTLEMENT_VERSION} from './clothing-collateral.ts';
+/** Cash held for an active clothing rental covers an equal part of rent; it is not customer receivable. */
+export function collectibleRentDue(o:RentalOrder):number{
+ const security=o.settlementPolicyVersion===CLOTHING_SETTLEMENT_VERSION&&!o.collateralReturnedAt?(o.handoverCashCollateralAmount||0):0;
+ return Math.max(0,(o.total||0)+(o.compensationTotal||0)+(o.lateFeeTotal||0)+(o.otherFeeTotal||0)-(o.paid||0)-security);
+}
 import type {Transaction,Firestore} from '@/lib/pg-firestore';
 import type {DebtAccount} from './debts';
 /** Only open receivables and future bookings are indexed. Historical paid orders are not re-scanned. */
 export function debtIndexKind(o:RentalOrder):'open'|'reserved'|null{
  if(o.status==='CANCELLED'||o.status==='VOIDED')return null;
- const outstanding=Math.max(0,(o.total||0)+(o.compensationTotal||0)+(o.lateFeeTotal||0)+(o.otherFeeTotal||0)-(o.paid||0));
+ const outstanding=collectibleRentDue(o);
  if(outstanding<=0&&!o.cameraLateFeePending)return null;
  return o.status==='RESERVED'?'reserved':o.status==='PICKED_UP'||o.status==='RETURNED'?'open':null;
 }
 export function debtIndexRecord(o:RentalOrder){
  const kind=debtIndexKind(o);
- const balance=Math.max(0,(o.total||0)+(o.compensationTotal||0)+(o.lateFeeTotal||0)+(o.otherFeeTotal||0)-(o.paid||0));
+ const balance=collectibleRentDue(o);
  return {kind,orderId:o.id,customerId:o.customerId,customerName:o.customerName,customerPhone:o.customerPhone,
    code:o.code,status:o.status,pickupDate:o.pickupDate,returnDate:o.returnDate,
    amount:balance+(o.paid||0),paid:o.paid||0,outstanding:balance,cameraLateFeePending:Boolean(o.cameraLateFeePending),updatedAt:o.updatedAt||o.createdAt||''};

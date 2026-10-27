@@ -4,6 +4,7 @@ import {staffUser,handleError,jsonBody,ApiError,requirePcStaff} from '@/lib/http
 import {localDateTimeToISO,billableBlocks,vnDayKey} from '@/lib/hourly-pricing';
 import {rentalCharge,chosenCameraPackageSnapshot,isCameraCategory,isCameraModel} from '@/lib/camera-rental';
 import {itemsBelongToGroup,type RentalGroup} from '@/lib/order-group';
+import {collateralForLines,CLOTHING_SETTLEMENT_VERSION} from '@/lib/clothing-collateral';
 import {intervalRefs,checkIntervalAvailability,createIntervalWrites,simpleId} from '@/lib/v5-server';
 import {normalizedAngles} from '@/lib/inspection-proof';
 import {auditInTransaction} from '@/lib/audit';
@@ -89,7 +90,7 @@ export async function POST(req:NextRequest){
     catch{throw new ApiError(409,`Góc chụp của sản phẩm “${item.name}” không hợp lệ. Admin cần kiểm tra lại.`);}
    }
    const referencePhotos=Object.fromEntries(items.map(i=>[i.id,i.referenceShots||{}]));
-   const record:Omit<RentalOrder,'id'>={code,rentalGroup:group,customerId:customer.id,customerName:customer.name,customerPhone:customer.phone,pickupDate:vnDayKey(pickupAt),returnDate:vnDayKey(returnAt),pickupAt,returnAt,pricingVersion:'GU_HOURLY_V1',photoTemplates,referencePhotos,rentalDays:blocks,lines,total,paid:prepay?total:0,depositDue:0,bookingKind:prepay?'RESERVE':'WALK_IN',bookedRentTotal:total,prepaidRentTotal:prepay?total:0,...(prepay?{reservationPaymentProofId:paymentProofId}:{}),note,status:'RESERVED',createdAt:now,updatedAt:now,createdBy:me.uid,createdByName:me.name,history:[{action:'CREATE_HOURLY',at:now,by:me.uid,detail:'Đơn đã được tạo, chụp ảnh tại màn giao hàng của nhân viên'}]};
+   const record:Omit<RentalOrder,'id'>={code,rentalGroup:group,...(group==='CLOTHING'?{settlementPolicyVersion:CLOTHING_SETTLEMENT_VERSION,collateralRequiredAmount:collateralForLines(lines)}:{}),customerId:customer.id,customerName:customer.name,customerPhone:customer.phone,pickupDate:vnDayKey(pickupAt),returnDate:vnDayKey(returnAt),pickupAt,returnAt,pricingVersion:'GU_HOURLY_V1',photoTemplates,referencePhotos,rentalDays:blocks,lines,total,paid:prepay?total:0,depositDue:0,bookingKind:prepay?'RESERVE':'WALK_IN',bookedRentTotal:total,prepaidRentTotal:prepay?total:0,...(prepay?{reservationPaymentProofId:paymentProofId}:{}),note,status:'RESERVED',createdAt:now,updatedAt:now,createdBy:me.uid,createdByName:me.name,history:[{action:'CREATE_HOURLY',at:now,by:me.uid,detail:'Đơn đã được tạo, chụp ảnh tại màn giao hàng của nhân viên'}]};
    // A failed rental does not leave an orphan customer. Concurrent quick creation
    // is serialized on phoneIndex even when two staff members click at once.
    if(quick&&!customerSnap.exists)tx.create(resolvedCustomerRef,{name:quickName,phone:quickPhone,note:'',createdAt:now});
