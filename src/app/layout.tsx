@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next';
 import './globals.css';
 import './gu-premium.css';
+import './gu-redesign.css';
 
 export const metadata: Metadata = {
   title: 'GU - Thuê đồ xinh',
@@ -14,7 +15,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: '#183d4b',
+  themeColor: '#203e46',
   width: 'device-width',
   initialScale: 1,
   viewportFit: 'cover',
