@@ -1,8 +1,9 @@
 import {NextRequest,NextResponse} from 'next/server';
 import {randomUUID} from 'node:crypto';
 import {db} from '@/lib/firebase-admin';
-import {staffUser,handleError,ApiError} from '@/lib/http';
+import {staffUser,handleError,ApiError,boundedUploadBytes} from '@/lib/http';
 import {validEvidenceId} from '@/lib/secure-evidence';
+import {reserveUploadBudget} from '@/lib/upload-budget';
 import {cleanupAllowed} from '@/lib/sensitive-evidence-rules';
 import {uploadSecureCloudinary,downloadSecureCloudinary,deleteSecureCloudinary,securePhotoPublicId,type SecureCloudinaryImage} from '@/lib/cloudinary-secure';
 export const runtime='nodejs';export const preferredRegion='sin1';
@@ -23,12 +24,13 @@ export async function POST(req:NextRequest){
   if(purpose!=='reservation'&&purpose!=='deposit')throw new ApiError(400,'Loại ảnh không hợp lệ.');
   if(!validEvidenceId(draftId))throw new ApiError(400,'Mã lượt chụp không hợp lệ.');
   if(!validMime.includes(type))throw new ApiError(400,'Chỉ hỗ trợ ảnh JPEG, PNG, WebP.');
-  const bytes=Buffer.from(await req.arrayBuffer());
+  const bytes=await boundedUploadBytes(req);
   if(!bytes.length||bytes.length>limits[purpose])throw new ApiError(413,'Ảnh tối đa 3 MB.');
   const isJpg=bytes[0]===0xff&&bytes[1]===0xd8&&bytes[2]===0xff;
   const isPng=bytes.subarray(0,8).equals(Buffer.from([137,80,78,71,13,10,26,10]));
   const isWebp=bytes.toString('ascii',0,4)==='RIFF'&&bytes.toString('ascii',8,12)==='WEBP';
   if(!(type==='image/jpeg'&&isJpg||type==='image/png'&&isPng||type==='image/webp'&&isWebp))throw new ApiError(400,'Dữ liệu ảnh không đúng định dạng.');
+  await reserveUploadBudget(me.uid,me.role,bytes.byteLength);
   const id=randomUUID();
   const stored=await uploadSecureCloudinary(bytes,type,me.uid,id);
   try{

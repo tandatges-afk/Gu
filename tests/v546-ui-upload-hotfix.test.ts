@@ -23,7 +23,8 @@ test('upload routes avoid multipart parsing and retain auth and content validati
  for(const p of ['src/app/api/uploads/route.ts','src/app/api/v5/secure-photo/route.ts']){
   const api=read(p);
   assert.doesNotMatch(api,/req\.formData\(\)/);
-  assert.match(api,/await req\.arrayBuffer\(\)/);
+  assert.match(api,/boundedUploadBytes\(req\)/);
+  assert.doesNotMatch(api,/req\.arrayBuffer\(\)/);
   assert.match(api,/await staffUser\(req\)/);
   assert.match(api,/3\*1024\*1024/);
  }

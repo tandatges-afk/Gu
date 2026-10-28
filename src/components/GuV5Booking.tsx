@@ -36,6 +36,7 @@ export function GuV5Booking({items,customers,api,initial,onClose,onSuccess,onCus
  const [quickCustomer,setQuickCustomer]=useState(false);
  const [showPhoneSuggestions,setShowPhoneSuggestions]=useState(false);
  const [paymentDraftId]=useState(()=>crypto.randomUUID());
+ const [createRequestId]=useState(()=>crypto.randomUUID());
  const [reservationProofId,setReservationProofId]=useState('');
  const [cameraPackageHours,setCameraPackageHours]=useState<CameraPackageHours|''>('');
  const available=[...new Map([...items,...searched,...selectedRecords].map(i=>[i.id,i])).values()];
@@ -55,7 +56,7 @@ export function GuV5Booking({items,customers,api,initial,onClose,onSuccess,onCus
  useEffect(()=>{if(!query.trim())return;
  let cancelled=false;const timer=setTimeout(()=>{void api<{results:InventoryItem[]}>('catalog?kind=items&q='+encodeURIComponent(query.trim())+'&size=50&rentalGroup='+rentalGroup).then(res=>{if(!cancelled)setSearched(res.results);}).catch(()=>{if(!cancelled)setSearched([]);});},350);
  return()=>{cancelled=true;clearTimeout(timer);};},[query,api,rentalGroup]);
- useEffect(()=>{if(phone.trim().length<3){setPeople([]);return;}const timer=setTimeout(()=>{void api<{customers:Customer[]}>('customers?phone='+encodeURIComponent(digits(phone))).then(r=>{setPeople(r.customers);}).catch(()=>setPeople([]));},400);return()=>clearTimeout(timer);},[phone,api,quickCustomer]);
+ useEffect(()=>{if(phone.trim().length<3){setPeople([]);return;}let cancelled=false;const timer=setTimeout(()=>{void api<{customers:Customer[]}>('customers?phone='+encodeURIComponent(digits(phone))).then(r=>{if(!cancelled)setPeople(r.customers);}).catch(()=>{if(!cancelled)setPeople([]);});},400);return()=>{cancelled=true;clearTimeout(timer);};},[phone,api,quickCustomer]);
  const blocks=useMemo(()=>{try{return billableBlocks(localDateTimeToISO(pickupAt),localDateTimeToISO(returnAt));}catch{return 0;}},[pickupAt,returnAt]);
  const pricedLine=(item:InventoryItem)=>{
   const from=localDateTimeToISO(pickupAt),to=localDateTimeToISO(returnAt);
@@ -75,7 +76,7 @@ export function GuV5Booking({items,customers,api,initial,onClose,onSuccess,onCus
    if(quickCustomer)cid='QUICK_CUSTOMER';
    if(!cid||!selected.length||!blocks)throw Error('Chọn khách, sản phẩm và ngày giờ hợp lệ.');
    if(needsPrepay&&!reservationProofId)throw Error('Cần chụp ảnh xác nhận tiền cọc/tiền thuê trước khi giữ lịch.');
-   const r=await api<RentalOrder>('v5/orders',{method:'POST',body:JSON.stringify({customerId:cid,itemIds:selected,pickupAt,returnAt,note,bookingKind:needsPrepay?'RESERVE':'WALK_IN',reservationPaymentProofId:reservationProofId,paymentDraftId,rentalGroup,cameraPackageHours:cameraItems.length?cameraPackageHours:undefined,...(quickCustomer?{quickCustomer:{name:name.trim(),phone:digits(phone)}}:{})})});
+   const r=await api<RentalOrder>('v5/orders',{method:'POST',body:JSON.stringify({customerId:cid,itemIds:selected,pickupAt,returnAt,note,createRequestId,bookingKind:needsPrepay?'RESERVE':'WALK_IN',reservationPaymentProofId:reservationProofId,paymentDraftId,rentalGroup,cameraPackageHours:cameraItems.length?cameraPackageHours:undefined,...(quickCustomer?{quickCustomer:{name:name.trim(),phone:digits(phone)}}:{})})});
    await onSuccess(`Đã tạo đơn ${r.code}.`);onCreated?.(r.id);
  }catch(e){setError(e instanceof Error?e.message:'Tạo đơn thất bại.');}finally{setBusy(false);}};
  return <form className={`modal-body ${ui.bookingForm}`} noValidate onSubmit={e=>void submit(e)}>

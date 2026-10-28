@@ -12,7 +12,7 @@ const missing=needed.filter(f=>!existsSync(join(process.cwd(),f)));
 const p=JSON.parse(readFileSync('package.json','utf8'));
 const badDeps=['firebase','firebase-admin','cloudinary'].filter(name=>p.dependencies?.[name]);
 const problems=[...missing.map(f=>'Missing '+f),...badDeps.map(f=>'Provider dependency '+f)];
-if(!p.version.startsWith('5.4.6-vps.'))problems.push('Invalid VPS version');
+if(p.version!=='5.4.6-fix20.0')problems.push('Invalid Fix20 version');
 if(!p.scripts['db:optimize']||!p.scripts['db:bench'])problems.push('Missing PG maintenance scripts');
 if(problems.length){console.error('GU VPS release verification failed:',problems.join('; '));process.exit(1);}
 console.log('GU VPS release structure verified ('+p.version+'). External npm build, DB integration and acceptance remain required.');

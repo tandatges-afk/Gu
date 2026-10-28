@@ -1,11 +1,5 @@
 #!/usr/bin/env bash
+# Deprecated backup for GU legacy database; NEVER use for V5 production.
 set -euo pipefail
-umask 077
-D=/var/backups/gu-v546
-install -d -m 0700 "$D"
-STAMP=$(date +%Y%m%d-%H%M%S)
-# Database name on the PG cluster; uses postgres Unix user with local auth.
-runuser -u postgres -- pg_dump -Fc gu_db > "$D/gu-${STAMP}.dump"
-tar -czf "$D/media-${STAMP}.tgz" -C /var/lib/gu-v546 uploads
-find "$D" -type f \( -name '*.dump' -o -name '*.tgz' \) -mtime +14 -delete
-printf 'Backup: %s\n' "$STAMP"
+echo 'GU Fix20 safety: legacy backup disabled. Enable gu-fix20-prod-backup.timer after configuring GPG + offsite remote.' >&2
+exit 3

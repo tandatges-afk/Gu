@@ -75,7 +75,7 @@ export async function PATCH(req:NextRequest,ctx:{params:Promise<{id:string}>}) {
         else{const old=validVisualIndexEntries(snap.data()?.visualSignatures)?snap.data()!.visualSignatures as {imagePath:string;signature:unknown}[]:[];patch.visualSignatures=old.filter(entry=>(b.imagePaths as string[]).slice(0,5).includes(entry.imagePath));}
         if(b.visualSignature!==undefined){if(!validVisualSignature(b.visualSignature))throw new ApiError(400,'Chỉ mục ảnh không hợp lệ.');patch.visualSignature=b.visualSignature;patch.visualImagePath=b.imagePaths[0]||'';}
         else if((b.imagePaths as string[])[0]!==snap.data()?.visualImagePath){patch.visualSignature=null;patch.visualImagePath=null;}
-        if(me.role==='admin'){const rawAngles=b.inspectionAngles??snap.data()?.inspectionAngles??[];const angles=Array.isArray(rawAngles)&&rawAngles.length?normalizedAngles(rawAngles):[];patch.inspectionAngles=angles;
+        {const rawAngles=b.inspectionAngles??snap.data()?.inspectionAngles??[];const angles=Array.isArray(rawAngles)&&rawAngles.length?normalizedAngles(rawAngles):[];patch.inspectionAngles=angles;
           const referenceShots=b.referenceShots??snap.data()?.referenceShots??{};
           if(typeof referenceShots!=='object'||Array.isArray(referenceShots)||Object.entries(referenceShots as Record<string,unknown>).some(([angle,url])=>!angles.includes(angle)||!(Object.values(snap.data()?.referenceShots||{}).includes(url)||validProductImageUrl(url,me.uid,process.env.CLOUDINARY_CLOUD_NAME||''))))throw new ApiError(400,'Ảnh chuẩn góc chụp không hợp lệ.');
           patch.referenceShots=referenceShots;

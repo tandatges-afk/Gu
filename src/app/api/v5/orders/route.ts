@@ -1,4 +1,5 @@
 import {NextRequest,NextResponse} from 'next/server';
+import {createHash} from 'node:crypto';
 import {db} from '@/lib/firebase-admin';
 import {staffUser,handleError,jsonBody,ApiError,requirePcStaff} from '@/lib/http';
 import {localDateTimeToISO,billableBlocks,vnDayKey} from '@/lib/hourly-pricing';
@@ -53,8 +54,27 @@ export async function POST(req:NextRequest){
   const prepay=requiresFullPrepayment(pickupAt,now,b.bookingKind==='RESERVE');
   const paymentProofId=String(b.reservationPaymentProofId||'');
   const paymentDraftId=String(b.paymentDraftId||'');
+  // Optional for old clients; the Fix20 UI always submits a stable UUID.
+  const requestId=String(b.createRequestId||'');
+  if(requestId&&!/^[a-f0-9-]{36}$/.test(requestId))throw new ApiError(400,'Mã lần tạo đơn không hợp lệ.');
+  const requestRef=requestId?db().collection('orderCreateRequests').doc(me.uid+'_'+requestId):null;
+  const fingerprint=createHash('sha256').update(JSON.stringify({
+    group,ids,customerId:quick?null:String(b.customerId),quick:quick?{name:quickName,phone:quickPhone}:null,
+    pickupAt,returnAt,note,bookingKind:b.bookingKind,paymentProofId,paymentDraftId,cameraPackageHours:b.cameraPackageHours
+  })).digest('hex');
   if(prepay&&!paymentProofId)throw new ApiError(400,'Đặt lịch trước phải thu đủ 100% tiền thuê và chụp ảnh thanh toán.');
   const result=await db().runTransaction(async tx=>{
+   // Read the idempotency record under the same PostgreSQL transaction lock as
+   // availability, cash journal and order creation. A retry returns the SAME order.
+   if(requestRef){
+    const prior=await tx.get(requestRef);
+    if(prior.exists){
+     if(prior.data()?.fingerprint!==fingerprint)throw new ApiError(409,'Đã dùng mã tạo đơn với nội dung khác. Đóng và mở lại cửa sổ tạo đơn.');
+     const previousOrder=await tx.get(db().collection('orders').doc(String(prior.data()?.orderId||'')));
+     if(!previousOrder.exists)throw new ApiError(409,'Mã tạo đơn đã dùng nhưng thiếu đơn tham chiếu. Liên hệ Admin.');
+     return {id:previousOrder.id,...previousOrder.data()} as RentalOrder;
+    }
+   }
    const [indexedCustomer,...itemSnaps]=await Promise.all([phoneRef?tx.get(phoneRef):Promise.resolve(null),...itemRefs.map(x=>tx.get(x))]);
    const indexedCustomerId=phoneRef&&indexedCustomer?.exists?String(indexedCustomer.data()?.customerId||''):'';
    if(indexedCustomer?.exists&&!simpleId(indexedCustomerId))throw new ApiError(409,'Chỉ mục khách hàng bị thiếu thông tin. Liên hệ Admin để kiểm tra.');
@@ -81,7 +101,7 @@ export async function POST(req:NextRequest){
     return {itemId:i.id,name:i.name,sku:i.sku,hangerCode:i.hangerCode,size:i.size,category:i.category,cameraModel:i.cameraModel,cameraSerial:i.cameraSerial,...cameraSnapshot,dailyRate:i.dailyRate,bufferDays:0,replacementValue:i.replacementValue,lineTotal:rentalCharge({...i,...cameraSnapshot},pickupAt,returnAt),startDate:vnDayKey(pickupAt),startAt:pickupAt};
    });
    const total=lines.reduce((s,l)=>s+l.lineTotal,0);
-   const code='TH-'+now.slice(2,10).replace(/-/g,'')+'-'+orderRef.id.slice(0,5).toUpperCase();
+   const code='TH-'+now.slice(2,10).replace(/-/g,'')+'-'+orderRef.id.slice(0,12).toUpperCase();
    // Snapshot only validated/normalized angle labels. InventoryItem.inspectionAngles is optional
    // for legacy records, but a new v5 order must persist a complete string[] per item.
    const photoTemplates:Record<string,string[]>={};
@@ -95,7 +115,7 @@ export async function POST(req:NextRequest){
    // is serialized on phoneIndex even when two staff members click at once.
    if(quick&&!customerSnap.exists)tx.create(resolvedCustomerRef,{name:quickName,phone:quickPhone,note:'',createdAt:now});
    if(phoneRef&&!indexedCustomer?.exists)tx.create(phoneRef,{customerId:customer.id});
-   tx.create(orderRef,record);createIntervalWrites(tx,slots,snapshots,orderRef.id);
+   tx.create(orderRef,record);if(requestRef)tx.create(requestRef,{orderId:orderRef.id,fingerprint,createdAt:now,by:me.uid});createIntervalWrites(tx,slots,snapshots,orderRef.id);
 
    if(paymentEvidence){
     tx.update(paymentEvidence.ref,{consumedOrderId:orderRef.id,consumedAt:now});
