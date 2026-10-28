@@ -20,3 +20,22 @@
 @media(max-width:1150px){.fields{grid-template-columns:repeat(4,minmax(0,1fr))}.nameField{grid-column:span 2}.categoryField,.colorField{grid-column:span 1}.priceField{grid-column:span 2}.angleField{grid-column:1/4}.laundry{grid-column:4}.angleControl{flex-wrap:wrap}.anglePresets{width:100%}}
 @media(max-width:760px){.root{padding:16px;border-radius:16px}.heading{align-items:flex-start;gap:12px}.heading h2{font-size:22px}.counter{padding:10px}.counter strong{font-size:20px}.counter small{font-size:9px}.progressTrack{width:55px}.entryTop{padding:12px}.entryActions{margin-left:auto}.iconAction span{display:none}.entryIdentity>span{max-width:180px}.entryStatus{font-size:10px}.fields{grid-template-columns:repeat(2,minmax(0,1fr));padding:14px;gap:13px 10px}.nameField{grid-column:1/-1}.categoryField,.colorField{grid-column:auto}.priceField{grid-column:1/-1}.angleField{grid-column:1/-1}.laundry{grid-column:1/-1;justify-content:start}.laundryChoice{justify-content:flex-start}.toolbar{align-items:stretch}.addButton{width:100%;justify-content:center}.saveArea{width:100%;flex-direction:column;align-items:stretch;gap:10px}.saveArea :global(.btn){width:100%}.hint{text-align:center}.details summary{padding:13px}.cameraFields{grid-template-columns:1fr;margin:0 14px}.photos{padding:3px 13px 14px}}
 @media(max-width:400px){.heading{flex-direction:column}.counter{align-self:flex-start;display:flex;align-items:center;gap:9px;text-align:left}.entryStatus{display:none}.anglePresets{flex-wrap:wrap}.anglePresets button{flex:1}}
+
+/* Rev7.8: dense, searchable list for 1–100 items; open only rows being edited. */
+.listTools{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:0 0 12px}
+.rowSearch{display:flex;align-items:center;gap:8px;flex:1;min-width:180px;max-width:400px;background:#fff;border:1px solid #dce5e8;border-radius:10px;padding:0 12px;color:#6e8792}
+.rowSearch input{min-width:0;min-height:39px;flex:1;border:0;outline:0;background:transparent;color:#1b3540;font-size:12px}
+.problemFilter{display:flex;align-items:center;gap:7px;font-weight:700;color:#49646e;font-size:11.5px;cursor:pointer}
+.problemFilter input{accent-color:#1e6974;width:16px;height:16px}
+.compactButton{border:1px solid #d8e4e7;border-radius:9px;background:#f8fbfb;color:#325965;padding:9px 10px;font-size:11px;font-weight:800;cursor:pointer}
+.rowTotal{font-size:11px;color:#7b9097;margin-left:auto;white-space:nowrap}
+.entries{max-height:min(62vh,660px);overflow-y:auto;overscroll-behavior:contain;padding:2px 3px 4px;scrollbar-width:thin}
+.entry{flex-shrink:0}
+.entryTop{padding:7px 10px;min-height:53px;gap:8px}
+.expandRow{display:flex;align-items:center;gap:10px;min-width:0;flex:1;text-align:left;border:0;background:transparent;color:#456775;padding:2px 0;cursor:pointer}
+.expandRow:hover .entryIdentity strong{color:#135c69}
+.entryIdentity>span{max-width:680px}
+.entryStatus{padding:5px 9px}
+.toolbar{position:sticky;bottom:0;background:#fff;border-top:1px solid #e9eff0;padding:13px 0 0;margin-top:8px;z-index:2}
+.emptyList{padding:22px;text-align:center;font-size:12px;color:#6e8590}
+@media(max-width:760px){.entries{max-height:min(63vh,650px)}.entryTop{gap:6px}.expandRow{gap:7px}.entryIdentity>span{max-width:220px}.listTools{gap:9px}.rowSearch{min-width:100%;max-width:none}.problemFilter{flex:1}.counter{display:none}}

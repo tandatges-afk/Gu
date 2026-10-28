@@ -21,7 +21,7 @@ type BulkInput={name:string;category:string;color:string;requiresLaundry:boolean
 export async function POST(req:NextRequest){
  try{
   const me=await staffUser(req);
-  const body=await jsonBody(req);
+  const body=await jsonBody(req,256_000);
   if(body.action==='check'){
    if(!Array.isArray(body.names)||body.names.length>MAX_BULK_ITEMS||body.names.some(n=>typeof n!=='string'||n.length>120))throw new ApiError(400,'Danh sách tên không hợp lệ.');
    const names=body.names as string[];

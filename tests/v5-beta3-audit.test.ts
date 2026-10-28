@@ -44,10 +44,9 @@ test('staff can capture proofs within full order detail, Admin-only approval rem
  const capture=readFileSync('src/components/GuOrderCapture.tsx','utf8');
  assert.match(capture,/phase==='RETURN'/);
 });
-test('Early handover atomically locks the extra interval while preserving the reserved pickup time',()=>{
- assert.match(route,/const earlySlots=earlyHandover\?intervalRefs/);
- assert.match(route,/await checkIntervalAvailability\(tx,earlySlots,id\)/);
- assert.match(route,/createIntervalWrites\(tx,earlySlots,earlyPrior,id\)/);
+test('handover atomically rebases reserved intervals while preserving scheduledPickupAt',()=>{
+ assert.match(route,/rebaseHandoverIntervals\(tx,order,now,actualReturnAt\)/);
+ assert.match(route,/writeRebasedSlots\(\)/);
  assert.match(route,/scheduledPickupAt:order\.scheduledPickupAt\|\|order\.pickupAt/);
  assert.match(route,/handoverProof:\{status:'SUBMITTED',by:me\.uid,byName:me\.name,at:now/);
  assert.doesNotMatch(route,/earlyHandover\?\{pickupAt:now/);

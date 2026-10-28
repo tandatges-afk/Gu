@@ -13,7 +13,7 @@ const add=(stamp:string,minutes:number)=>new Date(Date.parse(stamp)+minutes*6000
 const route=readFileSync('src/app/api/v5/orders/[id]/route.ts','utf8');
 
 test('handover persists billing START, never advances a monetary total for a scheduled hypothetical return',()=>{
- assert.match(route,/const actualLines=order\.lines\.map\(l=>\(\{\.\.\.l,startAt:billingStart\}\)\)/);
+ assert.match(route,/const actualLines=order\.lines\.map\(l=>\(\{\.\.\.l,startAt:billingStart,startDate:vnDayKey\(now\)\}\)\)/);
  assert.match(route,/const actualTotal=order\.total/);
  assert.doesNotMatch(route,/computedTotal=actualLines/);
  assert.match(route,/const nextTotal=order\.total/); // handover extra items also avoids future-fee precharging
@@ -41,7 +41,7 @@ for(const model of CAMERA_MODELS){
    const earlyBilling=handoverBillingStart({pickupAt:start,actualHandoverAt:early});
    const latePickup=add(start,60);
    assert.equal(earlyBilling,early);
-   assert.equal(handoverBillingStart({pickupAt:start,actualHandoverAt:latePickup}),start);
+   assert.equal(handoverBillingStart({pickupAt:start,actualHandoverAt:latePickup}),latePickup);
    assert.equal(cameraQuoteForLine(line,earlyBilling,add(early,tier*60)).amount,base);
    assert.equal(cameraQuoteForLine(line,earlyBilling,add(early,tier*60+1)).amount,base+10000);
    assert.equal(cameraQuoteForLine(line,earlyBilling,due).amount,base+10000);

@@ -11,13 +11,14 @@ import {CAMERA_SETTLEMENT_VERSION,cameraCollateralForLines,cameraCollateralQuote
 import {approvedLineQuote} from '@/lib/v5-review-pricing';
 import {returnReconciliation} from '@/lib/settlement-ledger';
 import {completeProof,type PhotoProof,type Capture} from '@/lib/inspection-proof';
-import {intervalRefs,checkIntervalAvailability,createIntervalWrites,removeOrderIntervals,requiredTemplates,simpleId} from '@/lib/v5-server';
+import {intervalRefs,checkIntervalAvailability,createIntervalWrites,rebaseHandoverIntervals,removeOrderIntervals,requiredTemplates,simpleId} from '@/lib/v5-server';
 import {auditInTransaction} from '@/lib/audit';
 import {FieldValue,type Transaction} from '@/lib/pg-firestore';
 import {addCompletedRound,type InspectionRound} from '@/lib/evidence-retention-rules';
 import {runEvidenceCleanup} from '@/lib/evidence-retention';
 import {queueSensitiveEvidenceCleanup,runSensitiveEvidenceCleanup} from '@/lib/sensitive-evidence-cleanup';
 import {finalRent,handoverBillingStart} from '@/lib/gu-v52-workflow';
+import {expectedReturnAfterHandover} from '@/lib/handover-return-time';
 import {readVerifiedEvidence} from '@/lib/secure-evidence';
 import {parseInspectionPhotoUrl} from '@/lib/inspection-photo-url';
 import type {RentalOrder,InventoryItem} from '@/lib/types';
@@ -96,14 +97,15 @@ export async function PATCH(req:NextRequest,ctx:{params:Promise<{id:string}>}){
    const itemRefs=order.lines.map(l=>db().collection('items').doc(l.itemId));
    if(action==='HANDOVER'){
     if(order.status!=='RESERVED')throw new ApiError(409,'Đơn đã được giao hoặc đóng.');
-    // An early physical handover needs an additional atomic interval lock, otherwise
-    // the same item can be reserved by a second customer before its planned pickup.
-    const earlyHandover=Date.parse(now)<Date.parse(order.pickupAt||'');
-    const earlySlots=earlyHandover?intervalRefs(order.lines.map(l=>l.itemId),now,order.pickupAt!):[];
+    // Every booked package starts when the product is physically handed over.
+    // Rebase all reservation locks under the same PG transaction; reject conflicts.
+    let actualReturnAt:string;
+    try{actualReturnAt=expectedReturnAfterHandover(order,now);}
+    catch(error){throw new ApiError(409,error instanceof Error?error.message:'Không tính được giờ trả thực tế.');}
     const proofs=readProof(b.items,order,me.uid,me.name,'HANDOVER',now);
     const snaps=await Promise.all(itemRefs.map(r=>tx.get(r)));
     await verifyProofUploads(tx,proofs,'handover',me.uid,id);
-    const earlyPrior=earlySlots.length?await checkIntervalAvailability(tx,earlySlots,id):[];
+    const writeRebasedSlots=await rebaseHandoverIntervals(tx,order,now,actualReturnAt);
     const depositProofId=String(b.depositProofId||'');
     const depositKind=String(b.depositKind||'');
     if(depositProofId&&!['CCCD','CASH','OTHER'].includes(depositKind))throw new ApiError(400,'Chọn loại vật cọc đã nhận.');
@@ -116,25 +118,19 @@ export async function PATCH(req:NextRequest,ctx:{params:Promise<{id:string}>}){
     const cashCollateral=(clothingPolicy||cameraPolicy)&&depositKind==='CASH'?collateralRequired:0;
     if((clothingPolicy||cameraPolicy)&&Number(b.collateralAmount)!==cashCollateral)throw new ApiError(409,`Cọc bảo đảm theo quy định là ${cashCollateral.toLocaleString('vi-VN')}đ, hoặc CCCD.`);
     if(snaps.some(s=>!s.exists||s.data()?.status!=='AVAILABLE'))throw new ApiError(409,'Có món đang cho thuê hoặc chưa giặt.');
-    // Reserved rentals keep their original scheduled pickup time for pricing and timeline
-    // even when the customer comes later, so the planned slot remains authoritative.
-    if(Date.parse(now)>=Date.parse(order.returnAt||''))throw new ApiError(409,'Giờ trả dự kiến đã qua; PC cần cập nhật lịch trước khi giao.');
     const billingStart=handoverBillingStart({bookingKind:order.bookingKind,scheduledPickupAt:order.scheduledPickupAt,pickupAt:order.pickupAt,actualHandoverAt:now});
-    // Record the real billing start, but DO NOT charge for a hypothetical return
-    // at the scheduled deadline. Early pickup can make that future interval
-    // longer than a camera package / 24-hour block even if the customer
-    // actually returns within the prepaid tier. RECEIVE calculates actual fees.
-    const actualLines=order.lines.map(l=>({...l,startAt:billingStart}));
+    // The agreed package price remains unchanged until RECEIVE calculates actual overtime.
+    const actualLines=order.lines.map(l=>({...l,startAt:billingStart,startDate:vnDayKey(now)}));
     const actualTotal=order.total;
-    if(earlySlots.length)createIntervalWrites(tx,earlySlots,earlyPrior,id);
+    writeRebasedSlots();
     if(depositEvidence)tx.update(depositEvidence.ref,{consumedOrderId:id,consumedAt:now});
     if(cashCollateral>0){
       tx.create(ref.collection('cashMovements').doc(),{orderId:id,kind:'COLLATERAL_IN',amount:cashCollateral,actorUid:me.uid,actorName:me.name,createdAt:now,description:'Nhận tiền bảo đảm vật lý; chưa ghi nhận là tiền thuê'});
       tx.set(db().collection('cashDaily').doc(vnDayKey(now)),{amount:FieldValue.increment(cashCollateral),collateralReceived:FieldValue.increment(cashCollateral),updatedAt:now},{merge:true});
     }
-    tx.update(ref,{status:'PICKED_UP',scheduledPickupAt:order.scheduledPickupAt||order.pickupAt,lines:actualLines,total:actualTotal,rentalDays:billableBlocks(billingStart,order.returnAt!),...(depositEvidence?{handoverDepositProofId:depositProofId,handoverDepositKind:depositKind,hadHandoverDeposit:true}:{}),...((clothingPolicy||cameraPolicy)?{collateralRequiredAmount:collateralRequired,handoverCashCollateralAmount:cashCollateral}:{}),handoverProof:{status:'SUBMITTED',by:me.uid,byName:me.name,at:now,items:proofs},updatedAt:now,history:[...order.history,{action:'HANDOVER_PHOTOS',by:me.uid,at:now,detail:`${me.name} chụp ${proofs.length} sản phẩm; giờ tính thuê: ${billingStart}; giờ hẹn: ${order.scheduledPickupAt||order.pickupAt}`} ]});
-    itemRefs.forEach(r=>tx.update(r,{status:'RENTED',currentOrderId:id,expectedReturnDate:order.returnDate}));
-    tx.set(job,{stage:'OUT',code:order.code,orderId:id,customerName:order.customerName,returnAt:order.returnAt,updatedAt:now},{merge:true});
+    tx.update(ref,{status:'PICKED_UP',scheduledPickupAt:order.scheduledPickupAt||order.pickupAt,pickupAt:now,pickupDate:vnDayKey(now),returnAt:actualReturnAt,returnDate:vnDayKey(actualReturnAt),lines:actualLines,total:actualTotal,rentalDays:billableBlocks(billingStart,actualReturnAt),...(depositEvidence?{handoverDepositProofId:depositProofId,handoverDepositKind:depositKind,hadHandoverDeposit:true}:{}),...((clothingPolicy||cameraPolicy)?{collateralRequiredAmount:collateralRequired,handoverCashCollateralAmount:cashCollateral}:{}),handoverProof:{status:'SUBMITTED',by:me.uid,byName:me.name,at:now,items:proofs},updatedAt:now,history:[...order.history,{action:'HANDOVER_PHOTOS',by:me.uid,at:now,detail:`${me.name} bàn giao ${proofs.length} sản phẩm; thực nhận: ${now}; hạn trả theo gói: ${actualReturnAt}; giờ hẹn gốc: ${order.scheduledPickupAt||order.pickupAt}`} ]});
+    itemRefs.forEach(r=>tx.update(r,{status:'RENTED',currentOrderId:id,expectedReturnDate:vnDayKey(actualReturnAt)}));
+    tx.set(job,{stage:'OUT',code:order.code,orderId:id,customerName:order.customerName,returnAt:actualReturnAt,updatedAt:now},{merge:true});
     
    }else if(action==='HANDOVER_EXTRA'){
     if(order.status!=='PICKED_UP'||!order.pendingExtraItemIds?.length||order.returnStage==='AWAITING_ADMIN')throw new ApiError(409,'Không có đồ bổ sung cần giao.');

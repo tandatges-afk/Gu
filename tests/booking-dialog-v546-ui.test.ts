@@ -25,7 +25,7 @@ test('Booking UI refactor preserves submit validation, phone lookup, secure phot
  assert.match(form,/GuSecureUpload purpose="reservation"/);
  assert.match(form,/aria-pressed=\{selected\.includes\(i\.id\)\}/);
  assert.match(form,/GuVNDateTimeInput required value=\{pickupAt\}/);
- assert.match(form,/GuVNDateTimeInput required value=\{returnAt\}/);
+ assert.match(form,/Giờ trả tự tính theo thời lượng thuê/);
 });
 test('24h date picker uses accessible calendar icon instead of glyph',()=>{
  const date=read('src/components/GuVNDateTimeInput.tsx');

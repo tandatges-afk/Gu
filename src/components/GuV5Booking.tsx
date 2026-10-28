@@ -9,7 +9,7 @@ import {money} from '@/lib/rental';
 import {matchesProductSearch} from '@/lib/product-search';
 import {vietnamToday} from '@/lib/rental';
 import {GuVNDateTimeInput} from './GuVNDateTimeInput';
-import {isoDayFromVN,isValidHHMM} from '@/lib/vn-datetime';
+import {isoDayFromVN,isValidHHMM,formatVNDateTime} from '@/lib/vn-datetime';
 import {productGroup,type RentalGroup} from '@/lib/order-group';
 import ui from './GuV5Booking.module.css';
 const localInput=(d:Date)=>new Date(d.getTime()+7*3600000).toISOString().slice(0,16);
@@ -20,8 +20,9 @@ function initialTimes(day?:string,endDay?:string,startHour?:string,endHour?:stri
  next.setUTCDate(next.getUTCDate()+1);
  return {pickup,returnAt:next.toISOString().slice(0,10)+'T'+(endHour||pickup.slice(11))};
 }
+const readableReturn=(value:string)=>{try{return formatVNDateTime(localDateTimeToISO(value));}catch{return 'Chọn giờ nhận hợp lệ';}};
 const digits=(s:string)=>s.replace(/\D/g,'').replace(/^84(?=\d{9}$)/,'0');
-function addPackageHours(pickup:string,hours:CameraPackageHours):string{
+function addPackageHours(pickup:string,hours:number):string{
  const date=new Date(pickup+':00Z');
  if(!Number.isFinite(date.getTime()))return pickup;
  return new Date(date.getTime()+hours*3600000).toISOString().slice(0,16);
@@ -39,6 +40,7 @@ export function GuV5Booking({items,customers,api,initial,onClose,onSuccess,onCus
  const [createRequestId]=useState(()=>crypto.randomUUID());
  const [reservationProofId,setReservationProofId]=useState('');
  const [cameraPackageHours,setCameraPackageHours]=useState<CameraPackageHours|''>('');
+ const [rentalDaysSelected,setRentalDaysSelected]=useState(1);
  const available=[...new Map([...items,...searched,...selectedRecords].map(i=>[i.id,i])).values()];
  useEffect(()=>{const missing=selected.filter(id=>![...items,...searched,...selectedRecords].some(i=>i.id===id));
   if(!missing.length)return;let cancelled=false;
@@ -51,7 +53,9 @@ export function GuV5Booking({items,customers,api,initial,onClose,onSuccess,onCus
  useEffect(()=>{let cancelled=false;void api<{results:InventoryItem[]}>('catalog?kind=items&rentalGroup='+rentalGroup+'&size=50')
   .then(r=>{if(!cancelled)setSearched(old=>[...new Map([...old,...r.results].map(i=>[i.id,i])).values()]);}).catch(()=>{});
  return()=>{cancelled=true;};},[api,rentalGroup]);
- useEffect(()=>{if(cameraPackageHours&&cameraItems.length)setReturnAt(previous=>{const next=addPackageHours(pickupAt,cameraPackageHours);return next===previous?previous:next;});},[pickupAt,cameraPackageHours]);
+ useEffect(()=>{const hours=rentalGroup==='CAMERA'?cameraPackageHours:rentalDaysSelected*24;
+  if(hours)setReturnAt(previous=>{const next=addPackageHours(pickupAt,hours);return next===previous?previous:next;});
+ },[pickupAt,rentalDaysSelected,cameraPackageHours,rentalGroup]);
  const visible=available.filter(i=>!i.archivedAt&&productGroup(i.category)===rentalGroup&&(!query||matchesProductSearch([i.name,i.hangerCode||'',i.category].join(' '),query)));
  useEffect(()=>{if(!query.trim())return;
  let cancelled=false;const timer=setTimeout(()=>{void api<{results:InventoryItem[]}>('catalog?kind=items&q='+encodeURIComponent(query.trim())+'&size=50&rentalGroup='+rentalGroup).then(res=>{if(!cancelled)setSearched(res.results);}).catch(()=>{if(!cancelled)setSearched([]);});},350);
@@ -110,8 +114,10 @@ export function GuV5Booking({items,customers,api,initial,onClose,onSuccess,onCus
    <div className={ui.sectionHeading}><h3 id="gu-booking-time-title">Thời gian thuê</h3></div>
    <div className={ui.dateGrid}>
     <div className={ui.field}><span>Nhận đồ</span><GuVNDateTimeInput required value={pickupAt} onChange={setPickupAt} ariaLabel="Ngày giờ nhận đồ"/></div>
-    <div className={ui.field}><span>Trả dự kiến</span><GuVNDateTimeInput required value={returnAt} onChange={setReturnAt} ariaLabel="Ngày giờ trả đồ"/></div>
+    <div className={ui.field}><span>Trả dự kiến (tự tính theo gói)</span><input className="input" aria-label="Giờ trả tự tính theo thời lượng thuê" type="text" readOnly value={readableReturn(returnAt)} /></div>
    </div>
+   {rentalGroup==='CLOTHING'&&<label className={ui.field}><span>Thời lượng (mỗi ngày là 24 giờ liên tục)</span><select className="input" value={rentalDaysSelected} onChange={e=>setRentalDaysSelected(Number(e.target.value))}>{Array.from({length:30},(_,i)=><option value={i+1} key={i+1}>{i+1} ngày ({(i+1)*24} giờ)</option>)}</select></label>}
+   <p className={ui.empty}>Hạn trả tính từ giờ hẹn khi đặt. Khi thực giao sớm/muộn, hệ thống đồng bộ lại giờ trả theo đúng gói và kiểm tra trùng lịch.</p>
   </section>
   <section className={ui.section} aria-labelledby="gu-booking-product-title">
    <div className={ui.sectionHeading}><h3 id="gu-booking-product-title">Sản phẩm thuê</h3><span className={ui.count}>{selected.length} đã chọn</span></div>

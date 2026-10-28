@@ -37,11 +37,9 @@ export function cameraLiveQuote(order:RentalOrder,now:number|string):CameraLiveQ
  try{
   for(const line of order.lines){
    if(!isCameraCategory(line.category||''))return null;
-   // Mirror the RECEIVE server action: overdue pre-bookings bill from the
-   // agreed pickup time, even when handover was photographed later.
-   // Each line stores the billing start agreed at HANDOVER. It is the
-   // earlier of scheduled pickup and actual handover; never overwrite it
-   // with the scheduled time when estimating overdue camera fees.
+   // Each line stores the actual physical handover as its billing start
+   // for orders handed over after Rev7.8. Historical orders retain their
+   // existing startAt without retroactively changing agreed payments.
    const startedAt=line.startAt||order.scheduledPickupAt||order.pickupAt||order.handoverProof?.at;
    if(!startedAt||Date.parse(startedAt)>=current)return null;
    const quote=cameraQuoteForLine(line,startedAt,endedAt);

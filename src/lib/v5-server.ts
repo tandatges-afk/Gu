@@ -29,6 +29,37 @@ export function createIntervalWrites(tx:Transaction,slots:IntervalRef[],prior:Aw
   tx.set(s.ref,{itemId:s.itemId,day:s.day,entries,updatedAt:new Date().toISOString()});
  });
 }
+/** Change a RESERVED order to its actual pickup+package slot atomically.
+ * Read every old/new day and legacy lock before writing anything; keep other orders.
+ */
+export async function rebaseHandoverIntervals(tx:Transaction,order:RentalOrder,newStart:string,newEnd:string){
+ if(!order.pickupAt||!order.returnAt)throw new ApiError(409,'Đơn thiếu giờ nhận hoặc giờ trả gốc.');
+ const itemIds=order.lines.map(line=>line.itemId);
+ const original=intervalRefs(itemIds,order.pickupAt,order.returnAt);
+ const incoming=intervalRefs(itemIds,newStart,newEnd);
+ const keys=new Map<string,IntervalRef>();
+ for(const slot of [...original,...incoming])keys.set(slot.ref.path,slot);
+ const slots=[...keys.values()];
+ const snapshots=await Promise.all(slots.map(slot=>tx.get(slot.ref)));
+ const legacy=await Promise.all(incoming.map(slot=>tx.get(db().collection('rentalSlots').doc(slot.itemId+'__'+slot.day))));
+ for(let i=0;i<incoming.length;i++){
+  const slot=incoming[i];
+  const snapshot=snapshots[slots.findIndex(entry=>entry.ref.path===slot.ref.path)];
+  const active=(snapshot.data()?.entries||[]) as IntervalEntry[];
+  if(active.some(other=>other.orderId!==order.id&&overlap(other.start,other.end,slot.start,slot.end)) ||
+   (legacy[i].exists && legacy[i].data()?.orderId!==order.id))
+   throw new ApiError(409,'Giờ trả mới sau khi nhận thực tế trùng đơn khác. Không thể bàn giao; hãy điều chỉnh lịch trước.',{itemId:slot.itemId,day:slot.day});
+ }
+ const fresh=new Map(incoming.map(slot=>[slot.ref.path,slot]));
+ return ()=>slots.forEach((slot,i)=>{
+  const prior=snapshots[i];
+  const remaining=((prior.data()?.entries||[]) as IntervalEntry[]).filter(entry=>entry.orderId!==order.id);
+  const next=fresh.get(slot.ref.path);
+  const entries=next?[...remaining,{orderId:order.id,start:next.start,end:next.end}]:remaining;
+  if(entries.length)tx.set(slot.ref,{itemId:slot.itemId,day:slot.day,entries,updatedAt:new Date().toISOString()});
+  else if(prior.exists)tx.delete(slot.ref);
+ });
+}
 export async function removeOrderIntervals(tx:Transaction,order:RentalOrder){
  if(!order.pickupAt||!order.returnAt)return;
  // Early pickup creates extra interval locks before the original slot.

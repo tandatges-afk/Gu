@@ -13,26 +13,26 @@ const late=at(3); // 10:00 VN
 const cameraReturn=at(4); // 11:00 VN
 const clothingReturn='2026-10-29T01:00:00.000Z'; // next 08:00 VN
 
-test('08:00 reserved handover at 10:00 bills from 08:00 for camera and clothing',()=>{
+test('08:00 reserved handover at 10:00 moves package to actual 10:00',()=>{
  for(const bookingKind of ['RESERVE','WALK_IN']){
   const start=handoverBillingStart({bookingKind,pickupAt:scheduled,actualHandoverAt:late});
-  assert.equal(start,scheduled);
-  assert.equal(rentalCharge({category:'Trang phục'},start,clothingReturn),50000);
+  assert.equal(start,late);
+  assert.equal(rentalCharge({category:'Trang phục'},start,new Date(Date.parse(late)+86400000).toISOString()),50000);
   const pkg=chosenCameraPackageSnapshot('Canon EOS R50',scheduled,cameraReturn,3);
-  assert.equal(rentalCharge({category:'Máy ảnh',cameraModel:'Canon EOS R50',...pkg},start,cameraReturn),110000);
+  assert.equal(rentalCharge({category:'Máy ảnh',cameraModel:'Canon EOS R50',...pkg},start,new Date(Date.parse(late)+3*3600000).toISOString()),110000);
  }
 });
 test('08:00 reserved handover at 07:00 bills from 07:00 for camera and clothing',()=>{
  for(const bookingKind of ['RESERVE','WALK_IN']){
   const start=handoverBillingStart({bookingKind,scheduledPickupAt:scheduled,pickupAt:scheduled,actualHandoverAt:early});
   assert.equal(start,early);
-  assert.equal(rentalCharge({category:'Trang phục'},start,clothingReturn),60000); // 25h
+  assert.equal(rentalCharge({category:'Trang phục'},start,new Date(Date.parse(early)+86400000).toISOString()),50000);
   const pkg=chosenCameraPackageSnapshot('Canon EOS R50',scheduled,cameraReturn,3);
-  assert.equal(rentalCharge({category:'Máy ảnh',cameraModel:'Canon EOS R50',...pkg},start,cameraReturn),120000); // 4h
+  assert.equal(rentalCharge({category:'Máy ảnh',cameraModel:'Canon EOS R50',...pkg},start,new Date(Date.parse(early)+3*3600000).toISOString()),110000);
  }
 });
 test('scheduledPickupAt is preserved before actual pickup and Walk-in without schedule uses actual time',()=>{
- assert.equal(handoverBillingStart({bookingKind:'RESERVE',scheduledPickupAt:scheduled,pickupAt:at(2),actualHandoverAt:late}),scheduled);
+ assert.equal(handoverBillingStart({bookingKind:'RESERVE',scheduledPickupAt:scheduled,pickupAt:at(2),actualHandoverAt:late}),late);
  assert.equal(handoverBillingStart({bookingKind:'WALK_IN',actualHandoverAt:late}),late);
 });
 test('handover, camera live estimate, receive and interval cleanup reuse billing start',()=>{
@@ -40,7 +40,7 @@ test('handover, camera live estimate, receive and interval cleanup reuse billing
  const camera=readFileSync('src/lib/camera-live-status.ts','utf8');
  const intervals=readFileSync('src/lib/v5-server.ts','utf8');
  const detail=readFileSync('src/components/GuV5Review.tsx','utf8');
- assert.match(handler,/const actualLines=order\.lines\.map\(l=>\(\{\.\.\.l,startAt:billingStart\}\)\)/);
+ assert.match(handler,/const actualLines=order\.lines\.map\(l=>\(\{\.\.\.l,startAt:billingStart,startDate:vnDayKey\(now\)\}\)\)/);
  assert.match(handler,/const fallbackStart=order\.scheduledPickupAt\|\|order\.pickupAt\|\|order\.handoverProof\?\.at/);
  assert.match(handler,/l\.startAt\|\|fallbackStart/);
  assert.match(camera,/const startedAt=line\.startAt\|\|order\.scheduledPickupAt/);

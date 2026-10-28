@@ -8,7 +8,7 @@ test('Bulk: detects accents, case, punctuation and repeated names in the same ba
  assert.deepEqual(validateBulkNames(['Áo dài xanh','ao dai XANH','Đầm xanh']),[{row:1,code:'DUPLICATE',message:'Trùng tên với dòng 1.'}]);
  assert.equal(validateBulkNames(['Áo-dài xanh'],['áo dài xanh'])[0].code,'EXISTING');
  assert.equal(validateBulkNames(['Đầm đen','Váy đỏ']).length,0);
- assert.equal(MAX_BULK_ITEMS,10);
+ assert.equal(MAX_BULK_ITEMS,100);
 });
 test('Bulk: enforces atomic transaction, global name index, migration and idempotent retry',()=>{
  const api=src('src/app/api/items/bulk/route.ts');

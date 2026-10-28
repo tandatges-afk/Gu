@@ -1,6 +1,7 @@
 import {normalizeProductName} from './product-name.ts';
 
-export const MAX_BULK_ITEMS=10;
+/** Hard limit for one serialized PostgreSQL transaction; 100 items per save. */
+export const MAX_BULK_ITEMS=100;
 export type BulkNameIssue={row:number;code:'EMPTY'|'DUPLICATE'|'EXISTING';message:string};
 /** Client preview only; PostgreSQL name-index checks inside the save transaction are authoritative. */
 export function validateBulkNames(names:readonly string[],existingNames:readonly string[]=[]):BulkNameIssue[]{

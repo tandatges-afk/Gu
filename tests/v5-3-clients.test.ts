@@ -37,22 +37,22 @@ test('single capture workflow supports handover/return; Admin reviews after staf
  assert.match(capture,/HANDOVER_EXTRA/);assert.match(capture,/RECEIVE/);assert.match(capture,/preparePhonePhoto/);
  assert.match(review,/order\.handoverProof/);assert.match(review,/order\.returnProof/);assert.match(review,/REVIEW_PHOTOS/);
 });
-test('reserved rental keeps its 14:00 booking time when handover occurs at 15:00 or 17:00',()=>{
+test('late handover starts package at actual pickup, preserving original agreed price',()=>{
  const scheduled='2026-10-22T07:00:00.000Z'; // 14:00 in Vietnam
  const deadline='2026-10-23T07:00:00.000Z';
  const clothing={category:'Áo dài'};
  const bookedRent=rentalCharge(clothing,scheduled,deadline);
  for(const arrived of ['2026-10-22T08:00:00.000Z','2026-10-22T10:00:00.000Z']){
   const start=handoverBillingStart({bookingKind:'RESERVE',pickupAt:scheduled,actualHandoverAt:arrived});
-  assert.equal(start,scheduled);
-  assert.equal(rentalCharge(clothing,start,deadline),bookedRent);
+  assert.equal(start,arrived);
+  assert.equal(rentalCharge(clothing,start,new Date(Date.parse(arrived)+86400000).toISOString()),bookedRent);
   assert.equal(finalRent({bookedRent,quotedRent:bookedRent,prepaid:true,scheduledReturn:deadline,actualReturn:deadline}),bookedRent);
  }
  // A same-day scheduled pickup must also preserve its agreed time when late.
- assert.equal(handoverBillingStart({bookingKind:'WALK_IN',pickupAt:scheduled,actualHandoverAt:'2026-10-22T08:00:00.000Z'}),scheduled);
+ assert.equal(handoverBillingStart({bookingKind:'WALK_IN',pickupAt:scheduled,actualHandoverAt:'2026-10-22T08:00:00.000Z'}),'2026-10-22T08:00:00.000Z');
  const route=read('src/app/api/v5/orders/[id]/route.ts');
  assert.match(route,/handoverBillingStart\(\{bookingKind:order\.bookingKind/);
- assert.match(route,/const actualLines=order\.lines\.map\(l=>\(\{\.\.\.l,startAt:billingStart\}\)\)/);
+ assert.match(route,/const actualLines=order\.lines\.map\(l=>\(\{\.\.\.l,startAt:billingStart,startDate:vnDayKey\(now\)\}\)\)/);
  assert.match(route,/handoverProof:\{status:'SUBMITTED',by:me\.uid,byName:me\.name,at:now/);
  assert.doesNotMatch(route,/syncDebtIndex/);
 });

@@ -68,9 +68,9 @@ export function handleError(err: unknown, endpoint?: string) {
   if(known)return NextResponse.json({error:known.message+' Mã đối chiếu: '+incidentId,code:known.code,incidentId,...(endpoint?{endpoint}:{})}, {status:known.status});
   return NextResponse.json({error:'Máy chủ không xử lý được yêu cầu. Mã lỗi: '+incidentId,code:'GU_SERVER_ERROR',incidentId}, {status:500});
 }
-export async function jsonBody(req: NextRequest): Promise<Record<string, unknown>> {
+export async function jsonBody(req: NextRequest, maxBytes=32_000): Promise<Record<string, unknown>> {
   const size = Number(req.headers.get('content-length') || '0');
-  if (size > 32_000) throw new ApiError(413, 'Dữ liệu gửi lên quá lớn.');
+  if (size > maxBytes) throw new ApiError(413, 'Dữ liệu gửi lên quá lớn.');
   // Enforce the limit while reading, not just Content-Length (often absent).
   if (!req.body) throw new ApiError(400,'Thiếu dữ liệu JSON.');
   const reader=req.body.getReader();
@@ -79,7 +79,7 @@ export async function jsonBody(req: NextRequest): Promise<Record<string, unknown
     while(true){
       const {done,value}=await reader.read();if(done)break;
       total+=value.byteLength;
-      if(total>32_000)throw new ApiError(413,'Dữ liệu gửi lên quá lớn.');
+      if(total>maxBytes)throw new ApiError(413,'Dữ liệu gửi lên quá lớn.');
       chunks.push(value);
     }
     const body:unknown=JSON.parse(new TextDecoder().decode(Buffer.concat(chunks)));
