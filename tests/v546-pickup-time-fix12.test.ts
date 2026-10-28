@@ -47,12 +47,6 @@ test('handover, camera live estimate, receive and interval cleanup reuse billing
  assert.match(intervals,/order\.lines\.map\(l=>l\.startAt\)/);
  assert.match(detail,/Bắt đầu tính tiền thuê/);
 });
-test('debt fallback puts trusted SQL id last, avoiding TS2783 duplicate id',()=>{
- const debts=readFileSync('src/app/api/debts/route.ts','utf8');
- assert.match(debts,/scan\.rows\.map\(r=>\(\{\.\.\.r\.data,id:r\.id\}\)\)/);
- assert.doesNotMatch(debts,/\{id:r\.id,\.\.\.r\.data\}/);
-});
-
 test('camera early handover triggers overtime warning at 10:01, not 11:01',()=>{
  const pkg=chosenCameraPackageSnapshot('Canon EOS R50',scheduled,cameraReturn,3);
  const order={id:'camera',status:'PICKED_UP',rentalGroup:'CAMERA',pickupAt:scheduled,scheduledPickupAt:scheduled,returnAt:cameraReturn,total:120000,paid:0,

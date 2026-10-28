@@ -8,16 +8,15 @@ import type { RentalOrder, ReturnInspection, InventoryItem } from '@/lib/types';
 import { calculateInspection } from '@/lib/inspection';
 import { auditInTransaction } from '@/lib/audit';
 import { planRentalExtension } from '@/lib/rental-extension';
-import {syncDebtIndex} from '@/lib/debt-index';
 import {FieldValue} from '@/lib/pg-firestore';
 export const runtime='nodejs';
 export const preferredRegion='sin1';
 
-// Allow administrators to open historical unpaid orders outside the bootstrap 300-row window.
+// Allow administrators to inspect historical orders outside the bootstrap window.
 export async function GET(req:NextRequest,ctx:{params:Promise<{id:string}>}) {
   try {
     const me=await staffUser(req);
-    if(me.role!=='admin')throw new ApiError(403,'Chỉ Admin được mở đơn công nợ lịch sử.');
+    if(me.role!=='admin')throw new ApiError(403,'Chỉ Admin được mở đơn lịch sử.');
     const {id}=await ctx.params;
     if(!/^[a-zA-Z0-9]{10,64}$/.test(id))throw new ApiError(400,'Mã đơn không hợp lệ.');
     const doc=await db().collection('orders').doc(id).get();
@@ -59,7 +58,7 @@ export async function PATCH(req:NextRequest,ctx:{params:Promise<{id:string}>}) {
       if(action==='CANCEL'&&order.paid>0)throw new ApiError(409,'Đơn đã thu tiền. Cần xử lý hoàn tiền trước khi hủy.');
       if(me.role==='staff'&&['RETURNED','CANCELLED'].includes(order.status))throw new ApiError(403,'Đơn đã hoàn tất chỉ Admin được truy cập.');
       if(action==='PAY'&&order.status==='CANCELLED')throw new ApiError(409,'Đơn đã hủy không thể thu tiền.');
-      if(action==='PAY'&&order.paid+amount>order.total+(order.compensationTotal||0)+(order.lateFeeTotal||0)+(order.otherFeeTotal||0))throw new ApiError(400,'Số tiền vượt công nợ gồm cả phí đền bù.');
+      if(action==='PAY'&&order.paid+amount>order.total+(order.compensationTotal||0)+(order.lateFeeTotal||0)+(order.otherFeeTotal||0))throw new ApiError(400,'Số tiền thu vượt tổng thuê và phụ phí.');
 
       if(action==='EXTEND'){
         if(typeof b.returnDate!=='string')throw new ApiError(400,'Vui lòng chọn ngày trả mới.');
@@ -83,7 +82,7 @@ export async function PATCH(req:NextRequest,ctx:{params:Promise<{id:string}>}) {
         if(order.status==='PICKED_UP' && itemSnaps.some(s=>s.data()?.status!=='RENTED'||s.data()?.currentOrderId!==id))
           throw new ApiError(409,'Có sản phẩm không còn ở trạng thái thuê của đơn này.');
         const now=new Date().toISOString();
-        syncDebtIndex(tx,db(),{...order,total:plan.newTotal,returnDate:plan.nextReturnDate,updatedAt:now});
+        
         tx.update(ref,{
           returnDate:plan.nextReturnDate,rentalDays:plan.rentalDays,
           total:plan.newTotal,lines:plan.newLines,updatedAt:now,
@@ -119,7 +118,7 @@ export async function PATCH(req:NextRequest,ctx:{params:Promise<{id:string}>}) {
         const conflicts=locks.flatMap((s,i)=>s.exists?[{sku:slotList[i].line.sku,date:slotList[i].day}]:[]);
         if(conflicts.length)throw new ApiError(409,'Các sản phẩm thêm vào đã có người giữ lịch.',conflicts.slice(0,10));
         const now=new Date().toISOString();
-        syncDebtIndex(tx,db(),{...order,total:order.total+newLines.reduce((s,l)=>s+l.lineTotal,0),updatedAt:now});
+        
         tx.update(ref,{lines:[...order.lines,...newLines],total:order.total+newLines.reduce((s,l)=>s+l.lineTotal,0),updatedAt:now,
           history:[...order.history,{action:'ADD_ITEMS',by:me.uid,at:now,detail:'Thêm '+newLines.map(l=>l.sku).join(', ')}]});
         slotList.forEach(({line,day,ref:r})=>tx.create(r,{orderId:id,itemId:line.itemId,date:day}));
@@ -163,7 +162,7 @@ export async function PATCH(req:NextRequest,ctx:{params:Promise<{id:string}>}) {
         :action==='RETURN'&&b.collectedAtReturn!==undefined?positiveVnd(b.collectedAtReturn,'Tiền thu khi trả',true):0;
       if(action==='RETURN'&&maxCollection<0)throw new ApiError(409,'Đơn có số dư đã thu lớn hơn tổng tiền. Admin cần kiểm tra trước khi trả.');
       if(action==='RETURN'&&collectedAtReturn>maxCollection)
-        throw new ApiError(400,'Số tiền thu vượt công nợ sau khi tính tất cả phụ thu.');
+        throw new ApiError(400,'Số tiền thu vượt tổng thuê và các phụ phí.');
       const now=new Date().toISOString();
       const cashCollected=amount+collectedAtReturn;
       if(cashCollected>0){
@@ -172,9 +171,7 @@ export async function PATCH(req:NextRequest,ctx:{params:Promise<{id:string}>}) {
         tx.set(db().collection('cashDaily').doc(date),{amount:FieldValue.increment(cashCollected),payments:FieldValue.increment(1),updatedAt:now},{merge:true});
       }
       const status=action==='PICKUP'?'PICKED_UP':action==='RETURN'?'RETURNED':action==='CANCEL'?'CANCELLED':order.status;
-      syncDebtIndex(tx,db(),{...order,status,paid:order.paid+amount+collectedAtReturn,updatedAt:now,
-        ...(action==='RETURN'?{compensationTotal,lateFeeTotal:specifiedLate,otherFeeTotal:otherFee}:{}),
-      });
+      
       tx.update(ref,{status,paid:order.paid+amount+collectedAtReturn,updatedAt:now,
         ...(action==='RETURN'?{compensationTotal,returnInspection:inspections,returnedAt:now,lateDays:overdue,lateFeeTotal:specifiedLate,otherFeeTotal:otherFee,surchargeNote}:{}),
         history:[...order.history,{action,by:me.uid,at:now,

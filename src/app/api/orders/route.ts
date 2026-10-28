@@ -6,7 +6,6 @@ import { rentalRequest, assertItems } from '@/lib/booking-server';
 import { bookingMode, verifyImmediatePickup, mustBeReadyAtPickup } from '@/lib/booking-rules';
 import type { Customer, InventoryItem, RentalLine, RentalOrder } from '@/lib/types';
 import { auditInTransaction } from '@/lib/audit';
-import {syncDebtIndex} from '@/lib/debt-index';
 export const runtime = 'nodejs';
 export const preferredRegion = 'sin1';
 export async function POST(req:NextRequest) {

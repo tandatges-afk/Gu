@@ -84,18 +84,6 @@ test('Visual search result click opens a usable selected product preview',()=>{
  assert.match(finder,/gu-v5-found-detail/);
 });
 
-test('Fully prepaid camera with unsettled overdue fee stays visible to Admin',async()=>{
- const {debtIndexKind,summaryFromDebtIndex,debtIndexRecord}=await import('../src/lib/debt-index.ts');
- const order={id:'ord1',code:'TH-1',customerId:'c1',customerName:'Mai',customerPhone:'0912345678',status:'RETURNED',pickupDate:'2026-10-18',returnDate:'2026-10-20',total:350000,paid:350000,createdAt:'2026-10-18T00:00:00Z',updatedAt:'2026-10-21T00:00:00Z',cameraLateFeePending:true} as Parameters<typeof debtIndexKind>[0];
- assert.equal(debtIndexKind(order),'open');
- const rows=[debtIndexRecord(order)];
- const result=summaryFromDebtIndex(rows);
- assert.equal(result.pendingCameraLateCount,1);
- assert.equal(result.accounts.length,1);
- assert.equal(result.totalOutstanding,0);
- assert.equal(result.accounts[0].orders[0].cameraLateFeePending,true);
-});
-
 test('Any returned garment/device with ISSUE requires a note and is quarantined',()=>{
  assert.match(route,/condition==='ISSUE'\)&&\(!p\.note/);
  assert.match(route,/const state=missing\?'MISSING':issue\?'MAINTENANCE'/);

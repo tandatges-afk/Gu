@@ -3,8 +3,6 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {cameraCollateralForLines,cameraCollateralQuote,CAMERA_CASH_COLLATERAL_PER_ITEM,CAMERA_SETTLEMENT_VERSION} from '../src/lib/camera-collateral.ts';
 import {cameraQuoteForLine} from '../src/lib/camera-rental.ts';
-import {debtIndexKind,debtIndexRecord,summaryFromDebtIndex} from '../src/lib/debt-index.ts';
-import {buildDebtSummary} from '../src/lib/debts.ts';
 import type {RentalOrder} from '../src/lib/types.ts';
 const read=(s:string)=>readFileSync(s,'utf8');
 const one=[{category:'Máy ảnh'}];
@@ -33,21 +31,6 @@ test('pre-booked camera: full 18m returned if rent was prepaid; 10k overtime ded
 });
 test('CCCD does not offset rent or fees automatically',()=>{
  assert.deepEqual(cameraCollateralQuote({security:0,rent:120000,extras:0,paidRent:0,kind:'CCCD'}),{outstanding:120000,applied:0,refund:0,collect:120000,returnId:true});
-});
-test('camera in customer possession does not appear as debt even when rent is unpaid',()=>{
- const picked=makeOrder();
- assert.equal(debtIndexKind(picked),null);
- assert.equal(buildDebtSummary([picked]).totalOutstanding,0);
- const returned={...picked,status:'RETURNED' as const,handoverCashCollateralAmount:18000000};
- assert.equal(debtIndexKind(returned),null); // cash security safely covers rent
- const outstanding={...returned,handoverCashCollateralAmount:0};
- assert.equal(debtIndexKind(outstanding),'open');
- assert.equal(summaryFromDebtIndex([debtIndexRecord(outstanding)]).totalOutstanding,110000);
-});
-test('debt open action must use V5 order detail API, not the legacy order id route',()=>{
- const page=read('src/app/page.tsx');
- assert.match(page,/api<\{order:RentalOrder\}>\('v5\/orders\/'\+encodeURIComponent\(id\)\)/);
- assert.doesNotMatch(page,/api<RentalOrder>\('orders\/'\+id\)/);
 });
 test('camera physically returned is never automatically moved into laundry, even for old camera configuration',()=>{
  const route=read('src/app/api/v5/orders/[id]/route.ts');

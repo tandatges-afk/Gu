@@ -85,7 +85,7 @@ export function GuReturnFlow({order,items,today,busy,onSubmit}:{
         <button className="gu-return-add-fee" type="button" onClick={()=>{setShowExtra(false);setExtraText('');setExtraReason('');}}>Bỏ phụ phí khác</button>
         {!validExtras&&<p className="gu-return-error">Nhập số tiền hợp lệ và lý do khi có phụ phí khác.</p>}
       </div>}
-      {estimate.remaining>0?<label className="gu-return-collect"><input type="checkbox" checked={collected} onChange={e=>setCollected(e.target.checked)}/><span><strong>Đã thực nhận đủ {money(estimate.remaining)}</strong><small>Chỉ đánh dấu khi cửa hàng đã nhận tiền. Nếu không, GU giữ lại công nợ để Admin xử lý.</small></span></label>:<p className="gu-return-paid"><CheckCircle2 size={17}/> Đơn đã được thanh toán đủ.</p>}
+      {estimate.remaining>0?<label className="gu-return-collect"><input type="checkbox" checked={collected} onChange={e=>setCollected(e.target.checked)}/><span><strong>Đã thực nhận đủ {money(estimate.remaining)}</strong><small>Chỉ xác nhận sau khi đã thu đủ tiền thực tế. Không tự ghi nhận khoản chưa thu là đã thanh toán.</small></span></label>:<p className="gu-return-paid"><CheckCircle2 size={17}/> Đơn đã được thanh toán đủ.</p>}
       <div className="gu-return-actions">
         <button type="button" className="btn btn-white" onClick={()=>{setStage('check');setCollected(false);}} disabled={busy}><ArrowLeft size={16}/> Sửa kiểm nhận</button>
         <button type="button" className="btn btn-dark" disabled={busy||!validExtras} onClick={()=>void submit()}><Wallet size={16}/> {busy?'Đang lưu…':'Hoàn tất nhận trả'}</button>

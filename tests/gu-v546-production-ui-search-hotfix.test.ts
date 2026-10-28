@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {readFileSync} from 'node:fs';
+import {readFileSync,existsSync} from 'node:fs';
 import {buildSubstringCatalogQuery,VN_SEARCH_FROM,VN_SEARCH_TO} from '../src/lib/pg-catalog-search.ts';
 const read=(path:string)=>readFileSync(path,'utf8');
 test('Substring search is parameterized and preserves accent folding including đ',()=>{
@@ -31,11 +31,11 @@ test('Search isolates camera category and remains SQL-filtered for page limits',
  assert.match(query.sql,/NOT \(coalesce/);
  assert.equal(query.params.at(-1),41);
 });
-test('Debt queries respect PG 10000 cap and use migration-aware fallback',()=>{
- const source=read('src/app/api/debts/route.ts');
- assert.doesNotMatch(source,/\.limit\(10001\)/);
- assert.match(source,/\.limit\(10000\)/);
- assert.match(source,/buildDebtSummary\(scan.rows/);
+test('Debt endpoint was removed without removing orders or payment history',()=>{
+ assert.equal(existsSync('src/app/api/debts/route.ts'),false);
+ assert.equal(existsSync('src/components/GuDebts.tsx'),false);
+ assert.match(read('src/app/page.tsx'),/Đã thu/);
+ assert.doesNotMatch(read('src/app/page.tsx'),/GuDebts|setPage\('debts'\)/);
 });
 test('Product images accept VPS URLs and finder receives catalog categories',()=>{
  const extras=read('src/components/GuExtras.tsx');

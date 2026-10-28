@@ -6,9 +6,6 @@ const required = [
   'src/app/page.tsx',
   'src/app/globals.css',
   'src/app/api/bootstrap/route.ts',
-  'src/app/api/debts/route.ts',
-  'src/components/GuDebts.tsx',
-  'src/lib/debts.ts',
   'src/app/api/smart-calendar/route.ts',
   'src/app/api/items/hanger-codes/route.ts',
   'src/app/api/orders/[id]/route.ts',
@@ -40,8 +37,6 @@ const required = [
   'src/app/api/calendar/route.ts',
   'src/app/api/tasks/route.ts',
   'src/app/api/reports/route.ts',
-  'src/lib/debt-index.ts',
-  'scripts/migrate-debt-index.mjs',
   'scripts/migrate-revenue-history.mjs',
   'scripts/backup-firestore.mjs',
   'scripts/reset-demo-data.mjs',
@@ -117,8 +112,6 @@ const required = [
 const missing = required.filter(p => !existsSync(join(root,p)));
 const read = p => readFileSync(join(root,p),'utf8');
 const checks = [
-  ['công nợ theo khách', /summaryFromDebtIndex/, 'src/app/api/debts/route.ts'],
-  ['đồng bộ chỉ mục nợ', /syncDebtIndex/, 'src/app/api/orders/[id]/route.ts'],
   ['giám sát lưu trữ admin', /GuSystem/, 'src/app/page.tsx'],
   ['mã sản phẩm tự động', /hangerCode\??:/, 'src/lib/types.ts'],
   ['lưu tên nhân viên tạo đơn', /createdByName:me\.name/, 'src/app/api/v5/orders/route.ts'],

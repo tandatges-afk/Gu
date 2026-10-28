@@ -19,7 +19,7 @@ test('photo content is checked against actual magic bytes',()=>{
 });
 test('V5 UI is preserved, client auth is local not Firebase',()=>{
  const ui=read('../src/app/page.tsx');
- assert.match(ui,/GuV5Booking/);assert.match(ui,/GuReturnFlow/);assert.match(ui,/GuDebts/);
+ assert.match(ui,/GuV5Booking/);assert.match(ui,/GuReturnFlow/);assert.doesNotMatch(ui,/GuDebts/);
  assert.match(ui,/from '@\/lib\/client-auth'/);
  assert.doesNotMatch(ui,/from 'firebase\/auth'/);
 });

@@ -12,7 +12,6 @@ import {auditInTransaction} from '@/lib/audit';
 import {FieldValue} from '@/lib/pg-firestore';
 import {requiresFullPrepayment} from '@/lib/gu-v52-workflow';
 import {readVerifiedEvidence} from '@/lib/secure-evidence';
-import {syncDebtIndex} from '@/lib/debt-index';
 import {assertText,normalizePhone} from '@/lib/rental';
 import type {RentalOrder,InventoryItem,Customer,RentalLine} from '@/lib/types';
 export const runtime='nodejs';export const preferredRegion='sin1';
@@ -104,7 +103,7 @@ export async function POST(req:NextRequest){
     tx.set(db().collection('cashDaily').doc(vnDayKey(now)),{amount:FieldValue.increment(total),payments:FieldValue.increment(1),updatedAt:now},{merge:true});
    }
    tx.create(jobRef,{orderId:orderRef.id,code,customerName:customer.name,pickupAt,returnAt,stage:'HANDOVER',createdAt:now,updatedAt:now,creatorName:me.name});
-   syncDebtIndex(tx,db(),{id:orderRef.id,...record});auditInTransaction(tx,me,'V5_ORDER_CREATE','order',orderRef.id,`${code} / ${items.length} sản phẩm, ${blocks} chu kỳ`);
+   auditInTransaction(tx,me,'V5_ORDER_CREATE','order',orderRef.id,`${code} / ${items.length} sản phẩm, ${blocks} chu kỳ`);
    return {id:orderRef.id,...record};
   });
   return NextResponse.json(result,{status:201});
