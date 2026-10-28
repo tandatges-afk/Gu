@@ -45,9 +45,12 @@ test('Fix20 release manifest tracks tests and maintenance scripts',()=>{
  assert.ok(!m.tests.includes('tests/operational.test.ts'));
 });
 
-test('Fix20 integrated branch triggers validation without production autodeploy',()=>{
+test('Fix20 main push auto deploys only after CI and opt-in',()=>{
  const flow=readFileSync('.github/workflows/deploy-main.yml','utf8');
  assert.match(flow,/gu-fix20-integrated-\*/);
  assert.match(flow,/pull_request:/);
- assert.match(flow,/github\.event_name == 'workflow_dispatch' && github\.ref == 'refs\/heads\/main' && inputs\.target == 'prod'/);
+ assert.match(flow,/github\.ref == 'refs\/heads\/main' && vars\.GU_V5_PRODUCTION_DEPLOY == 'enabled'/);
+ assert.match(flow,/github\.event_name == 'push'/);
+ assert.match(flow,/needs: validate/);
+ assert.match(flow,/environment: gu-v5-production/);
 });

@@ -6,8 +6,11 @@ const root=process.cwd();
 const workflow=readFileSync(join(root,'.github/workflows/deploy-main.yml'),'utf8');
 const installer=readFileSync(join(root,'CAI-FIX20-VA-KIEM-TRA.ps1'),'utf8');
 const pkg=JSON.parse(readFileSync(join(root,'package.json'),'utf8'));
-test('Rev6 production deploy only dispatch from approved main branch',()=>{
- assert.match(workflow,/if: github\.event_name == 'workflow_dispatch' && github\.ref == 'refs\/heads\/main' && inputs\.target == 'prod'/);
+test('Auto Production only runs for main push or emergency main dispatch after opt-in',()=>{
+ assert.match(workflow,/if: github\.ref == 'refs\/heads\/main' && vars\.GU_V5_PRODUCTION_DEPLOY == 'enabled'/);
+ assert.match(workflow,/github\.event_name == 'push'/);
+ assert.match(workflow,/github\.event_name == 'workflow_dispatch' && inputs\.target == 'prod'/);
+ assert.match(workflow,/Reject superseded commits/);
  assert.match(workflow,/vars\.GU_V5_PRODUCTION_DEPLOY == 'enabled'/);
  assert.match(workflow,/environment: gu-v5-production/);
  assert.match(workflow,/npm run test:vps/);

@@ -142,6 +142,7 @@
     "tests/fix20-build-repair.test.ts",
     "tests/fix20-bulk-inventory.test.ts",
     "tests/fix20-rev6-release.test.ts",
+    "tests/fix20-rev74-backup-guard.test.ts",
     "tests/fix20-safety.test.ts",
     "tests/fix20-source-manifest-extended.test.ts",
     "tests/gu-v535-beta3-build-regression.test.ts",

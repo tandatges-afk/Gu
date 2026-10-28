@@ -1,5 +1,5 @@
 [Unit]
-Description=Daily GU Fix20 production encrypted offsite backup
+Description=Daily GU Fix20 Production local DB and media backup
 [Timer]
 OnCalendar=*-*-* 03:15:00
 Persistent=true

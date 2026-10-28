@@ -1,13 +1,14 @@
 [Unit]
-Description=GU Fix20 production encrypted offsite backup
-Wants=network-online.target
-After=network-online.target postgresql.service
+Description=GU Fix20 production root-only local snapshot (PostgreSQL and uploads)
+After=postgresql.service
+
 [Service]
 Type=oneshot
 User=root
 EnvironmentFile=/etc/gu-v546/prod.env
-EnvironmentFile=/etc/gu-v546/backup-prod.env
 Environment=GU_BACKUP_TARGET=prod
-ExecStart=/usr/local/sbin/gu-fix20-encrypted-offsite-backup
+ExecStartPre=/usr/local/sbin/gu-fix20-backup-doctor --service
+ExecStart=/usr/local/sbin/gu-fix20-local-prod-backup
 NoNewPrivileges=true
 PrivateTmp=true
+TimeoutStartSec=900

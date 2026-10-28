@@ -94,4 +94,6 @@ test('GU media filesystem operations are flagged as runtime-only for Turbopack',
  const media=read('src/lib/local-media.ts');
  for(const marker of ['mkdir(/* turbopackIgnore: true */','writeFile(/* turbopackIgnore: true */','readFile(/* turbopackIgnore: true */'])assert.ok(media.includes(marker),marker);
  assert.ok(media.includes("process.env.GU_UPLOAD_DIR||'/var/lib/gu/uploads'"));
+ assert.ok(media.includes('const uploadFolder=dirname(target);'), 'use the validated target path for mkdir');
+ assert.ok(!media.includes('join(base(),dir,uid)'), 'do not dynamically join the uploads root for mkdir');
 });

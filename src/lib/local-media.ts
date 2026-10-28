@@ -1,6 +1,6 @@
 import 'server-only';
 import {mkdir,writeFile,readFile,unlink,stat,readdir} from 'node:fs/promises';
-import {join,resolve,sep} from 'node:path';
+import {join,resolve,sep,dirname} from 'node:path';
 import {ApiError} from './http';
 const base=()=>process.env.GU_UPLOAD_DIR||'/var/lib/gu/uploads';
 const validUid=(s:string)=>/^[A-Za-z0-9_-]{10,128}$/.test(s);
@@ -16,8 +16,9 @@ export async function savePhoto(dir:'products'|'inspections'|'secure',uid:string
  if(!validUUID(id)||!validUid(uid))throw new ApiError(400,'Mã ảnh không hợp lệ');
  const file=id+'.'+extension(mime),target=safePath(dir,uid,file);
  if(!bytes.length||bytes.length>3*1024*1024)throw new ApiError(413,'Ảnh phải từ 1 byte đến 3 MB');
- // This is runtime media outside the Next.js bundle (GU_UPLOAD_DIR). Do not trace it.
- const uploadFolder=join(base(),dir,uid);
+ // Derive the upload directory from the validated absolute target. Avoid dynamically
+ // joining the runtime GU_UPLOAD_DIR: Turbopack may trace the entire project.
+ const uploadFolder=dirname(target);
  await mkdir(/* turbopackIgnore: true */ uploadFolder,{recursive:true,mode:0o700});
  await writeFile(/* turbopackIgnore: true */ target,bytes,{flag:'wx',mode:0o600});
  return {path:target,filename:file};

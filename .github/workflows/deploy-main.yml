@@ -1,4 +1,4 @@
-name: GU Fix20 — Validate / Stage / Controlled Production
+name: GU Fix20 — CI and Auto Production on main
 on:
   push:
     branches: [main, 'gu-fix20-integrated-*']
@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       target:
-        description: 'Where to deploy after checks (stage safe, prod requires cutover approval)'
+        description: 'Manual staging or emergency production (production also deploys automatically on main push)'
         required: true
         type: choice
         default: stage
@@ -77,14 +77,24 @@ jobs:
             -e "ssh $opts" ./ "$host:/home/gu-deploy/v5-incoming/stage/$id/"
           ssh $opts "$host" "sudo -n /usr/local/sbin/gu-v5-release stage $id"
   production:
-    name: Deploy production :3302 (only after approval)
+    name: Auto-deploy production :3302 (backup required)
     needs: validate
-    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.target == 'prod' && vars.GU_V5_PRODUCTION_DEPLOY == 'enabled'
+    if: github.ref == 'refs/heads/main' && vars.GU_V5_PRODUCTION_DEPLOY == 'enabled' && (github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.target == 'prod'))
     runs-on: ubuntu-latest
     timeout-minutes: 60
     environment: gu-v5-production
     steps:
       - uses: actions/checkout@v4
+      - name: Reject superseded commits before deployment
+        shell: bash
+        run: |
+          set -euo pipefail
+          latest="$(git ls-remote origin refs/heads/main | awk '{print $1}')"
+          test -n "$latest"
+          if [[ "$latest" != "$GITHUB_SHA" ]]; then
+            echo "Refusing to deploy superseded commit $GITHUB_SHA; main is now $latest" >&2
+            exit 1
+          fi
       - name: SSH and release to production
         shell: bash
         env:

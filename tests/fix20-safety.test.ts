@@ -52,10 +52,16 @@ test('Fix20: deprecated backup fails closed; replacement is encrypted and offsit
  assert.match(backup,/gu_v546_prod/);assert.match(backup,/gu-v546-prod\/uploads/);
  assert.match(src('deploy-vps/gu-v546-backup.sh'),/exit 3/);
 });
-test('Fix20: production cannot be automatically deployed from main',()=>{
+test('Fix20: push main auto deploys only after CI and mandatory local backup',()=>{
  const workflow=src('.github/workflows/deploy-main.yml');
- assert.match(workflow,/github\.event_name == 'workflow_dispatch' && github\.ref == 'refs\/heads\/main' && inputs\.target == 'prod'/);
- assert.doesNotMatch(workflow,/github\.event_name == 'push' \|\|/);
+ assert.match(workflow,/github\.ref == 'refs\/heads\/main' && vars\.GU_V5_PRODUCTION_DEPLOY == 'enabled'/);
+ assert.match(workflow,/github\.event_name == 'push'/);
+ assert.match(workflow,/needs: validate/);
+ assert.match(workflow,/Reject superseded commits/);
+ const release=src('vps-main/gu-v5-release');
+ assert.match(release,/PRODUCTION_APPROVED/);
+ assert.match(release,/systemctl start gu-fix20-prod-backup\.service/);
+ assert.match(release,/Local backup failed; Production unchanged/);
  assert.match(src('vps-main/gu-v5-release'),/npm run db:preflight/);
 });
 test('Fix20: orphan image deletion requires confirmation and excludes evidence',()=>{

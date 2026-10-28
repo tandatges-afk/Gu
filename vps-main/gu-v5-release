@@ -18,15 +18,38 @@ if [[ "$target" == stage ]]; then
   port=3301
 else
   port=3302
-  [[ -f /etc/gu-v546/PRODUCTION_APPROVED ]] || { echo 'Production cutover not approved; refusing.' >&2; exit 1; }
+  # One-time explicit host authorization. Without it every automatic deploy fails closed.
+  [[ -f /etc/gu-v546/PRODUCTION_APPROVED ]] || { echo 'Production auto-deploy not enabled on VPS; refusing.' >&2; exit 1; }
 fi
 exec 9>"/run/lock/gu-v5-$target-deploy.lock"
 flock -n 9 || { echo 'Deploy already running'; exit 1; }
-[[ -f "$incoming/package.json" && -f "$incoming/package-lock.json" && -f "$incoming/.gu-deploy-commit" ]] || { echo 'Incomplete staged source'; exit 1; }
+[[ -f "$incoming/package.json" && -f "$incoming/package-lock.json" && -f "$incoming/.gu-deploy-commit" && -f "$incoming/.github/workflows/deploy-main.yml" ]] || { echo 'Incomplete staged source'; exit 1; }
 [[ ! -L "$incoming" && ! -L "$incoming/package.json" ]] || { echo 'Symlink source not accepted'; exit 1; }
 [[ -r "$envfile" ]] || { echo "Missing $envfile"; exit 1; }
 [[ ! -e "$release" ]] || { echo 'Release id already deployed'; exit 1; }
 [[ -f /etc/systemd/system/$service.service ]] || { echo 'Service not installed'; exit 1; }
+# Fail closed: local PostgreSQL + media snapshot MUST succeed before production deployment.
+# Offsite Windows backup is separate and must be repeated regularly.
+if [[ "$target" == prod ]]; then
+  systemctl cat gu-fix20-prod-backup.service >/dev/null 2>&1 || {
+    echo 'Local Production backup service missing; leaving Production unchanged.' >&2
+    exit 1
+  }
+  if [[ ! -x /usr/local/sbin/gu-fix20-backup-doctor ]]; then
+    echo 'Local backup doctor not installed; leaving Production unchanged.' >&2
+    exit 1
+  fi
+  if ! /usr/local/sbin/gu-fix20-backup-doctor --host; then
+    echo 'Local backup prerequisites failed; Production unchanged.' >&2
+    exit 1
+  fi
+  if ! systemctl start gu-fix20-prod-backup.service; then
+    echo 'Local backup failed; Production unchanged.' >&2
+    journalctl -u gu-fix20-prod-backup.service -n 20 --no-pager || true
+    exit 1
+  fi
+  echo 'Local pre-deploy backup finished successfully (offsite sync is separate).'
+fi
 old=''
 if [[ -L "$link" ]]; then old="$(readlink -f "$link")"; fi
 mkdir -p "$release"
