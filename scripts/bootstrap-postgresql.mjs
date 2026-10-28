@@ -19,8 +19,10 @@ CREATE INDEX IF NOT EXISTS gu_docs_customer_phone ON gu_documents((data->>'phone
 CREATE INDEX IF NOT EXISTS gu_docs_order_status ON gu_documents((data->>'status')) WHERE collection='orders';
 CREATE TABLE IF NOT EXISTS gu_login_attempts(email text PRIMARY KEY,failures int NOT NULL DEFAULT 0,first_failure_at timestamptz NOT NULL DEFAULT now());
 CREATE TABLE IF NOT EXISTS gu_accounts (
- uid text PRIMARY KEY, email text NOT NULL UNIQUE,name text NOT NULL,password_hash text NOT NULL,
+ uid text PRIMARY KEY, email text NOT NULL UNIQUE,username text,name text NOT NULL,password_hash text NOT NULL,
  disabled boolean NOT NULL DEFAULT false,revoked_after timestamptz,created_at timestamptz NOT NULL DEFAULT now());
+ALTER TABLE gu_accounts ADD COLUMN IF NOT EXISTS username text;
+CREATE UNIQUE INDEX IF NOT EXISTS gu_accounts_username_unique ON gu_accounts(lower(username)) WHERE username IS NOT NULL;
 `;
 try{
  if(opts.has('--init')||opts.has('--admin')){await pool.query(schema);console.log('GU V5 schema OK');}
@@ -31,19 +33,20 @@ try{
  if(opts.has('--admin')){
   if(!process.stdin.isTTY)throw Error('Admin setup requires a terminal.');
   const rl=readline.createInterface({input:process.stdin,output:process.stdout});
-  const email=(await rl.question('Admin email: ')).trim().toLowerCase();
+  const username=(await rl.question('Admin username (3-32 chars): ')).trim().toLowerCase();
+  const email=`${username}@accounts.gu.internal`;
   const name=(await rl.question('Admin display name: ')).trim();
-  const password=await rl.question('Initial password (min 12 chars; terminal input may be visible): ');
+  const password=await rl.question('Initial password (min 6 chars; terminal input may be visible): ');
   rl.close();
-  if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)||name.length<2||password.length<12)throw Error('Invalid admin identity or password');
+  if(!/^[a-z0-9][a-z0-9._-]{2,31}$/.test(username)||name.length<2||password.length<6)throw Error('Invalid admin identity or password');
   const uid=randomBytes(16).toString('hex'),salt=randomBytes(16).toString('hex');
   const hash='scrypt:'+salt+':'+scryptSync(password,salt,64).toString('hex');
   const client=await pool.connect();try{
    await client.query('BEGIN');
    const count=await client.query("SELECT COUNT(*)::int n FROM gu_documents WHERE collection='staff' AND data->>'role'='admin'");
    if(count.rows[0].n>0)throw Error('Admin already exists. Use a manual audited reset, never duplicate Admin accounts.');
-   await client.query('INSERT INTO gu_accounts(uid,email,name,password_hash) VALUES($1,$2,$3,$4)',[uid,email,name,hash]);
-   await client.query("INSERT INTO gu_documents(collection,id,data) VALUES('staff',$1,$2::jsonb)",[uid,JSON.stringify({name,email,role:'admin',disabled:false,createdAt:new Date().toISOString()})]);
+   await client.query('INSERT INTO gu_accounts(uid,email,username,name,password_hash) VALUES($1,$2,$3,$4,$5)',[uid,email,username,name,hash]);
+   await client.query("INSERT INTO gu_documents(collection,id,data) VALUES('staff',$1,$2::jsonb)",[uid,JSON.stringify({name,username,email,role:'admin',disabled:false,createdAt:new Date().toISOString()})]);
    await client.query('COMMIT');console.log('Admin created. UID:',uid);
   }catch(e){await client.query('ROLLBACK');throw e;}finally{client.release();}
  }

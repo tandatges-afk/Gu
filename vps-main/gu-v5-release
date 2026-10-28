@@ -68,6 +68,7 @@ runuser -u guapp -- /bin/bash -c '
   if [[ "$2" == stage ]]; then npm run db:init; fi
   npm run db:check
   npm run db:preflight
+  npm run auth:migrate
   npm run build
   test -s .next/BUILD_ID
 ' gu-v5-build "$release" "$target"

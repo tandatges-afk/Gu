@@ -2,7 +2,7 @@ import {NextRequest,NextResponse} from 'next/server';
 import {db} from '@/lib/firebase-admin';
 import {staffUser,handleError,ApiError} from '@/lib/http';
 export const runtime='nodejs';
-export const preferredRegion='sin1';
+
 export async function GET(req:NextRequest){
  try{
   await staffUser(req);

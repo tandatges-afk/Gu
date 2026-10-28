@@ -30,6 +30,31 @@ export async function initializeSchema(){
   password_hash text NOT NULL, disabled boolean NOT NULL DEFAULT false,
   revoked_after timestamptz, created_at timestamptz NOT NULL DEFAULT now()
  )`);
+ // Add usernames without dropping or renaming any existing account.
+ // A transaction-level advisory lock prevents concurrent workers racing on schema upgrades.
+ const client=await pgPool().connect();
+ try{
+  await client.query('BEGIN');
+  await client.query('SELECT pg_advisory_xact_lock(7941006)');
+  await client.query('ALTER TABLE gu_accounts ADD COLUMN IF NOT EXISTS username text');
+  await client.query(`WITH candidates AS (
+    SELECT uid, lower(split_part(email,'@',1)) AS candidate,
+      row_number() OVER (PARTITION BY lower(split_part(email,'@',1)) ORDER BY created_at,uid) AS rn
+    FROM gu_accounts WHERE username IS NULL
+   ), resolved AS (
+    SELECT c.uid, CASE
+      WHEN c.candidate ~ '^[a-z0-9][a-z0-9._-]{2,31}$' AND c.rn=1
+        AND NOT EXISTS (SELECT 1 FROM gu_accounts known WHERE lower(known.username)=c.candidate)
+        THEN c.candidate
+      ELSE 'user_' || left(md5(c.uid),20)
+    END AS proposed FROM candidates c
+   )
+   UPDATE gu_accounts a SET username=r.proposed FROM resolved r
+   WHERE a.uid=r.uid AND a.username IS NULL`);
+  await client.query(`CREATE UNIQUE INDEX IF NOT EXISTS gu_accounts_username_unique
+    ON gu_accounts (lower(username)) WHERE username IS NOT NULL`);
+  await client.query('COMMIT');
+ }catch(err){await client.query('ROLLBACK');throw err;}finally{client.release();}
  })().catch(error=>{schemaGlobal.__guSchemaReady=undefined;throw error;});
  return schemaGlobal.__guSchemaReady;
 }

@@ -6,7 +6,7 @@ import {validateSmartRange} from '@/lib/smart-calendar';
 import {localSearchRange,queryDays,occupiedInRange,type ExistingInterval} from '@/lib/hourly-availability';
 import {productSearchText,matchesProductSearch} from '@/lib/product-search';
 import type {InventoryItem} from '@/lib/types';
-export const runtime='nodejs';export const preferredRegion='sin1';
+export const runtime='nodejs';
 const blocked=(i:InventoryItem,today:string)=>Boolean(i.archivedAt||['LAUNDRY','MAINTENANCE','MISSING'].includes(i.status)||!(i.replacementValue>0)||(i.status==='RENTED'&&(!i.expectedReturnDate||i.expectedReturnDate<today)));
 async function getLocks(ids:string[],days:string[]){
  const refs=ids.flatMap(id=>days.map(day=>({id,day,legacy:db().collection('rentalSlots').doc(slotId(id,day)),timed:db().collection('v5DayIntervals').doc(id+'_'+day)})));

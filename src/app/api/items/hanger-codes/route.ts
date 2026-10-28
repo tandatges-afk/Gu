@@ -4,7 +4,7 @@ import { staffUser, handleError, ApiError } from '@/lib/http';
 import { auditInTransaction } from '@/lib/audit';
 import { HANGER_COUNTER_DOC, nextHangerSequence, formatHangerCode } from '@/lib/hanger-code';
 export const runtime='nodejs';
-export const preferredRegion='sin1';
+
 /** Assign display labels to old stock without changing document ID/SKU or historical rental lines. */
 export async function POST(req: NextRequest) {
   try {

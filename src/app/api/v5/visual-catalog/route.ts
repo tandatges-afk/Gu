@@ -3,7 +3,7 @@ import {FieldPath} from '@/lib/pg-firestore';
 import {db} from '@/lib/firebase-admin';
 import {staffUser,requireAdmin,handleError,jsonBody,ApiError} from '@/lib/http';
 import {validVisualSignature,validVisualSignatureV2,validVisualIndexEntries,type VisualIndexEntry} from '@/lib/visual-index';
-export const runtime='nodejs';export const preferredRegion='sin1';
+export const runtime='nodejs';
 /** Only compact numerical descriptors are sent to employees. Product photographs
  * are loaded only for the few actual results, not for every inventory row. */
 export async function GET(req:NextRequest){

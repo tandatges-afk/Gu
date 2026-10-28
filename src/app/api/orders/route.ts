@@ -7,7 +7,7 @@ import { bookingMode, verifyImmediatePickup, mustBeReadyAtPickup } from '@/lib/b
 import type { Customer, InventoryItem, RentalLine, RentalOrder } from '@/lib/types';
 import { auditInTransaction } from '@/lib/audit';
 export const runtime = 'nodejs';
-export const preferredRegion = 'sin1';
+
 export async function POST(req:NextRequest) {
   try {
     const me=await staffUser(req);

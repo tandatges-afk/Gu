@@ -3,7 +3,7 @@ import {FieldPath} from '@/lib/pg-firestore';
 import {db} from '@/lib/firebase-admin';
 import {staffUser,handleError,ApiError} from '@/lib/http';
 export const runtime='nodejs';
-export const preferredRegion='sin1';
+
 export async function GET(req:NextRequest){
  try{
   const me=await staffUser(req);if(me.role!=='admin')throw new ApiError(403,'Chỉ Admin được xem báo cáo tiền thu.');

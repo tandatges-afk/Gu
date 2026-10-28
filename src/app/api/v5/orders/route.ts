@@ -15,7 +15,7 @@ import {requiresFullPrepayment} from '@/lib/gu-v52-workflow';
 import {readVerifiedEvidence} from '@/lib/secure-evidence';
 import {assertText,normalizePhone} from '@/lib/rental';
 import type {RentalOrder,InventoryItem,Customer,RentalLine} from '@/lib/types';
-export const runtime='nodejs';export const preferredRegion='sin1';
+export const runtime='nodejs';
 export async function POST(req:NextRequest){
  try{
   const me=await staffUser(req);requirePcStaff(me);

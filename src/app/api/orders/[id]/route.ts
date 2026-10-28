@@ -10,7 +10,7 @@ import { auditInTransaction } from '@/lib/audit';
 import { planRentalExtension } from '@/lib/rental-extension';
 import {FieldValue} from '@/lib/pg-firestore';
 export const runtime='nodejs';
-export const preferredRegion='sin1';
+
 
 // Allow administrators to inspect historical orders outside the bootstrap window.
 export async function GET(req:NextRequest,ctx:{params:Promise<{id:string}>}) {

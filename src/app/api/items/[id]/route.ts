@@ -14,7 +14,7 @@ import { auditInTransaction } from '@/lib/audit';
 import {mayArchiveItem} from '@/lib/inventory-archive-rules';
 export const runtime='nodejs';
 const nameKeyChanged=(a:string,b:string)=>a!==b;
-export const preferredRegion='sin1';
+
 export async function PATCH(req:NextRequest,ctx:{params:Promise<{id:string}>}) {
   try{
     const me=await staffUser(req);

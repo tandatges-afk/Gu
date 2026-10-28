@@ -5,7 +5,7 @@ import { assertItems, rentalRequest, requiredSlots } from '@/lib/booking-server'
 import { InventoryItem } from '@/lib/types';
 import { vietnamToday } from '@/lib/rental';
 export const runtime = 'nodejs';
-export const preferredRegion = 'sin1';
+
 export async function POST(req:NextRequest) {
   try {
     await staffUser(req);

@@ -5,7 +5,7 @@ import {vnDayKey} from '@/lib/hourly-pricing';
 import {vietnamDayPlus,visualUpcomingForItem,type VisualAvailabilityState} from '@/lib/visual-availability';
 import type {InventoryItem,RentalOrder,ItemStatus} from '@/lib/types';
 export const runtime='nodejs';
-export const preferredRegion='sin1';
+
 /** Only the twelve matching image candidates are read. No customer names, phones or payment data leave the server. */
 export async function POST(req:NextRequest){
  try{

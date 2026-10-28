@@ -4,7 +4,7 @@ import {staffUser,handleError,ApiError} from '@/lib/http';
 import {addDays,slotId} from '@/lib/rental';
 import type {RentalOrder} from '@/lib/types';
 export const runtime='nodejs';
-export const preferredRegion='sin1';
+
 export async function GET(req:NextRequest){
  try{
   const me=await staffUser(req),u=new URL(req.url),start=String(u.searchParams.get('start')||'');

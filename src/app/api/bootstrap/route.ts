@@ -4,7 +4,7 @@ import { staffUser, handleError } from '@/lib/http';
 import { Customer, InventoryItem, RentalOrder } from '@/lib/types';
 import {getDashboardCounts} from '@/lib/pg-dashboard-counts';
 export const runtime = 'nodejs';
-export const preferredRegion = 'sin1';
+
 export async function GET(req: NextRequest) {
   try {
     const me = await staffUser(req);

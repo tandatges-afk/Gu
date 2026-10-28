@@ -1,0 +1,52 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {readFileSync,readdirSync,existsSync} from 'node:fs';
+import {normalizeUsername,validUsername,validateNewPassword} from '../src/lib/gu-username.ts';
+const read=(name:string)=>readFileSync(name,'utf8');
+test('GU login uses username rather than required email and supports six-character new password',()=>{
+ assert.equal(normalizeUsername('  GU_Admin  '),'gu_admin');
+ for(const n of ['gu1','nhanvien01','gu.admin','staff-09'])assert.ok(validUsername(n),n);
+ for(const n of ['ab','tênđăngnhập','a b','a@example.com','a'.repeat(33)])assert.equal(validUsername(n),false,n);
+ assert.equal(validateNewPassword('a12345'),true);
+ assert.equal(validateNewPassword('abc12'),false);
+ assert.equal(validateNewPassword('a'.repeat(129)),false);
+ const route=read('src/app/api/local-auth/route.ts');
+ assert.match(route,/body\.username\?\?body\.email/);
+ assert.match(route,/authenticate\(identity,body\.password\)/);
+ assert.match(read('src/lib/client-auth.ts'),/JSON\.stringify\(\{username,password\}\)/);
+ const login=read('src/app/page.tsx');
+ assert.match(login,/>Tên đăng nhập<\/label>/);
+ assert.match(login,/signInWithUsernameAndPassword/);
+ assert.doesNotMatch(login,/type="email" autoComplete="username"/);
+});
+test('Existing accounts get username migration without deleting legacy email, ID or sessions',()=>{
+ const schema=read('src/lib/pg-firestore.ts');
+ assert.match(schema,/ADD COLUMN IF NOT EXISTS username text/);
+ assert.match(schema,/pg_advisory_xact_lock/);
+ assert.match(schema,/SET username=r\.proposed/);
+ assert.match(schema,/UNIQUE INDEX IF NOT EXISTS gu_accounts_username_unique/);
+ const migration=read('scripts/migrate-gu-usernames.mjs');
+ assert.match(migration,/GU_USERNAME_MIGRATION_OK/);
+ assert.match(read('vps-main/gu-v5-release'),/npm run auth:migrate/);
+ const auth=read('src/lib/local-auth.ts');
+ assert.match(auth,/WHERE lower\(username\)=\$1/);
+ assert.match(auth,/WHERE email=\$1/);
+ assert.match(auth,/uid:\$\{acc\.uid\}/);
+ assert.match(auth,/scrypt/);
+ assert.match(auth,/validateNewPassword\(password\)/);
+ assert.match(auth,/username:login/);
+});
+test('Admin staff endpoint uses validated username, unique index, and rate-limited credentials',()=>{
+ const staff=read('src/app/api/staff/route.ts');
+ assert.match(staff,/validUsername\(username\)/);
+ assert.match(staff,/validateNewPassword\(password\)/);
+ assert.match(staff,/username:names\.get\(d\.id\)/);
+ assert.match(read('src/components/GuExtras.tsx'),/minLength=\{6\}/);
+ assert.match(read('src/components/GuExtras.tsx'),/username:e\.target\.value/);
+});
+test('Repository no longer includes legacy root README, changelogs and documentation',()=>{
+ assert.equal(existsSync('docs'),false);
+ assert.equal(existsSync('README.md'),false);
+ assert.deepEqual(readdirSync('.').filter(f=>f.endsWith('.md')),[]);
+ assert.equal(existsSync('scripts/verify-release.mjs'),false);
+});

@@ -2,7 +2,7 @@ import {NextRequest,NextResponse} from 'next/server';
 import {staffUser,requireAdmin,handleError,ApiError} from '@/lib/http';
 import {runEvidenceCleanup} from '@/lib/evidence-retention';
 import {runSensitiveEvidenceCleanup,queueReviewedEvidenceBackfill} from '@/lib/sensitive-evidence-cleanup';
-export const runtime='nodejs';export const preferredRegion='sin1';
+export const runtime='nodejs';
 export async function POST(req:NextRequest){
  try{const me=await staffUser(req);requireAdmin(me);await queueReviewedEvidenceBackfill();return NextResponse.json({inspections:await runEvidenceCleanup(10),sensitive:await runSensitiveEvidenceCleanup(10)},{headers:{'Cache-Control':'no-store'}});}catch(e){return handleError(e);}
 }

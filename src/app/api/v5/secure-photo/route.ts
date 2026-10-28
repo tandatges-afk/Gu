@@ -6,7 +6,7 @@ import {validEvidenceId} from '@/lib/secure-evidence';
 import {reserveUploadBudget} from '@/lib/upload-budget';
 import {cleanupAllowed} from '@/lib/sensitive-evidence-rules';
 import {uploadSecureCloudinary,downloadSecureCloudinary,deleteSecureCloudinary,securePhotoPublicId,type SecureCloudinaryImage} from '@/lib/cloudinary-secure';
-export const runtime='nodejs';export const preferredRegion='sin1';
+export const runtime='nodejs';
 const limits={reservation:3*1024*1024,deposit:3*1024*1024};
 const validMime=['image/jpeg','image/png','image/webp'];
 function canReadEvidence(me:{uid:string;role:string},order:Record<string,unknown>){

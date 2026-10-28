@@ -22,7 +22,6 @@
     "db:optimize": "node --env-file=.env.local scripts/optimize-postgresql.mjs",
     "test:performance": "node --experimental-strip-types --test tests/vps-performance.test.ts",
     "db:bench": "node --env-file=.env.local scripts/benchmark-postgresql.mjs",
-    "verify:legacy": "node scripts/verify-release.mjs",
     "stage:check": "node --env-file=.env.local scripts/check-staging-env.mjs",
     "prod:check": "node --env-file=.env.local scripts/check-production-env.mjs",
     "db:preflight": "node --env-file=.env.local scripts/gu-fix20-preflight.mjs",
@@ -32,7 +31,8 @@
     "test:concurrency:stage": "node --env-file=.env.local scripts/gu-fix20-concurrency-stage.mjs",
     "verify:versions": "node scripts/gu-fix20-versions.mjs",
     "source:check": "node scripts/gu-fix20-source-guard.mjs --check",
-    "source:prune": "node scripts/gu-fix20-source-guard.mjs --prune"
+    "source:prune": "node scripts/gu-fix20-source-guard.mjs --prune",
+    "auth:migrate": "node --env-file=.env.local scripts/migrate-gu-usernames.mjs"
   },
   "dependencies": {
     "lucide-react": "^0.468.0",

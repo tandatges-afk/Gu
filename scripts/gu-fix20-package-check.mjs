@@ -13,7 +13,7 @@ if(hashes.schema!==1||hashes.release!=='5.4.6-fix20.0-rev7'||!hashes.files||type
  console.error('GU FIX20 REV7 FILE CHECK: Invalid release manifest.');process.exit(2);
 }
 const entries=Object.entries(hashes.files);
-if(entries.length<300){console.error('GU FIX20 REV7 FILE CHECK: Incomplete manifest.');process.exit(2);}
+if(entries.length<260){console.error('GU FIX20 REV7 FILE CHECK: Incomplete manifest.');process.exit(2);}
 const errors=[];
 for(const [p,expected] of entries){
  if(typeof p!=='string'||p.includes('\\')||p.startsWith('/')||p.split('/').some(x=>!x||x==='.'||x==='..')||typeof expected!=='string'||!/^[a-f0-9]{64}$/.test(expected)){

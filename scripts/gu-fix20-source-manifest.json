@@ -80,6 +80,7 @@
     "src/lib/evidence-retention.ts",
     "src/lib/firebase-admin.ts",
     "src/lib/firebase-client.ts",
+    "src/lib/gu-username.ts",
     "src/lib/gu-v52-workflow.ts",
     "src/lib/handover-return-time.ts",
     "src/lib/hanger-code.ts",
@@ -175,6 +176,7 @@
     "tests/shift-schedule-v53.test.ts",
     "tests/smart-calendar-v41.test.ts",
     "tests/system-longterm-v420.test.ts",
+    "tests/username-auth-prod.test.ts",
     "tests/ux-debt-v413.test.ts",
     "tests/v4-workflow.test.ts",
     "tests/v5-2-reservation-flow.test.ts",
@@ -234,12 +236,12 @@
     "scripts/gu-fix20-source-guard.mjs",
     "scripts/gu-fix20-versions.mjs",
     "scripts/import-firestore-json.mjs",
+    "scripts/migrate-gu-usernames.mjs",
     "scripts/migrate-revenue-history.mjs",
     "scripts/optimize-postgresql.mjs",
     "scripts/repair-product-name-index.mjs",
     "scripts/run-cleanup.mjs",
     "scripts/test-vps.mjs",
-    "scripts/verify-release-vps.mjs",
-    "scripts/verify-release.mjs"
+    "scripts/verify-release-vps.mjs"
   ]
 }

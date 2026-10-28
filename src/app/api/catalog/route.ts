@@ -7,7 +7,7 @@ import {productSearchText,matchesProductSearch} from '@/lib/product-search';
 import {isInventoryCodeQuery,inventoryCodeNeedle,matchesInventoryCode} from '@/lib/catalog-code-search';
 import {orderGroup,productGroup} from '@/lib/order-group';
 export const runtime='nodejs';
-export const preferredRegion='sin1';
+
 export async function GET(req:NextRequest){
  try{
   const me=await staffUser(req);const u=new URL(req.url);

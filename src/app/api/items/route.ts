@@ -13,7 +13,7 @@ import {auditInTransaction } from '@/lib/audit';
 import { validProductImageUrl } from '@/lib/cloudinary-images';
 import { HANGER_COUNTER_DOC, nextHangerSequence, formatHangerCode } from '@/lib/hanger-code';
 export const runtime='nodejs';
-export const preferredRegion='sin1';
+
 export async function POST(req:NextRequest) {
   try{
     const me=await staffUser(req);

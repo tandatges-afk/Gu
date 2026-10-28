@@ -2,6 +2,7 @@ import 'server-only';
 import {randomBytes,createHmac,timingSafeEqual,scrypt as scryptCallback} from 'node:crypto';
 import {promisify} from 'node:util';
 import {pgPool,initializeSchema} from './pg-firestore';
+import {normalizeUsername,validUsername,validateNewPassword} from './gu-username';
 const scrypt=promisify(scryptCallback);
 const TTL=12*60*60;
 const MAX_ATTEMPTS=10;
@@ -19,40 +20,51 @@ export async function verifyToken(token:string){
  const now=Math.floor(Date.now()/1000);
  if(!data.uid||!Number.isFinite(data.iat)||!Number.isFinite(data.exp)||now>data.exp||data.iat>now+60)throw Error('Session expired');
  await initializeSchema();
- const res=await pgPool().query('SELECT uid,email,name,disabled,revoked_after FROM gu_accounts WHERE uid=$1',[data.uid]);
+ const res=await pgPool().query('SELECT uid,email,username,name,disabled,revoked_after FROM gu_accounts WHERE uid=$1',[data.uid]);
  const u=res.rows[0];if(!u||u.disabled||u.revoked_after&&data.iat*1000<=new Date(u.revoked_after).getTime())throw Error('User disabled');
- return {uid:u.uid,email:u.email,name:u.name,auth_time:data.iat,exp:data.exp};
+ return {uid:u.uid,email:u.email,username:u.username,name:u.name,auth_time:data.iat,exp:data.exp};
 }
 export async function hashPassword(password:string){const salt=randomBytes(16).toString('hex');const hash=await scrypt(password,salt,64) as Buffer;return `scrypt:${salt}:${hash.toString('hex')}`;}
 export async function verifyPassword(password:string,stored:string){
  const [scheme,salt,expected]=stored.split(':');if(scheme!=='scrypt'||!/^[a-f0-9]{32}$/.test(salt||'')||!/^[a-f0-9]{128}$/.test(expected||''))return false;
  const got=await scrypt(password,salt,64) as Buffer;return timingSafeEqual(Buffer.from(expected,'hex'),got);
 }
-export async function authenticate(email:string,password:string){
- await initializeSchema();const normalized=email.trim().toLowerCase();
- const rate=await pgPool().query('SELECT failures,first_failure_at FROM gu_login_attempts WHERE email=$1',[normalized]);
- if(rate.rows[0]?.failures>=MAX_ATTEMPTS&&Date.now()-new Date(rate.rows[0].first_failure_at).getTime()<15*60_000)throw Error('Too many attempts');
- const r=await pgPool().query('SELECT * FROM gu_accounts WHERE email=$1',[normalized]);
+export async function authenticate(identity:string,password:string){
+ await initializeSchema();const normalized=normalizeUsername(identity);
+ // Transitional support for existing admins using email; new accounts sign in with username.
+ const oldEmailLogin=normalized.includes('@');
+ const r=await pgPool().query(oldEmailLogin?
+   'SELECT * FROM gu_accounts WHERE email=$1':'SELECT * FROM gu_accounts WHERE lower(username)=$1',[normalized]);
  const acc=r.rows[0];
- // Perform a scrypt hash even on unknown users to minimize account enumeration.
+ // A shared per-account key stops bypassing the attempt threshold by changing identity format.
+ const attemptKey=acc?.uid?`uid:${acc.uid}`:`name:${normalized}`;
+ const rate=await pgPool().query('SELECT failures,first_failure_at FROM gu_login_attempts WHERE email=$1',[attemptKey]);
+ if(rate.rows[0]?.failures>=MAX_ATTEMPTS&&Date.now()-new Date(rate.rows[0].first_failure_at).getTime()<15*60_000)throw Error('Too many attempts');
+ // Perform a scrypt hash even on unknown users to reduce timing-based enumeration.
  const fallback='scrypt:00000000000000000000000000000000:'+('00'.repeat(64));
  const matched=await verifyPassword(password,acc?.password_hash||fallback);
  if(!matched||!acc||acc.disabled){
   await pgPool().query(`INSERT INTO gu_login_attempts(email,failures,first_failure_at) VALUES($1,1,now())
    ON CONFLICT(email) DO UPDATE SET failures=CASE WHEN gu_login_attempts.first_failure_at < now()-interval '15 minutes' THEN 1 ELSE gu_login_attempts.failures+1 END,
-   first_failure_at=CASE WHEN gu_login_attempts.first_failure_at < now()-interval '15 minutes' THEN now() ELSE gu_login_attempts.first_failure_at END`,[normalized]);
-  throw Error('Email hoặc mật khẩu không đúng.');
+   first_failure_at=CASE WHEN gu_login_attempts.first_failure_at < now()-interval '15 minutes' THEN now() ELSE gu_login_attempts.first_failure_at END`,[attemptKey]);
+  throw Error('Tên đăng nhập hoặc mật khẩu không đúng.');
  }
- await pgPool().query('DELETE FROM gu_login_attempts WHERE email=$1',[normalized]);
- return {uid:acc.uid,email:acc.email,name:acc.name,token:sessionToken(acc.uid)};
+ await pgPool().query('DELETE FROM gu_login_attempts WHERE email=$1',[attemptKey]);
+ return {uid:acc.uid,email:acc.email,username:acc.username,name:acc.name,token:sessionToken(acc.uid)};
 }
 export function serverAuth(){return {
  verifyIdToken:async(token:string,_checkRevoked=true)=>verifyToken(token),
- createUser:async({email,password,displayName,disabled=false}:{email:string;password:string;displayName?:string;disabled?:boolean})=>{
-  if(password.length<12)throw Error('Password too short');await initializeSchema();const uid=randomBytes(16).toString('hex');const hashed=await hashPassword(password);
-  try{await pgPool().query('INSERT INTO gu_accounts(uid,email,name,password_hash,disabled) VALUES($1,$2,$3,$4,$5)',[uid,email.toLowerCase(),displayName||'',hashed,disabled]);}
-  catch(e){if((e as {code?:string}).code==='23505'){const err=new Error('Email exists') as Error&{code?:string};err.code='auth/email-already-exists';throw err;}throw e;}
-  return {uid,email};
+ createUser:async({username,password,displayName,disabled=false}:{username:string;password:string;displayName?:string;disabled?:boolean})=>{
+  const login=normalizeUsername(username);
+  if(!validUsername(login))throw Error('Invalid username');
+  if(!validateNewPassword(password))throw Error('Password must contain 6-128 characters');
+  await initializeSchema();const uid=randomBytes(16).toString('hex');const hashed=await hashPassword(password);
+  // Internal email placeholder retains compatibility with historic staff/event records.
+  // GU no longer requires or sends an actual email address for new accounts.
+  const email=`${login}@accounts.gu.internal`;
+  try{await pgPool().query('INSERT INTO gu_accounts(uid,email,username,name,password_hash,disabled) VALUES($1,$2,$3,$4,$5,$6)',[uid,email,login,displayName||'',hashed,disabled]);}
+  catch(e){if((e as {code?:string}).code==='23505'){const err=new Error('Username exists') as Error&{code?:string};err.code='auth/username-already-exists';throw err;}throw e;}
+  return {uid,email,username:login};
  },
  updateUser:async(uid:string,opts:{disabled?:boolean})=>{
   await pgPool().query('UPDATE gu_accounts SET disabled=$2,revoked_after=CASE WHEN $2 THEN now() ELSE revoked_after END WHERE uid=$1',[uid,opts.disabled]);
