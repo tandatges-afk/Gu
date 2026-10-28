@@ -73,7 +73,7 @@ jobs:
           printf '%s\n' "$GITHUB_SHA" > .gu-deploy-commit
           host=gu-deploy@103.176.25.226
           ssh $opts "$host" "mkdir -p /home/gu-deploy/v5-incoming/stage/$id"
-          rsync -az --delete --exclude='.git/' --exclude='.github/' --exclude='.env*' --exclude='node_modules/' --exclude='.next/' \
+          rsync -az --delete --exclude='.git/' --exclude='.env*' --exclude='node_modules/' --exclude='.next/' \
             -e "ssh $opts" ./ "$host:/home/gu-deploy/v5-incoming/stage/$id/"
           ssh $opts "$host" "sudo -n /usr/local/sbin/gu-v5-release stage $id"
   production:
@@ -102,6 +102,6 @@ jobs:
           printf '%s\n' "$GITHUB_SHA" > .gu-deploy-commit
           host=gu-deploy@103.176.25.226
           ssh $opts "$host" "mkdir -p /home/gu-deploy/v5-incoming/prod/$id"
-          rsync -az --delete --exclude='.git/' --exclude='.github/' --exclude='.env*' --exclude='node_modules/' --exclude='.next/' \
+          rsync -az --delete --exclude='.git/' --exclude='.env*' --exclude='node_modules/' --exclude='.next/' \
             -e "ssh $opts" ./ "$host:/home/gu-deploy/v5-incoming/prod/$id/"
           ssh $opts "$host" "sudo -n /usr/local/sbin/gu-v5-release prod $id"
