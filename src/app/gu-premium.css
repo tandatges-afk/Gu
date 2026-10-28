@@ -1,0 +1,253 @@
+/* GU Premium v9 — coherent design layer. Keep business state colors and behavior from the base stylesheet. */
+:root {
+  color-scheme: light;
+  --gu-bg: #f5f7f8;
+  --gu-surface: #ffffff;
+  --gu-surface-alt: #f8fafb;
+  --gu-ink: #1d3040;
+  --gu-muted: #546779;
+  --gu-faint: #6b7c89;
+  --gu-line: #dce5eb;
+  --gu-brand: #183d4b;
+  --gu-brand-hover: #245565;
+  --gu-accent: #9f6448;
+  --gu-focus: #0c7380;
+  --gu-shadow: 0 7px 28px rgba(18,43,56,.055);
+  --gu-shadow-lg: 0 22px 70px rgba(16,42,56,.20);
+  --ink: var(--gu-ink);
+  --muted: var(--gu-muted);
+  --line: var(--gu-line);
+  --paper: var(--gu-bg);
+  --border: var(--gu-line);
+}
+html{scroll-behavior:smooth}
+body{background:var(--gu-bg);color:var(--gu-ink);font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;font-size:14px;line-height:1.5}
+h1,h2,h3,h4,.brand,.page-intro h1,.metric>strong{font-family:inherit;letter-spacing:-.025em}
+::selection{background:#bedfe3;color:#0b3440}
+:where(button,input,textarea,select,a,[tabindex],summary):focus-visible{outline:3px solid var(--gu-focus)!important;outline-offset:3px!important}
+:where(button,input,textarea,select){font-family:inherit}
+:where(button,.btn){transition:background-color .16s ease,border-color .16s ease,box-shadow .16s ease,color .16s ease}
+:where(button,.btn):disabled{opacity:.6;cursor:not-allowed;filter:saturate(.55)}
+input,select,textarea{color:var(--gu-ink)}
+input::placeholder,textarea::placeholder{color:#728493;opacity:1}
+.skip-link{position:fixed;top:-90px;left:16px;padding:13px 18px;border-radius:10px;background:#fff;color:var(--gu-ink);z-index:9999;font-weight:750;box-shadow:var(--gu-shadow-lg)}
+.skip-link:focus{top:16px}
+/* The workspace is a premium utility application: quiet canvas, strong hierarchy. */
+.shell{background:var(--gu-bg)}
+.sidebar{width:258px;background:var(--gu-surface);border-right:1px solid var(--gu-line);box-shadow:2px 0 12px rgba(18,42,55,.025);padding:23px 15px 17px}
+.sidebar .brand{font-weight:850;font-size:23px;letter-spacing:.065em;color:var(--gu-brand);gap:12px}
+.sidebar .brandmark,.login-page .brandmark{background:linear-gradient(135deg,#244e5c,#142e3b);color:#fff;border-radius:12px;box-shadow:0 5px 12px #15374221}
+.sidebar .brand small{color:#687783;font-size:9px;letter-spacing:.24em;margin-top:4px}
+.brand-accent{color:var(--gu-accent)}
+.sidebar .workspace{margin:26px 2px 18px;background:var(--gu-surface-alt);border:1px solid var(--gu-line);padding:12px;border-radius:13px}
+.workspace-logo{background:#dfe9ea;color:var(--gu-brand);border-radius:10px}
+.workspace-copy strong{font-size:12px;color:var(--gu-ink)}
+.workspace-copy span{font-size:11px;color:var(--gu-muted)}
+.sidebar .navigation{scrollbar-width:thin;overscroll-behavior:contain}
+.sidebar .gu-nav-section{margin-bottom:13px}
+.sidebar .gu-nav-section-title{color:#748390;font-size:10px;letter-spacing:.13em;margin:14px 12px 6px}
+.sidebar .nav-link{min-height:45px;padding:10px 12px;border:1px solid transparent;border-radius:11px;color:#415568;font-size:13px;font-weight:650;gap:12px}
+.sidebar .nav-link:hover{background:#f0f5f6;color:#183e4a}
+.sidebar .nav-link.nav-active{background:#e7f1f2;border-color:#cbdfe1;color:#144a56;font-weight:800}
+.sidebar .nav-active svg{color:#196474}
+.sidebar .active-line{background:#237483;right:0;top:calc(50% - 10px)}
+.sidebar-user{border-color:var(--gu-line)}
+.sidebar-user-copy strong{font-size:12px;color:var(--gu-ink)}
+.sidebar-user-copy span{font-size:11px;color:var(--gu-muted)}
+.avatar{background:#dfece8;color:#1c5956}
+.main{margin-left:258px;width:calc(100% - 258px);min-width:0}
+.topbar{position:sticky;top:0;height:68px;z-index:14;background:#ffffffed;backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border-bottom:1px solid var(--gu-line);padding:0 clamp(18px,2.5vw,36px)}
+.topbar .crumb{font-size:12px;color:#758491}
+.topbar .crumb-current{color:var(--gu-ink);font-size:13px;font-weight:750}
+.topbar .today{color:var(--gu-muted)}
+.topbar .icon-btn{min-width:38px;min-height:38px}
+.content{max-width:1690px;padding:clamp(21px,3vw,38px) clamp(16px,2.5vw,38px) 85px}
+.page-intro{margin-bottom:22px;gap:16px;align-items:flex-end}
+.page-intro h1{color:var(--gu-ink);font-size:clamp(24px,2.25vw,32px);font-weight:810;line-height:1.2;letter-spacing:-.04em}
+.page-intro p{color:var(--gu-muted);line-height:1.6;max-width:760px;font-size:13px}
+.page-intro .eyebrow,.eyebrow{color:var(--gu-accent);font-weight:800;font-size:10px;letter-spacing:.11em}
+.page-intro .action-row{gap:8px}
+.wave{color:var(--gu-accent)}
+/* Buttons: one visual primary action, discreet secondary actions. */
+.btn{min-height:42px;min-width:0;border-radius:11px;padding:10px 15px;font-size:12.5px;font-weight:750;white-space:normal;line-height:1.35;text-wrap:balance}
+.btn-dark{background:var(--gu-brand);border-color:var(--gu-brand);color:#fff;box-shadow:0 3px 9px #123c471a}
+.btn-dark:hover:not(:disabled){background:var(--gu-brand-hover);border-color:var(--gu-brand-hover)}
+.btn-white{background:#fff;border-color:#cad8df;color:#274555}
+.btn-white:hover:not(:disabled){background:#f0f6f7;border-color:#9dbdc4;color:#153945}
+.btn-danger{background:#fff4f3;border-color:#edc2ba;color:#963c32}
+.btn-danger:hover:not(:disabled){background:#ffebe9;border-color:#dba197}
+.icon-btn{color:#536c7b;border-radius:10px;min-width:36px;min-height:36px}
+.icon-btn:hover{background:#edf4f6;color:#173e4d}
+/* Cards: use the same border/radius/shadow rhythm on all main tabs. */
+.panel,.metric,.gu-system-card,.gu-v5-review-detail,.gu-inline-box{background:var(--gu-surface);border:1px solid var(--gu-line);border-radius:16px;box-shadow:var(--gu-shadow)}
+.panel-heading{padding:20px 22px 16px}
+.panel-heading h3{font-size:15px;color:var(--gu-ink)}
+.panel-heading p{color:var(--gu-muted);font-size:12px}
+.stats-grid{gap:14px;margin-bottom:19px}
+.metric{padding:19px;min-height:159px}
+.metric>strong{font-size:clamp(20px,1.9vw,26px);color:var(--gu-ink);font-weight:820;letter-spacing:-.025em}
+.metric-icon{border-radius:12px}
+.metric-name{color:var(--gu-muted);font-size:12px}
+.metric-detail{color:var(--gu-muted);font-size:11px;line-height:1.45}
+.overview-columns{gap:17px}
+.quick-grid button{border-color:var(--gu-line);border-radius:13px;min-height:116px}
+.quick-grid button:hover{background:#f7fafb;border-color:#a6c6cd;box-shadow:0 3px 13px #234a5a0c}
+.bottom-stripe{background:#f1f5f5;border-color:#dce8ea}
+/* Tables: consistent readability, no cramped tiny typography. */
+.table-wrap{overflow:auto;max-width:100%;overscroll-behavior-inline:contain}
+table th,table td{font-variant-numeric:tabular-nums}
+th{background:#f8fafb;color:#526778;font-size:10px;letter-spacing:.045em;padding:13px 15px;border-color:#e4ebee}
+td{color:#33495b;font-size:12px;padding:14px 15px;border-color:#ecf0f2}
+td b{font-size:12px;color:var(--gu-ink)}
+.table-sub{color:var(--gu-muted);font-size:11px}
+.click-row:hover{background:#f4f8f9}
+.badge{font-size:11px;line-height:1.2;border-radius:9px;font-weight:750;padding:6px 9px}
+/* All filterable views share the same field sizes. */
+.filter-toolbar{gap:11px!important;align-items:center;flex-wrap:wrap}
+.input,.small-select,.search-box input,select,textarea{font-size:13px}
+.input,.small-select{background:#fff;border:1px solid #cbd9e0;color:var(--gu-ink);border-radius:11px;min-height:43px;padding:10px 12px;box-shadow:none}
+.input:focus,.small-select:focus{border-color:#2e808b;outline:2px solid #2e808b24;outline-offset:1px}
+textarea.input,textarea{line-height:1.6}
+.field-label,.form-field>span,.form-field>label{font-size:12px;color:#40586a;font-weight:700}
+.search-box{min-height:42px;border-color:#cad8df;border-radius:11px;background:#fff}
+.search-box input{color:var(--gu-ink)}
+/* Calendar: labels still carry their semantic states. */
+.gu-calendar-toolbar-v532{border:1px solid var(--gu-line)!important;border-radius:14px!important;background:#fff!important;box-shadow:none!important}
+.gu-calendar-toolbar-v532 label>span{font-size:11px;color:#496073;font-weight:750}
+.gu-calendar-toolbar-v532 :is(select,input){font-size:12px}
+.gu-calendar-toolbar-v532 .gu-calendar-date-actions>.gu-vn-date-only>.gu-date-nav{background:#fff!important;font-variant-numeric:tabular-nums}
+.gu-calendar-toolbar-v532 .gu-calendar-date-actions>.gu-calendar-today{background:#e8f3ee!important;color:#235a45!important;border-color:#bcd9c9!important}
+.gu-calendar-toolbar-v532 .gu-calendar-date-actions>.boxed{background:#f8fafb!important}
+.legend{gap:6px!important}
+.legend>span{font-size:11px;min-height:27px}
+.calendar-row,.calendar-day{font-variant-numeric:tabular-nums}
+.gu-calendar-cell-result{font-size:11px;font-weight:800;letter-spacing:0}
+/* Dialogs are decision surfaces; reduce visual noise while keeping all actions reachable. */
+.modal-overlay,.gu-capture-overlay{background:rgba(9,27,37,.60);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);padding:16px}
+.modal,.gu-capture-dialog{border:1px solid #d7e3e7;border-radius:19px;box-shadow:var(--gu-shadow-lg);background:#fff;max-height:min(94dvh,1000px);overscroll-behavior:contain}
+.modal-heading,.gu-capture-header{background:#fff;border-bottom:1px solid var(--gu-line);padding:19px 23px;position:relative}
+.modal-heading h2,.gu-capture-header h2{font-size:clamp(19px,1.65vw,24px);line-height:1.23;font-weight:810;color:var(--gu-ink);letter-spacing:-.035em}
+.modal-heading .eyebrow,.gu-capture-kicker{font-size:10px;color:var(--gu-accent);font-weight:750;letter-spacing:.12em}
+.modal-body{padding:21px 23px;min-width:0}
+.modal-actions,.gu-capture-footer{background:#fff;border-top:1px solid #ebf0f2;padding:14px 0;gap:10px}
+.modal .form-grid{gap:16px}
+.gu-capture-dialog{width:min(96vw,840px);display:flex;flex-direction:column}
+.gu-capture-progress{padding:12px 20px;border-bottom:1px solid #edf0f2}
+.gu-capture-item{border:1px solid var(--gu-line);background:#fff;border-radius:14px;margin:10px 18px;padding:15px}
+.gu-capture-item-title h3{color:var(--gu-ink);line-height:1.35}
+.gu-capture-item-title span{color:var(--gu-muted)}
+.gu-capture-angle,.gu-v52-deposit-panel{border-color:var(--gu-line);border-radius:12px}
+.gu-capture-placeholder{background:#f4f7f8}
+.gu-capture-footer .btn-dark,.gu-v52-deposit-panel .btn-dark{min-height:46px}
+.gu-v52-settlement,.gu-v52-deposit-panel,.gu-v52-settlement-actions{color:var(--gu-ink)}
+.gu-v52-settlement h3{font-size:19px;font-weight:810;letter-spacing:-.02em}
+.gu-quick-money>span{background:#f5f9f9;border-color:#dce8e8}
+.gu-quick-money small{color:var(--gu-muted)}
+.gu-quick-money strong{color:var(--gu-ink);font-variant-numeric:tabular-nums}
+.gu-optional-details summary,details>summary{cursor:pointer;outline-offset:3px}
+.gu-mini-note,.gu-v52-settlement p{line-height:1.55}
+.gu-v5-review-layout{gap:15px}
+.gu-v5-review-list{background:#fff;border:1px solid var(--gu-line);border-radius:14px}
+.gu-v5-job:hover{background:#f2f7f8}
+/* Alerts should be visible without overpowering the workflow. */
+.inline-alert{font-size:12.5px;line-height:1.5;border-radius:11px}
+.danger-alert{color:#943b34;background:#fff5f3;border-color:#ecc9c1}
+.toast{background:#1b4652;border:1px solid #376371;border-radius:12px;box-shadow:var(--gu-shadow-lg);font-size:12px}
+.overdue-banner,.gu-next-day-risk-banner,.gu-late-pickup-banner{box-shadow:none!important;border-radius:13px!important}
+.gu-system-card{padding:19px 21px}
+.gu-system-progress{border-radius:100px}
+/* Sign-in: legible, comfortable and no external font tracking. */
+.login-page{background:#f5f8f8;min-height:100dvh}
+.login-art{background:linear-gradient(145deg,#183846 5%,#214e57 70%,#36565c 100%);color:#fff}
+.login-art-copy h1{font-size:clamp(29px,3vw,47px);line-height:1.13;letter-spacing:-.045em}
+.login-art-copy h1 em{color:#f0cdb8;font-style:normal}
+.login-feature{color:#e1eeee}
+.login-pane{background:#f6f9f9}
+.login-box{background:#fff;border:1px solid #e4ebed;border-radius:21px;padding:clamp(23px,3vw,40px);box-shadow:var(--gu-shadow)}
+.login-box h2{color:var(--gu-ink);font-size:clamp(24px,2.3vw,30px);font-weight:820}
+.login-box p{font-size:13px;color:var(--gu-muted);line-height:1.6}
+.login-box .field-label{display:block;margin-top:17px;margin-bottom:8px}
+.login-box .input{min-height:47px;width:100%}
+.gu-password-field{display:flex;align-items:stretch;position:relative;width:100%}
+.gu-password-field>.input{padding-right:68px}
+.gu-password-toggle{position:absolute;right:5px;top:5px;bottom:5px;min-width:55px;padding:0 9px;border:0;background:#edf4f5;border-radius:8px;color:#295668;font-size:12px;font-weight:800}
+.gu-password-toggle:hover{background:#dbeaed}
+.login-box .login-btn{min-height:48px;width:100%;margin-top:17px}
+.login-secure{color:var(--gu-muted);font-size:11px}
+/* Preserve status meaning; semantic colors remain clearly distinct. */
+.badge-success,.gu-visual-status-available{color:#216047}
+.badge-danger,.gu-visual-status-rented{color:#9b2b43}
+.badge-blue,.gu-visual-status-unknown{color:#285988}
+.badge-amber,.gu-visual-status-blocked{color:#80550f}
+/* Mobile-first operational ergonomics, while keeping existing components intact. */
+@media(max-width:1200px){
+  .content{padding:25px 20px 80px}
+  .stats-grid{gap:10px}
+  .panel-heading{padding:17px}
+}
+@media(max-width:850px){
+  .sidebar{transform:translateX(-105%);width:min(86vw,315px);z-index:41}
+  .sidebar.sidebar-open{transform:translateX(0)}
+  .scrim{z-index:40;background:#091d2bb8}
+  .main{margin-left:0;width:100%}
+  .topbar{height:62px;z-index:12;padding:0 17px}
+  .content{padding:20px 15px 95px}
+  .page-intro h1{font-size:27px}
+  .modal-overlay,.gu-capture-overlay{padding:7px}
+  .gu-capture-dialog{max-height:98dvh}
+}
+@media(max-width:620px){
+  body{font-size:13px}
+  .content{padding:17px 11px calc(95px + env(safe-area-inset-bottom,0px))}
+  .page-intro{align-items:flex-start;flex-direction:column;margin-bottom:15px;gap:12px}
+  .page-intro h1{font-size:24px}
+  .page-intro .action-row{width:100%;justify-content:flex-start;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+  .page-intro .action-row .btn{min-height:44px;width:100%;font-size:12px;padding:10px}
+  .page-intro .action-row .btn-dark{order:0}
+  .stats-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+  .metric{min-height:137px;padding:14px}
+  .metric>strong{font-size:clamp(18px,4.5vw,24px)}
+  .metric-name{font-size:11px}
+  .metric-detail{font-size:10px}
+  .panel{border-radius:13px}
+  .panel-heading{padding:15px}
+  .quick-grid{gap:9px;padding:0 12px 14px}
+  .quick-grid button{min-height:102px;padding:12px}
+  .filter-toolbar{display:grid!important;grid-template-columns:1fr!important;gap:9px!important;align-items:stretch!important}
+  .filter-toolbar>*{max-width:100%;min-width:0}
+  th{font-size:10px;padding:10px 11px}
+  td{font-size:11.5px;padding:11px}
+  .modal-overlay,.gu-capture-overlay{padding:0}
+  .modal,.gu-capture-dialog{width:100%;max-width:none;max-height:100dvh;border-radius:16px 16px 0 0;margin-top:auto;border-bottom:0}
+  .modal-heading,.gu-capture-header{padding:16px 17px}
+  .modal-body{padding:16px}
+  .gu-capture-item{margin:8px;padding:11px}
+  .gu-capture-footer{position:sticky;bottom:0;z-index:2;padding:12px max(12px,env(safe-area-inset-right,0px)) calc(12px + env(safe-area-inset-bottom,0px))}
+  .gu-capture-footer .btn-dark{flex:1}
+  .gu-v52-settlement h3{font-size:17px}
+  .gu-quick-money{gap:7px}
+  .gu-quick-money>span{padding:9px}
+  .login-page{grid-template-columns:1fr}
+  .login-art{min-height:175px;padding:23px 22px}
+  .login-art-copy{padding:20px 0 5px}
+  .login-art-copy h1{font-size:24px}
+  .login-pane{padding:18px 15px 40px}
+  .login-box{padding:25px 20px}
+}
+@media(max-width:385px){
+  .page-intro .action-row{grid-template-columns:1fr}
+  .stats-grid{gap:7px}
+  .metric{padding:11px}
+  .metric>strong{font-size:17px}
+}
+@media(prefers-reduced-motion:reduce){
+  html{scroll-behavior:auto}
+  *,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important;scroll-behavior:auto!important}
+}
+@media print{
+  .sidebar,.topbar,.gu-main-bottom-nav,.gu-staff-bottom-nav,.toast,.scrim,.btn,.icon-btn{display:none!important}
+  .main{margin:0!important;width:100%!important}
+  .content{padding:0!important}
+  .panel,.metric{box-shadow:none!important}
+  .gu-v52-deposit-panel img,.gu-capture-dialog img{visibility:hidden!important}
+}

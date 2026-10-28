@@ -1,0 +1,8 @@
+[Unit]
+Description=Daily GU 5.4.6 VPS backup
+[Timer]
+OnCalendar=*-*-* 03:30:00
+Persistent=true
+Unit=gu-v546-backup.service
+[Install]
+WantedBy=timers.target

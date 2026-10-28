@@ -1,0 +1,9 @@
+[Unit]
+Description=Daily GU Fix20 production encrypted offsite backup
+[Timer]
+OnCalendar=*-*-* 03:15:00
+Persistent=true
+RandomizedDelaySec=15min
+Unit=gu-fix20-prod-backup.service
+[Install]
+WantedBy=timers.target

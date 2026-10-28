@@ -1,0 +1,81 @@
+/* GU v5.4.6 — Booking dialog only. No global CSS overrides. */
+.bookingDialog:global(.modal-wide){width:min(780px,calc(100vw - 32px));max-width:780px}
+.bookingDialog :global(.modal-heading){background:#fff;align-items:center;padding:22px 26px 18px;border-bottom:1px solid #e7ebee}
+.bookingDialog :global(.modal-heading) :global(.eyebrow){color:#54738a;letter-spacing:.11em;font-size:10px;margin-bottom:6px}
+.bookingDialog :global(.modal-heading) h2{font-family:Manrope,'DM Sans',sans-serif;font-size:21px;line-height:1.28;font-weight:800;letter-spacing:-.5px;margin:0;color:#1e354b}
+.bookingDialog :global(.modal-heading) :global(.close-btn){width:40px;height:40px;border:1px solid #e4eaf0;border-radius:11px;flex-shrink:0;display:grid;place-items:center}
+.bookingForm:global(.modal-body){padding:20px 26px 25px;display:grid;gap:17px;min-width:0;color:#20354a}
+.section{display:grid;gap:13px;padding:0 0 18px;border-bottom:1px solid #e9edf1;min-width:0}
+.sectionHeading{display:flex;align-items:center;justify-content:space-between;gap:12px;min-width:0}
+.sectionHeading h3{margin:0;font:800 14px/1.4 Manrope,'DM Sans',sans-serif;letter-spacing:-.2px;color:#20354a}
+.quickAction{min-height:34px;display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:7px 11px;border:1px solid #d4e1ed;border-radius:9px;background:#f8fbfe;color:#315a7a;font-weight:750;font-size:11.5px;white-space:nowrap}
+.quickAction:hover{background:#eaf4fc;border-color:#accbe3}
+.quickAction:focus-visible,.productRow:focus-visible{outline:2px solid #4989b0;outline-offset:2px}
+.customerGrid,.dateGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;align-items:start;min-width:0}
+.field{display:grid;gap:7px;min-width:0;align-content:start}
+.field>span{display:block;color:#586b7e;font-size:11.5px;font-weight:700;line-height:1.3}
+.field :global(.input),.searchField :global(.input){width:100%;min-width:0;min-height:44px;padding:10px 12px;font-size:13px;color:#20354a;border-radius:10px;border:1px solid #d7e0e9;background:#fff;box-shadow:0 1px 2px #17304405;transition:border-color .15s,box-shadow .15s}
+.field :global(.input):focus,.searchField :global(.input):focus{outline:none;border-color:#75a8c9;box-shadow:0 0 0 3px #9ac7e92b}
+.field :global(.input)::placeholder,.searchField :global(.input)::placeholder{color:#9baab5}
+.phoneAnchor{min-width:0}
+.phoneAnchor :global(.gu-v11-customer-results){width:100%;box-shadow:0 12px 26px #1b35451c}
+.dateGrid{gap:14px}
+.field :global(.gu-vn-datetime){display:flex;align-items:stretch;gap:0;flex-wrap:nowrap;min-width:0;border:1px solid #d7e0e9;border-radius:10px;background:#fff;overflow:hidden;transition:border-color .15s,box-shadow .15s}
+.field :global(.gu-vn-datetime):focus-within{border-color:#75a8c9;box-shadow:0 0 0 3px #9ac7e92b}
+.field :global(.gu-vn-datetime) > :global(.input){border:0;border-radius:0;box-shadow:none!important;padding-inline:11px;background:transparent}
+.field :global(.gu-vn-datetime) > :global(.input):focus{border:0;box-shadow:none!important}
+.field :global(.gu-vn-datetime) > :global(.input:first-child){flex:1.55 1 0;min-width:0}
+.field :global(.gu-vn-datetime) > :global(.input:nth-child(2)){flex:1 1 0;min-width:0;text-align:center;border-left:1px solid #e7ecf1;font-variant-numeric:tabular-nums}
+.field :global(.gu-vn-datetime) > button{flex:0 0 42px;width:42px;height:44px;min-height:44px;padding:0;display:flex;align-items:center;justify-content:center;color:#3c6480;background:#f1f6fa;border:0;border-left:1px solid #e7ecf1;border-radius:0;font-size:16px;box-shadow:none}
+.field :global(.gu-vn-datetime) > button:hover{background:#e5f1fa}
+.count{font-size:11px;color:#416b84;background:#edf5fb;border-radius:99px;padding:5px 10px;white-space:nowrap;font-weight:750}
+.searchField{display:block;min-width:0}
+.searchField :global(.input){min-height:44px;padding-left:14px;background:#fafbfd}
+.srOnly{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+.productList:global(.gu-v5-product-select){margin:0;max-height:280px;overflow-y:auto;overscroll-behavior:contain;display:grid;gap:7px;padding:2px 3px 3px 0}
+.productRow:global(.gu-v5-product){width:100%;min-height:66px;display:flex;gap:11px;align-items:center;text-align:left;padding:7px 11px;border:1px solid #e0e8ef;border-radius:11px;color:#20354a;background:#fff;box-shadow:none;transition:background .15s,border-color .15s}
+.productRow:global(.gu-v5-product):hover{background:#f8fbfd;border-color:#a6c0d4}
+.productRow:global(.gu-v5-product) :global(.product-photo),.productRow:global(.gu-v5-product) img{width:49px;height:49px;object-fit:contain;flex:0 0 49px;border-radius:8px;background:#f4f6f8}
+.productRow:global(.gu-v5-product) span{display:grid;gap:3px;min-width:0;flex:1}
+.productRow:global(.gu-v5-product) b{color:#233b51;font-size:12.5px;line-height:1.4}
+.productRow:global(.gu-v5-product) small{font-size:11px;line-height:1.35;color:#7b8b9b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.productRow:global(.gu-v5-product) strong{font-size:11px;min-width:69px;text-align:right;color:#59758a}
+.chosen:global(.gu-v5-product){border-color:#82c0ac;background:#eff9f4}
+.chosen:global(.gu-v5-product) strong{color:#1d765a}
+.empty{margin:0;padding:16px 10px;text-align:center;font-size:12px;color:#718294;background:#f8fafc;border-radius:10px}
+.packagePanel:global(.gu-camera-package-panel){margin:0;padding:14px 16px;border:1px solid #d9e6ef;border-radius:12px;background:#f9fcff}
+.summary:global(.booking-total){margin:0;padding:15px 18px;border:1px solid #e3eaf0;border-radius:12px;background:#f5f8fb;gap:10px}
+.summary:global(.booking-total) b{font-size:12px;color:#53677c}
+.summary:global(.booking-total)>strong{font-size:19px;color:#1e354b;white-space:nowrap}
+.prepay:global(.gu-v52-prepay){margin:0;gap:10px;border-radius:12px}
+.prepay:global(.gu-v52-prepay) :global(.booking-total){margin:0;padding:10px 12px}
+.noteField{margin:0}
+.actions:global(.modal-actions){margin:1px 0 0;padding:15px 0 1px;display:flex;gap:10px;justify-content:flex-end}
+.actions:global(.modal-actions) :global(.btn){min-height:44px}
+.actions:global(.modal-actions) :global(.btn-dark){min-width:185px;background:#1d3650}
+.actions:global(.modal-actions) :global(.btn-dark):hover{background:#294c6c}
+@media(max-width:680px){
+ .bookingDialog:global(.modal-wide){width:100%;max-width:100%;max-height:calc(100dvh - env(safe-area-inset-top));border-radius:20px 20px 0 0}
+ .bookingDialog :global(.modal-heading){padding:17px 18px 15px;gap:12px}
+ .bookingDialog :global(.modal-heading) h2{font-size:18px}
+ .bookingForm:global(.modal-body){padding:17px 17px calc(20px + env(safe-area-inset-bottom));gap:16px}
+ .section{gap:12px;padding-bottom:16px}
+ .customerGrid,.dateGrid{grid-template-columns:minmax(0,1fr);gap:13px}
+ .field :global(.input),.searchField :global(.input){min-height:46px;font-size:16px}
+ .field :global(.gu-vn-datetime){gap:0;flex-wrap:nowrap}
+ .field :global(.gu-vn-datetime) > button{height:46px;min-height:46px}
+ .productList:global(.gu-v5-product-select){max-height:245px}
+ .actions:global(.modal-actions){bottom:0;padding:12px 0 calc(10px + env(safe-area-inset-bottom));gap:9px}
+ .actions:global(.modal-actions) :global(.btn){min-width:0;font-size:12px;flex:1}
+ .actions:global(.modal-actions) :global(.btn-dark){flex:1.5}
+}
+@media(max-width:360px){
+ .bookingForm:global(.modal-body){padding-inline:12px}
+ .field :global(.gu-vn-datetime) > button{flex-basis:38px;width:38px}
+ .field :global(.gu-vn-datetime) > :global(.input:first-child){flex:1.35 1 0}
+ .field :global(.gu-vn-datetime) > :global(.input:nth-child(2)){flex:.9 1 0;padding-inline:5px}
+ .quickAction{padding:7px;font-size:11px}
+ .summary:global(.booking-total){padding:12px}
+ .summary:global(.booking-total)>strong{font-size:16px}
+}
+@media(prefers-reduced-motion:reduce){.productRow,.field :global(.input){transition:none}}

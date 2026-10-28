@@ -1,0 +1,18 @@
+[Unit]
+Description=GU V5.4.6 production PostgreSQL (candidate)
+After=network-online.target postgresql.service
+Wants=network-online.target
+[Service]
+Type=simple
+User=guapp
+Group=guapp
+WorkingDirectory=/var/www/gu-v546-prod-deploy/current
+Environment=NODE_ENV=production
+ExecStart=/usr/bin/npm run start -- -H 127.0.0.1 -p 3302
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+UMask=0027
+[Install]
+WantedBy=multi-user.target

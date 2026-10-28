@@ -1,0 +1,11 @@
+[Unit]
+Description=GU V5 production photo retention cleanup (PostgreSQL and local VPS storage)
+After=network-online.target gu-v546-prod.service
+[Service]
+Type=oneshot
+User=guapp
+WorkingDirectory=/var/www/gu-v546-prod-deploy/current
+EnvironmentFile=/etc/gu-v546/prod.env
+Environment=PORT=3302
+ExecStart=/usr/bin/node scripts/run-cleanup.mjs
+NoNewPrivileges=true

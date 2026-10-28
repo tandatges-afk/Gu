@@ -1,0 +1,8 @@
+[Unit]
+Description=GU 5.4.6 VPS evidence cleanup daily
+[Timer]
+OnCalendar=*-*-* 03:45:00
+Persistent=true
+Unit=gu-v546-cleanup.service
+[Install]
+WantedBy=timers.target

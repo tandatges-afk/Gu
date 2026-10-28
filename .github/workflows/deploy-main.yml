@@ -1,88 +1,104 @@
-name: GU main - Check and deploy VPS
-
+name: GU Fix20 — Validate / Stage / Controlled Production
 on:
-  workflow_dispatch:
   push:
     branches: [main]
-
+  workflow_dispatch:
+    inputs:
+      target:
+        description: 'Where to deploy after checks (stage safe, prod requires cutover approval)'
+        required: true
+        type: choice
+        default: stage
+        options: [stage, prod]
 permissions:
   contents: read
-
 concurrency:
-  group: gu-main-production
+  group: gu-v5-main
   cancel-in-progress: false
-
 jobs:
   validate:
+    name: Validate GU 5.4.6 Fix20 source
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     steps:
-      - name: Checkout main
-        uses: actions/checkout@v4
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: '22'
           cache: npm
-      - name: Verify PostgreSQL application and package lock
-        shell: bash
+      - name: Validate correct version, lockfile and infrastructure
         run: |
           set -euo pipefail
-          test -f package-lock.json
-          test -f db/003_v2.sql
+          test -s package-lock.json
+          test -f src/lib/pg-firestore.ts
           test -f src/app/api/version/route.ts
-          node -e 'const p=require("./package.json"); if(!/^6\./.test(p.version)) {console.error("Not GU PostgreSQL 6.x"); process.exit(1)}'
-      - name: Install and test
+          test -f scripts/check-staging-env.mjs
+          node -e 'const p=require("./package.json"); if (p.version !== "5.4.6-fix20.0") process.exit(1)'
+      - name: CI tests and build
         run: |
-          npm ci
+          npm ci --no-audit --no-fund
+          npm run verify:imports
           npm run typecheck
           npm test
+          npm run build
         env:
           CI: 'true'
-
-  deploy:
+          NEXT_TELEMETRY_DISABLED: '1'
+  stage:
+    name: Deploy isolated staging :3301
     needs: validate
-    # Manual deploy must succeed before enabling push-based deploys.
-    # Repository variable GU_PRODUCTION_DEPLOY=enabled enables production deploys on push.
-    if: github.event_name == 'workflow_dispatch' || vars.GU_PRODUCTION_DEPLOY == 'enabled'
+    if: github.event_name == 'workflow_dispatch' && inputs.target == 'stage'
     runs-on: ubuntu-latest
-    timeout-minutes: 45
-    environment: production
+    timeout-minutes: 60
+    environment: gu-v5-staging
     steps:
       - uses: actions/checkout@v4
-      - name: Setup SSH securely
+      - name: SSH and release to staging
         shell: bash
         env:
           SSH_PRIVATE_KEY: ${{ secrets.GU_DEPLOY_SSH_KEY }}
           SSH_KNOWN_HOSTS: ${{ secrets.GU_SSH_KNOWN_HOSTS }}
         run: |
           set -euo pipefail
-          test -n "$SSH_PRIVATE_KEY"
-          test -n "$SSH_KNOWN_HOSTS"
+          test -n "$SSH_PRIVATE_KEY" && test -n "$SSH_KNOWN_HOSTS"
           install -d -m 700 "$HOME/.ssh"
           printf '%s\n' "$SSH_PRIVATE_KEY" > "$HOME/.ssh/id_ed25519"
-          chmod 600 "$HOME/.ssh/id_ed25519"
           printf '%s\n' "$SSH_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
-          chmod 600 "$HOME/.ssh/known_hosts"
-      - name: Stage, build, deploy and verify commit
+          chmod 600 "$HOME/.ssh/id_ed25519" "$HOME/.ssh/known_hosts"
+          id="${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          opts="-i $HOME/.ssh/id_ed25519 -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=yes"
+          printf '%s\n' "$GITHUB_SHA" > .gu-deploy-commit
+          host=gu-deploy@103.176.25.226
+          ssh $opts "$host" "mkdir -p /home/gu-deploy/v5-incoming/stage/$id"
+          rsync -az --delete --exclude='.git/' --exclude='.github/' --exclude='.env*' --exclude='node_modules/' --exclude='.next/' \
+            -e "ssh $opts" ./ "$host:/home/gu-deploy/v5-incoming/stage/$id/"
+          ssh $opts "$host" "sudo -n /usr/local/sbin/gu-v5-release stage $id"
+  production:
+    name: Deploy production :3302 (only after approval)
+    needs: validate
+    if: github.event_name == 'workflow_dispatch' && inputs.target == 'prod' && vars.GU_V5_PRODUCTION_DEPLOY == 'enabled'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    environment: gu-v5-production
+    steps:
+      - uses: actions/checkout@v4
+      - name: SSH and release to production
         shell: bash
         env:
-          VPS_HOST: '103.176.25.226'
+          SSH_PRIVATE_KEY: ${{ secrets.GU_DEPLOY_SSH_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.GU_SSH_KNOWN_HOSTS }}
         run: |
           set -euo pipefail
-          RELEASE_ID="${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
-          REMOTE="gu-deploy@${VPS_HOST}"
-          SSH_ARGS="-i $HOME/.ssh/id_ed25519 -o BatchMode=yes -o StrictHostKeyChecking=yes"
-          printf '%s\n' "${GITHUB_SHA}" > .gu-deploy-commit
-          ssh $SSH_ARGS "$REMOTE" "mkdir -p /home/gu-deploy/incoming/$RELEASE_ID"
-          rsync -az --delete \
-            -e "ssh $SSH_ARGS" \
-            --exclude='.git/' \
-            --exclude='.github/' \
-            --exclude='.env*' \
-            --exclude='.next/' \
-            --exclude='node_modules/' \
-            --exclude='*.tsbuildinfo' \
-            ./ "$REMOTE:/home/gu-deploy/incoming/$RELEASE_ID/"
-          ssh $SSH_ARGS "$REMOTE" "sudo -n /usr/local/sbin/gu-release-deploy $RELEASE_ID"
-          echo "DEPLOYED MAIN COMMIT: $GITHUB_SHA"
+          test -n "$SSH_PRIVATE_KEY" && test -n "$SSH_KNOWN_HOSTS"
+          install -d -m 700 "$HOME/.ssh"
+          printf '%s\n' "$SSH_PRIVATE_KEY" > "$HOME/.ssh/id_ed25519"
+          printf '%s\n' "$SSH_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+          chmod 600 "$HOME/.ssh/id_ed25519" "$HOME/.ssh/known_hosts"
+          id="${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          opts="-i $HOME/.ssh/id_ed25519 -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=yes"
+          printf '%s\n' "$GITHUB_SHA" > .gu-deploy-commit
+          host=gu-deploy@103.176.25.226
+          ssh $opts "$host" "mkdir -p /home/gu-deploy/v5-incoming/prod/$id"
+          rsync -az --delete --exclude='.git/' --exclude='.github/' --exclude='.env*' --exclude='node_modules/' --exclude='.next/' \
+            -e "ssh $opts" ./ "$host:/home/gu-deploy/v5-incoming/prod/$id/"
+          ssh $opts "$host" "sudo -n /usr/local/sbin/gu-v5-release prod $id"

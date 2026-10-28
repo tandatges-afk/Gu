@@ -1,35 +1,54 @@
 {
-  "name": "gu-vps-postgresql",
-  "version": "6.1.0-rc.1",
+  "name": "gu-thue-do-xinh-vps",
+  "version": "5.4.6-fix20.0",
   "private": true,
   "type": "module",
-  "engines": {
-    "node": ">=22 <23"
-  },
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "node scripts/gu-fix20-source-guard.mjs --check && node scripts/check-local-imports.mjs && node scripts/check-client-directives.mjs && node scripts/check-lucide-icons.mjs && next build",
     "start": "next start",
     "typecheck": "tsc --noEmit",
-    "test": "node --experimental-strip-types --test tests/*.test.ts",
-    "db:migrate": "node --env-file=.env.local scripts/migrate.mjs",
-    "db:check": "node --env-file=.env.local scripts/check-db.mjs",
-    "admin:create": "node --env-file=.env.local scripts/create-admin.mjs",
-    "db:smoke": "node --env-file=.env.local scripts/pg-smoke-test.mjs"
+    "test": "node scripts/test-vps.mjs",
+    "verify:release": "node scripts/gu-fix20-source-guard.mjs --check && node scripts/verify-release-vps.mjs && node scripts/check-local-imports.mjs && node scripts/check-client-directives.mjs",
+    "verify:imports": "node scripts/check-local-imports.mjs && node scripts/check-client-directives.mjs",
+    "verify:client": "node scripts/check-client-directives.mjs",
+    "verify:icons": "node scripts/check-lucide-icons.mjs",
+    "db:init": "node --env-file=.env.local scripts/bootstrap-postgresql.mjs --init",
+    "db:admin": "node --env-file=.env.local scripts/bootstrap-postgresql.mjs --admin",
+    "db:check": "node --env-file=.env.local scripts/bootstrap-postgresql.mjs --check",
+    "data:import-json": "node --env-file=.env.local scripts/import-firestore-json.mjs",
+    "test:vps": "node --experimental-strip-types --test tests/vps-port.test.ts tests/vps-performance.test.ts",
+    "test:legacy-all": "node --experimental-strip-types --test tests/*.test.ts",
+    "db:optimize": "node --env-file=.env.local scripts/optimize-postgresql.mjs",
+    "test:performance": "node --experimental-strip-types --test tests/vps-performance.test.ts",
+    "db:bench": "node --env-file=.env.local scripts/benchmark-postgresql.mjs",
+    "verify:legacy": "node scripts/verify-release.mjs",
+    "stage:check": "node --env-file=.env.local scripts/check-staging-env.mjs",
+    "prod:check": "node --env-file=.env.local scripts/check-production-env.mjs",
+    "db:preflight": "node --env-file=.env.local scripts/gu-fix20-preflight.mjs",
+    "db:audit:read-only": "node --env-file=.env.local scripts/gu-fix20-audit.mjs",
+    "test:fix20": "node --experimental-strip-types --test tests/fix20-safety.test.ts",
+    "photos:gc:dry-run": "node --env-file=.env.local scripts/gu-fix20-product-photo-gc.mjs",
+    "test:concurrency:stage": "node --env-file=.env.local scripts/gu-fix20-concurrency-stage.mjs",
+    "verify:versions": "node scripts/gu-fix20-versions.mjs",
+    "source:check": "node scripts/gu-fix20-source-guard.mjs --check",
+    "source:prune": "node scripts/gu-fix20-source-guard.mjs --prune"
   },
   "dependencies": {
-    "next": "16.4.3",
-    "react": "19.2.0",
-    "react-dom": "19.2.0",
-    "pg": "^8.16.3",
-    "argon2": "^0.44.0",
-    "lucide-react": "^0.468.0"
+    "lucide-react": "^0.468.0",
+    "next": "^16.0.0",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "pg": "^8.13.3"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
-    "@types/pg": "^8.15.0",
-    "typescript": "^5.8.0"
+    "typescript": "^5.8.0",
+    "@types/pg": "^8.11.11"
+  },
+  "engines": {
+    "node": "22.x"
   }
 }

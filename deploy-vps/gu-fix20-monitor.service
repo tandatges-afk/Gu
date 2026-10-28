@@ -1,0 +1,8 @@
+[Unit]
+Description=GU Fix20 production safety monitor
+After=network-online.target
+[Service]
+Type=oneshot
+User=root
+ExecStart=/usr/local/sbin/gu-fix20-monitor
+NoNewPrivileges=true
