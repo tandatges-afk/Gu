@@ -1,5 +1,5 @@
 c3bc2e7d4931b128b792c05049afd2391ddd4de6be34ffa68990bddfc65e36ec  .gitattributes
-62234518035b1cf0d9dc3fbe8d092485ce2486a28da822cfae368ae385539e6c  .github/workflows/deploy-main.yml
+5d91be1872d499b63d2d164d24b8bd2c2d9e7b53a8e5fa9de26e5e85172e5a81  .github/workflows/deploy-main.yml
 9b064282d853044db4bbaa0fc7c26e9a59fede825a2012096dbff7fa83b503eb  .gitignore
 bd1ac7088fa7b952f3eef9e6f64315be92067434a3b991b51e66ef97badba97b  00-BAT-DAU-REV6.md
 fd01aff3ef797e42dcb18e479c8ea90ef72a6835641bebed9abb52051dd1fb66  00-DOC-TRUOC-KHI-CAP-NHAT.md

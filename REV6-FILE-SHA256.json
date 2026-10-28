@@ -4,7 +4,7 @@
   "source": "Fix17 origin/main a076693 + user-exported Fix20 GitHub review",
   "files": {
     ".gitattributes": "c3bc2e7d4931b128b792c05049afd2391ddd4de6be34ffa68990bddfc65e36ec",
-    ".github/workflows/deploy-main.yml": "62234518035b1cf0d9dc3fbe8d092485ce2486a28da822cfae368ae385539e6c",
+    ".github/workflows/deploy-main.yml": "5d91be1872d499b63d2d164d24b8bd2c2d9e7b53a8e5fa9de26e5e85172e5a81",
     ".gitignore": "9b064282d853044db4bbaa0fc7c26e9a59fede825a2012096dbff7fa83b503eb",
     "00-BAT-DAU-REV6.md": "bd1ac7088fa7b952f3eef9e6f64315be92067434a3b991b51e66ef97badba97b",
     "00-DOC-TRUOC-KHI-CAP-NHAT.md": "fd01aff3ef797e42dcb18e479c8ea90ef72a6835641bebed9abb52051dd1fb66",
@@ -25,7 +25,7 @@
     "README-v4.1.2.md": "fef2502f0db92539b713392b88afc46cb7910c3bdaf7a46488b570a5f0f2a510",
     "README.md": "31c0725fa905c693bf959618d274cde70512e62c5106dcd44e1e4206393c4095",
     "RELEASE-STATUS.md": "0866ff3852efe11b93783d2980ac7c2c91aff40e8d0bbffdad1ee270b6749078",
-    "SOURCE-SHA256SUMS.txt": "908bf9ecebae246d2a863b87044a53c2e19a316c3b922a909329443a6c628d04",
+    "SOURCE-SHA256SUMS.txt": "ec8783f0bec4850906b1db40259508efbb93d2f9dd4ee6bfd84dda83ebd61259",
     "deploy-vps/README-STAGING-VI.md": "79e4735d9e6e73f0a63268b02f7545b085c38fe6fcd458dd5b69488814b9beeb",
     "deploy-vps/backup-prod.env.example": "9f817589391fbd912c8748662622e141af56dd22244f55a234853e84f19ed5bc",
     "deploy-vps/gu-fix20-encrypted-offsite-backup.sh": "967926bf27f69aebf59614f766c0c19b3935ae1816b6f5348b04e9ce5e529fc0",
