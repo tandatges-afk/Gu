@@ -105,7 +105,9 @@ export async function cleanupAbandonedSecureEvidence(limit=25):Promise<{deleted:
    // so this cannot race with a customer pressing Create Order.
    const claim=await store.runTransaction(async tx=>{
     const fresh=await tx.get(doc.ref);
-    if(!fresh.exists||fresh.data()?.consumedOrderId!==null)return false;
+    // Recheck both ownership and age inside the same transaction. A stale
+    // list result must never be enough to authorize destructive cleanup.
+    if(!fresh.exists||fresh.data()?.consumedOrderId!==null||!orphanOldEnough(fresh.data()?.createdAt))return false;
     tx.update(doc.ref,{cleanupState:'DELETING'});
     return true;
    });
@@ -119,16 +121,31 @@ export async function cleanupAbandonedSecureEvidence(limit=25):Promise<{deleted:
  await cursorRef.set({cursor:queue.size<100?'':queue.docs.at(-1)?.id||'',updatedAt:new Date().toISOString()},{merge:true});
  return {deleted,failed};
 }
-export async function runSensitiveEvidenceCleanup(limit=8):Promise<{done:number;failed:number;orphanDeleted:number;errors:string[]}>{
+export async function runSensitiveEvidenceCleanup(limit=8):Promise<{done:number;failed:number;deferred:number;orphanDeleted:number;errors:string[]}>{
  const queue=await db().collection(SENSITIVE_CLEANUP_COLLECTION).orderBy('createdAt','asc').limit(Math.max(1,Math.min(limit,20))).get();
  let done=0,failed=0;const errors:string[]=[];
+ let deferred=0;
  for(const j of queue.docs){
-  try{if(await cleanupSensitiveOrder(j.id)==='deleted')done++;}
+  try{
+   // Jobs are queued immediately on RETURN / COLLATERAL_SETTLED, but the
+   // evidence must be kept for 5 days. Waiting is not a failed deletion:
+   // do not increment attempts or report a false cleanup error each hour.
+   const order=await db().collection('orders').doc(j.id).get();
+   if(order.exists&&!cleanupAllowed(order.data()||{})){
+    deferred++;
+    // Rotate deferred jobs behind others, including jobs eligible for deletion.
+    // This also prevents a permanently unreturned collateral from blocking
+    // all newer cleanup jobs at the front of a small ordered queue.
+    await j.ref.update({createdAt:new Date().toISOString()});
+    continue;
+   }
+   if(await cleanupSensitiveOrder(j.id)==='deleted')done++;
+  }
   catch(error){failed++;errors.push(j.id+': '+(error instanceof Error?error.message:'Lỗi'));
-   // Rotate failures so one unavailable legacy bucket does not block other orders.
+   // Rotate real failures so one unavailable legacy bucket does not block other orders.
    await j.ref.update({createdAt:new Date().toISOString(),attempts:FieldValue.increment(1)}).catch(()=>{});
   }
  }
  const abandoned=await cleanupAbandonedSecureEvidence(15).catch(error=>{errors.push('Ảnh chưa gắn đơn: '+(error instanceof Error?error.message:'Lỗi'));return {deleted:0,failed:1};});
- return {done,failed:failed+abandoned.failed,orphanDeleted:abandoned.deleted,errors};
+ return {done,failed:failed+abandoned.failed,deferred,orphanDeleted:abandoned.deleted,errors};
 }
