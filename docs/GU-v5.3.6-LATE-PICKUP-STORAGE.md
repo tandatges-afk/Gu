@@ -5,7 +5,7 @@
 - Bắt đầu cảnh báo khi **giờ hẹn nhận thực tế đã trôi qua** và đơn vẫn `RESERVED` (Chờ bàn giao), không tự chuyển trạng thái, tính tiền hoặc hủy lịch.
 - So sánh thời điểm ISO `scheduledPickupAt` (ưu tiên) / `pickupAt` với thời gian hiện tại; giao diện hiển thị `HH:MM DD/MM/YYYY`, theo giờ Việt Nam.
 - Đơn cũ chỉ lưu ngày không có giờ: chỉ cảnh báo khi **ngày hẹn đã qua**, tuyệt đối không tự mặc định 00:00.
-- Kiểm tra bằng API đã xác thực `GET /api/v5/return-risk` cho toàn bộ các đơn `RESERVED` (không chỉ 80 đơn gần nhất), refresh khoảng 60 giây khi trang mở; thông báo xanh dương phân biệt cảnh báo trả trễ màu đỏ và rủi ro 17h màu tím.
+- Kiểm tra bằng API đã xác thực `GET /api/v5/return-risk` cho toàn bộ các đơn `RESERVED` (không chỉ 80 đơn gần nhất), refresh khoảng 60 giây khi trang mở; thông báo xanh dương phân biệt cảnh báo trả trễ màu đỏ và rủi ro 20h màu tím.
 - Nhấn mã đơn trong banner để lọc đơn trong trang **Đơn thuê**; có nút X để tạm ẩn danh sách cảnh báo hiện tại. Khi danh sách thay đổi, banner hiện lại. Admin/nhân viên có thể liên hệ khách và làm thủ tục giao hàng qua nghiệp vụ có sẵn.
 - Nếu quá 5.000 đơn đang đặt trước, API trả lỗi 503, không âm thầm báo thiếu; quy mô lớn cần backend job/counter chuyên dụng.
 - Đây là cảnh báo **trong giao diện đang mở**, không phải SMS/Zalo/push tự động đến thiết bị đã đóng website.

@@ -21,7 +21,7 @@ test('Rows form adjacent status groups for the first displayed day and REGROUP w
  assert.notDeepEqual(todayOrder,tomorrowOrder);
  assert.deepEqual(rows.map(i=>i.id),['free','picked-a','reserved','picked-b'],'Do not mutate inventory input');
 });
-test('Late and 17h warning take precedence over active pickups; laundry is not a free slot',()=>{
+test('Late and 20h warning take precedence over active pickups; laundry is not a free slot',()=>{
  const rows=[item('free'),item('laundry','LAUNDRY'),item('warning'),item('late'),item('picked'),item('reserved')];
  const orders=[order('warning','PICKED_UP',day1,day2),order('late','PICKED_UP','2026-10-17','2026-10-19'),order('picked','PICKED_UP',day1,day2),order('reserved','RESERVED',day1,day2)];
  const sorted=sortCalendarProductsForDay(rows,day1,orders,day1,new Set(['warning'])).map(i=>i.id);

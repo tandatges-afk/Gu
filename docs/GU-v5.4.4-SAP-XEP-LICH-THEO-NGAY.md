@@ -6,7 +6,7 @@
 - Tiêu đề ngày và các ô lịch dùng cùng kích thước lưới, viền một nét giống nhau; bỏ các đường viền giả bằng `box-shadow` gây lệch 2–4px.
 - Ô ngày còn trống chỉ còn dấu **+**. Khi hover hoặc dùng trình đọc màn hình vẫn có mô tả và thao tác đặt thuê, không bỏ kiểm tra khóa lịch máy chủ.
 - Toàn bộ sản phẩm đang hiển thị được **phân nhóm trạng thái theo ngày đầu của khoảng 7 ngày**. Bấm tiến/lùi ngày sẽ tự nhóm lại; không dùng trạng thái ngày cũ hoặc trạng thái tổng tuần.
-- Thứ tự nhóm: **Trả trễ → Cảnh báo 17h → Đã lấy → Đã giữ → Chưa sẵn sàng → Còn trống → Ngày quá khứ**. Trong cùng một nhóm, sắp tên tiếng Việt rồi mã sản phẩm để thứ tự ổn định.
+- Thứ tự nhóm: **Trả trễ → Cảnh báo 20h → Đã lấy → Đã giữ → Chưa sẵn sàng → Còn trống → Ngày quá khứ**. Trong cùng một nhóm, sắp tên tiếng Việt rồi mã sản phẩm để thứ tự ổn định.
 - Nếu một món có nhiều lượt thuê máy ảnh trong cùng ngày, ưu tiên biểu diễn lượt đang giao trước lượt đặt trước; click vẫn cho phép chọn lượt thuê.
 - Desktop và mobile dùng chung `calendarSlotState` và `sortCalendarProductsForDay`; không thay đổi thời gian thuê, khóa lịch, Firebase, giá hoặc chứng từ.
 

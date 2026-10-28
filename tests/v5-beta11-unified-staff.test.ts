@@ -25,15 +25,15 @@ test('phone matches existing customer results and offers explicit selection',()=
  assert.match(booking,/customers\?phone=/);assert.match(booking,/onClick=\{\(\)=>\{setCustomerId\(c\.id\)/);
  assert.match(booking,/gu-v11-customer-result/);
 });
-test('risk only after 17h VN when product held and another rental starts tomorrow',()=>{
+test('risk starts at 20h VN when product held and another rental starts tomorrow',()=>{
  const held=mockOrder('h','PICKED_UP','2026-10-19','2026-10-19','item-1');
  const booked=mockOrder('b','RESERVED','2026-10-20','2026-10-20','item-1');
  const date=(hour:number)=>new Date(`2026-10-19T${String(hour-7).padStart(2,'0')}:00:00Z`);
- assert.deepEqual(tomorrowReturnRisk([held,booked],date(16)),[]);
- assert.deepEqual(tomorrowReturnRisk([held,booked],date(17)),[{itemId:'item-1',heldOrderId:'h',nextOrderId:'b'}]);
- assert.deepEqual(tomorrowReturnRisk([{...held,returnDate:'2026-10-22'},booked],date(17)),[{itemId:'item-1',heldOrderId:'h',nextOrderId:'b'}]);
- assert.deepEqual(tomorrowReturnRisk([held,{...booked,lines:booked.lines.map(l=>({...l,itemId:'other'}))}],date(18)),[]);
- assert.equal(vnClock(date(17)).hour,17);assert.equal(nextDay('2026-10-31'),'2026-11-01');
+ assert.deepEqual(tomorrowReturnRisk([held,booked],date(19)),[]);
+ assert.deepEqual(tomorrowReturnRisk([held,booked],date(20)),[{itemId:'item-1',heldOrderId:'h',nextOrderId:'b'}]);
+ assert.deepEqual(tomorrowReturnRisk([{...held,returnDate:'2026-10-22'},booked],date(20)),[{itemId:'item-1',heldOrderId:'h',nextOrderId:'b'}]);
+ assert.deepEqual(tomorrowReturnRisk([held,{...booked,lines:booked.lines.map(l=>({...l,itemId:'other'}))}],date(21)),[]);
+ assert.equal(vnClock(date(20)).hour,20);assert.equal(nextDay('2026-10-31'),'2026-11-01');
 });
 test('single responsive staff UI and capture; no separate mobile webpage',()=>{
  assert.equal(existsSync('src/app/mobile/page.tsx'),false);

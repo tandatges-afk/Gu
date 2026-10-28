@@ -6,7 +6,7 @@ Chỉ đổi thuật toán **hiển thị thứ tự các dòng** trên Lịch c
 
 ## Quy tắc ưu tiên
 
-1. Xác định trạng thái cho **ngày đầu tiên của khoảng lịch đang xem** và giữ thứ tự ưu tiên có sẵn: **Trả trễ → Cảnh báo 17h → Đã lấy → Đã giữ → Chưa sẵn sàng → Còn trống** (ngày đã qua xử lý riêng).
+1. Xác định trạng thái cho **ngày đầu tiên của khoảng lịch đang xem** và giữ thứ tự ưu tiên có sẵn: **Trả trễ → Cảnh báo 20h → Đã lấy → Đã giữ → Chưa sẵn sàng → Còn trống** (ngày đã qua xử lý riêng).
 2. **Trong cùng trạng thái**, các sản phẩm của cùng một khách được xếp liền nhau; dùng `customerId` (dự phòng số điện thoại đã chuẩn hóa), **không ghép theo tên người**.
 3. Khi một sản phẩm **trống vào ngày đầu** nhưng có đặt trước sau đó, sử dụng **đơn hợp lệ gần nhất trong 7 ngày đang xem** để xác định khách cần gom.
 4. Sắp xếp các cụm theo **tổng số ô ngày có đơn** trong 7 ngày, nhiều hơn lên trước; trong cụm cũng ưu tiên món có nhiều ngày có đơn hơn. Nếu bằng nhau, xét số đơn khác nhau rồi ngày phát sinh lịch đầu tiên và tên/mã sản phẩm.

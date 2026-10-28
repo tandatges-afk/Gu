@@ -8,7 +8,7 @@
 4. Tìm tên sản phẩm không dấu/chữ hoa hoặc theo chữ bất kỳ bên trong tên (`ao`, `áo`, `xanh` đều tìm được `Áo dài xanh lá`). Gõ ít nhất 2 ký tự, không cần nhập đúng đầu tên.
 5. Tạo đơn. Form chụp ảnh mở ngay trong website: nếu **đang bàn giao thực tế**, chụp đầy đủ từng góc do Admin thiết lập, xác nhận giao; nếu khách đặt cho ngày tương lai, bấm **Để sau**, chụp khi khách đến lấy để không làm lệch giờ tính tiền thuê.
 6. Khách trả đồ: Mở đơn → **Chụp ảnh nhận trả** → chụp ảnh từng góc, chọn tình trạng và gửi Admin duyệt. Ảnh giao/nhận vẫn được phân quyền và kiểm tra URL trên server. Admin duyệt tình trạng vật lý, quyết toán, công nợ như trước.
-7. **17:00 giờ Việt Nam** trở đi, các đơn chưa trả có sản phẩm đã được đặt cho ngày mai được đánh dấu màu cam tại danh sách đơn/lịch và hiện cảnh báo. Kiểm tra, liên hệ khách và chuẩn bị đồ thay thế. Cảnh báo là phát hiện rủi ro, không tự hủy đơn hay tính phí.
+7. **20:00 giờ Việt Nam** trở đi, các đơn chưa trả có sản phẩm đã được đặt cho ngày mai được đánh dấu màu cam tại danh sách đơn/lịch và hiện cảnh báo. Kiểm tra, liên hệ khách và chuẩn bị đồ thay thế. Cảnh báo là phát hiện rủi ro, không tự hủy đơn hay tính phí.
 
 ## Dữ liệu cũ và triển khai
 

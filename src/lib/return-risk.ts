@@ -1,5 +1,8 @@
 import type {RentalOrder} from './types';
-/** Local VN policy: after 17:00, highlight items still with a customer and booked tomorrow.
+
+/** 20:00 Vietnam time; shared by API, dashboard and calendar risk detection. */
+export const NEXT_DAY_RISK_START_HOUR_VN=20;
+/** Local VN policy: from 20:00, highlight items still with a customer and booked tomorrow.
  * Business data must be queried from server (not just the most recent dashboard page).
  */
 export function vnClock(now:Date){const fmt=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Ho_Chi_Minh',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',hourCycle:'h23'});
@@ -7,7 +10,7 @@ export function vnClock(now:Date){const fmt=new Intl.DateTimeFormat('en-CA',{tim
 }
 export function nextDay(date:string){const d=new Date(date+'T00:00:00Z');d.setUTCDate(d.getUTCDate()+1);return d.toISOString().slice(0,10);}
 export function tomorrowReturnRisk(orders:RentalOrder[],now:Date):{itemId:string;heldOrderId:string;nextOrderId:string}[]{
- const {today,hour}=vnClock(now);if(hour<17)return [];
+ const {today,hour}=vnClock(now);if(hour<NEXT_DAY_RISK_START_HOUR_VN)return [];
  const tomorrow=nextDay(today);
  const held=orders.filter(o=>o.status==='PICKED_UP');
  const next=orders.filter(o=>o.status==='RESERVED'&&o.pickupDate===tomorrow);

@@ -133,7 +133,7 @@ checks.push(['tiền phân cách hàng nghìn', /formatVndInput/, 'src/component
 checks.push(['giá thuê dùng tiền định dạng', /GuMoneyInput required/, 'src/app/page.tsx']);
 checks.push(['không có trang /mobile', /GuOrderCapture/, 'src/app/page.tsx']);
 checks.push(['tìm tên ở giữa từ không dấu', /nameSearchBigrams/, 'src/app/api/catalog/route.ts']);
-checks.push(['cảnh báo sau 17 giờ', /vnClock/, 'src/lib/return-risk.ts']);
+checks.push(['cảnh báo từ 20 giờ', /vnClock/, 'src/lib/return-risk.ts']);
 checks.push(['chỉ giữ Cloudinary trong giám sát Admin', /cloudinaryReport/, 'src/app/api/system/route.ts']);
 checks.push(['nút cập nhật bỏ cache', /system\?refresh=1/, 'src/components/GuSystem.tsx']);
 checks.push(['giá thuê theo 24h', /billableBlocks/, 'src/lib/hourly-pricing.ts']);
