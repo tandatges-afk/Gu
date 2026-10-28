@@ -11,6 +11,7 @@ import {isCameraCategory,isCameraModel} from '@/lib/camera-rental';
 import {normalizedAngles} from '@/lib/inspection-proof';
 import {DEFAULT_PRODUCT_SIZE,launderingForCategory,isNonLaundryCategory} from '@/lib/product-policies';
 import { auditInTransaction } from '@/lib/audit';
+import {mayArchiveItem} from '@/lib/inventory-archive-rules';
 export const runtime='nodejs';
 const nameKeyChanged=(a:string,b:string)=>a!==b;
 export const preferredRegion='sin1';
@@ -109,16 +110,22 @@ export async function DELETE(req:NextRequest,ctx:{params:Promise<{id:string}>}){
     const {id}=await ctx.params;
     if(!/^[a-zA-Z0-9]{10,64}$/.test(id))throw new ApiError(400,'Mã sản phẩm không hợp lệ.');
     const ref=db().collection('items').doc(id);
-    // Lock entries are persisted for every active reserved/picked-up order.
-    const locks=await db().collection('rentalSlots').where('itemId','==',id).limit(1).get();
-    if(!locks.empty)throw new ApiError(409,'Không thể xóa sản phẩm đang có lịch giữ hoặc chưa trả.');
-    const hourly=await db().collection('v5DayIntervals').where('itemId','==',id).limit(5).get();
-    if(hourly.docs.some(d=>(d.data()?.entries||[]).length))throw new ApiError(409,'Sản phẩm đã được đặt lịch theo giờ.');
+    // All three checks MUST share the transaction's advisory lock with V5
+    // order creation, extension, and pickup. Reading slots outside the lock
+    // lets a concurrent reservation slip between the check and archive.
     await db().runTransaction(async tx=>{
-      const snap=await tx.get(ref);
+      const [snap,legacyLocks,hourlyLocks]=await Promise.all([
+        tx.get(ref),
+        tx.get(db().collection('rentalSlots').where('itemId','==',id).limit(1)),
+        // Never limit to the first five days: an older empty day may hide
+        // an active reservation in a later row.
+        tx.get(db().collection('v5DayIntervals').where('itemId','==',id)),
+      ]);
       if(!snap.exists)throw new ApiError(404,'Không tìm thấy sản phẩm.');
       if(snap.data()?.archivedAt)throw new ApiError(409,'Sản phẩm đã được lưu trữ.');
       if(snap.data()?.status!=='AVAILABLE' && snap.data()?.status!=='MAINTENANCE')throw new ApiError(409,'Chỉ được lưu trữ đồ rảnh hoặc bảo trì; đồ thuê, giặt, thất lạc phải xử lý trước.');
+      if(!mayArchiveItem(legacyLocks.size>0,hourlyLocks.docs.map(d=>d.data())))
+        throw new ApiError(409,'Sản phẩm vẫn còn lịch đặt hoặc dữ liệu khóa lịch cần đối soát; chưa thể lưu trữ.');
       const now=new Date().toISOString();
       tx.update(ref,{archivedAt:now});
       auditInTransaction(tx,me,'ITEM_ARCHIVE','item',id,`Lưu trữ ${snap.data()?.name}; giữ nguyên dữ liệu đơn cũ`,now);
