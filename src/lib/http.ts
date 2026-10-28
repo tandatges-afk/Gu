@@ -3,6 +3,7 @@ import { db, serverAuth } from './firebase-admin';
 import { Role } from './types';
 import { classifyTokenFailure } from './auth-errors';
 import { randomUUID } from 'node:crypto';
+import {isTrustedMutationOrigin} from './request-origin';
 import {classifyServerFailure} from './server-error-classifier';
 import { currentStaffAccess, isoWeekMonday, vnDate, type ShiftWeekRecord } from './shift-schedule';
 export class ApiError extends Error {
@@ -10,6 +11,8 @@ export class ApiError extends Error {
 }
 export async function staffUser(req: NextRequest, options?:{allowSchedule?:boolean}) {
   const token = req.cookies.get('gu_session')?.value;
+  if(!['GET','HEAD','OPTIONS'].includes(req.method) && !isTrustedMutationOrigin(req.headers))
+    throw new ApiError(403,'Nguồn yêu cầu không hợp lệ.');
   if(!['GET','HEAD','OPTIONS'].includes(req.method)){
     const origin=req.headers.get('origin');const host=req.headers.get('host');
     if(origin&&host){let parsed:URL;try{parsed=new URL(origin);}catch{throw new ApiError(403,'Nguồn yêu cầu không hợp lệ.');}
