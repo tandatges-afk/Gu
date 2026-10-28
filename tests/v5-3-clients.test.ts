@@ -52,7 +52,7 @@ test('reserved rental keeps its 14:00 booking time when handover occurs at 15:00
  assert.equal(handoverBillingStart({bookingKind:'WALK_IN',pickupAt:scheduled,actualHandoverAt:'2026-10-22T08:00:00.000Z'}),scheduled);
  const route=read('src/app/api/v5/orders/[id]/route.ts');
  assert.match(route,/handoverBillingStart\(\{bookingKind:order\.bookingKind/);
- assert.match(route,/startAt:billingStart,lineTotal:rentalCharge\(l,billingStart,order\.returnAt!/);
+ assert.match(route,/const actualLines=order\.lines\.map\(l=>\(\{\.\.\.l,startAt:billingStart\}\)\)/);
  assert.match(route,/handoverProof:\{status:'SUBMITTED',by:me\.uid,byName:me\.name,at:now/);
  assert.match(route,/syncDebtIndex\(tx,db\(\),\{\.\.\.order,lines:actualLines,total:actualTotal,status:'PICKED_UP'/);
 });

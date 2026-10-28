@@ -22,8 +22,10 @@ export function requiresFullPrepayment(pickupAt:string, createdAt:string, reques
 export function finalRent(input:{bookedRent:number;quotedRent:number;prepaid:boolean;scheduledReturn:string;actualReturn:string}){
  const {bookedRent,quotedRent,prepaid,scheduledReturn,actualReturn}=input;
  if(!Number.isSafeInteger(bookedRent)||bookedRent<0||!Number.isSafeInteger(quotedRent)||quotedRent<0)throw Error('Giá thuê không hợp lệ');
- // Full prepayment pays for the reserved period, even if items are returned early.
- if(prepaid && Date.parse(actualReturn)<=Date.parse(scheduledReturn))return bookedRent;
+ // A prepaid reservation never loses its agreed price when returned early.
+ // But early physical pickup STARTS the paid period early: crossing the chosen
+ // camera tier or a 24h block still creates a real charge, even if returned
+ // before the originally scheduled deadline.
  return prepaid?Math.max(bookedRent,quotedRent):quotedRent;
 }
 export function amountRemaining(total:number,paid:number,other=0,compensation=0){

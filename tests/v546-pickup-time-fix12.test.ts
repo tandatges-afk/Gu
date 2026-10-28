@@ -40,7 +40,7 @@ test('handover, camera live estimate, receive and interval cleanup reuse billing
  const camera=readFileSync('src/lib/camera-live-status.ts','utf8');
  const intervals=readFileSync('src/lib/v5-server.ts','utf8');
  const detail=readFileSync('src/components/GuV5Review.tsx','utf8');
- assert.match(handler,/startAt:billingStart,lineTotal:rentalCharge\(l,billingStart,order\.returnAt!/);
+ assert.match(handler,/const actualLines=order\.lines\.map\(l=>\(\{\.\.\.l,startAt:billingStart\}\)\)/);
  assert.match(handler,/const fallbackStart=order\.scheduledPickupAt\|\|order\.pickupAt\|\|order\.handoverProof\?\.at/);
  assert.match(handler,/l\.startAt\|\|fallbackStart/);
  assert.match(camera,/const startedAt=line\.startAt\|\|order\.scheduledPickupAt/);

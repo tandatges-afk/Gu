@@ -106,9 +106,12 @@ export async function PATCH(req:NextRequest,ctx:{params:Promise<{id:string}>}){
     // even when the customer comes later, so the planned slot remains authoritative.
     if(Date.parse(now)>=Date.parse(order.returnAt||''))throw new ApiError(409,'Giờ trả dự kiến đã qua; PC cần cập nhật lịch trước khi giao.');
     const billingStart=handoverBillingStart({bookingKind:order.bookingKind,scheduledPickupAt:order.scheduledPickupAt,pickupAt:order.pickupAt,actualHandoverAt:now});
-    const actualLines=order.lines.map(l=>({...l,startAt:billingStart,lineTotal:rentalCharge(l,billingStart,order.returnAt!)}));
-    const computedTotal=actualLines.reduce((sum,l)=>sum+Number(l.lineTotal||0),0);
-    const actualTotal=Math.max(order.bookedRentTotal||order.total,computedTotal);
+    // Record the real billing start, but DO NOT charge for a hypothetical return
+    // at the scheduled deadline. Early pickup can make that future interval
+    // longer than a camera package / 24-hour block even if the customer
+    // actually returns within the prepaid tier. RECEIVE calculates actual fees.
+    const actualLines=order.lines.map(l=>({...l,startAt:billingStart}));
+    const actualTotal=order.total;
     if(earlySlots.length)createIntervalWrites(tx,earlySlots,earlyPrior,id);
     if(depositEvidence)tx.update(depositEvidence.ref,{consumedOrderId:id,consumedAt:now});
     if(cashCollateral>0){
@@ -144,9 +147,9 @@ export async function PATCH(req:NextRequest,ctx:{params:Promise<{id:string}>}){
       tx.set(db().collection('cashDaily').doc(vnDayKey(now)),{amount:FieldValue.increment(extraSecurity),collateralReceived:FieldValue.increment(extraSecurity),updatedAt:now},{merge:true});
     }
     const updates=order.lines.map(l=>pending.includes(l.itemId)?{...l,startAt:now}:l);
-    const nextTotal=updates.reduce((sum,l,i)=>{
-      return sum+rentalCharge(l,updates[i].startAt||order.pickupAt!,order.returnAt!);
-    },0);
+    // Additional items were already priced and agreed when ADD_ITEMS ran.
+    // Do not overwrite that contract using a hypothetical future return.
+    const nextTotal=order.total;
     tx.update(ref,{lines:updates,total:nextTotal,...(clothingPolicy||cameraPolicy?{collateralRequiredAmount:clothingPolicy?collateralForLines(updates):cameraCollateralForLines(updates),handoverCashCollateralAmount:(order.handoverCashCollateralAmount||0)+extraSecurity}:{}),pendingExtraItemIds:[],handoverProof:{...order.handoverProof,status:'SUBMITTED',items:[...(order.handoverProof?.items||[]),...proofs]},updatedAt:now,history:[...order.history,{action:'HANDOVER_EXTRA',at:now,by:me.uid,detail:`${me.name} giao bổ sung ${pending.length} món, đã chụp ảnh`} ]});
     pendingRefs.forEach(r=>tx.update(r,{status:'RENTED',currentOrderId:id,expectedReturnDate:order.returnDate}));
     tx.set(job,{stage:'OUT',updatedAt:now},{merge:true});
