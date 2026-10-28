@@ -21,6 +21,7 @@ export function calendarVisualState(input:{late:boolean;warning:boolean;orderSta
 }
 
 import type {InventoryItem,RentalOrder} from './types.ts';
+import {cameraLateAlert} from './camera-live-status.ts';
 
 /**
  * One source of truth for the desktop and mobile calendar cells AND for sorting.
@@ -34,6 +35,7 @@ export function calendarSlotState(
  orders:readonly RentalOrder[],
  today:string,
  riskItemIds:ReadonlySet<string>=new Set<string>(),
+ nowMs:number=Date.now(),
 ){
  const isForItem=(o:RentalOrder)=>o.lines.some(l=>l.itemId===item.id);
  const matching=orders.filter(o=>
@@ -42,9 +44,12 @@ export function calendarSlotState(
   day>=(o.lines.find(l=>l.itemId===item.id)?.startDate||o.pickupDate)
  ).sort((a,b)=>(a.status==='PICKED_UP'?0:1)-(b.status==='PICKED_UP'?0:1)||
   String(a.pickupAt||'').localeCompare(String(b.pickupAt||''))||a.id.localeCompare(b.id));
- const lateOrder=orders.find(o=>o.status==='PICKED_UP'&&o.returnDate<today&&isForItem(o));
- const shown=matching[0]||(lateOrder&&day>=lateOrder.pickupDate?lateOrder:undefined);
- const late=!!lateOrder&&day>lateOrder.returnDate;
+ const lateOrder=orders.find(o=>o.status==='PICKED_UP'&&isForItem(o)&&
+  (cameraLateAlert(o,nowMs)!==null||o.returnDate<today));
+ const late=!!lateOrder&&(cameraLateAlert(lateOrder,nowMs)?day>=today:day>lateOrder.returnDate);
+ // An overdue camera already on loan takes priority over a later reservation.
+ const shown=late&&lateOrder?lateOrder:matching[0]||(lateOrder&&day>=lateOrder.pickupDate?lateOrder:undefined);
+ const matchingForClick=late&&lateOrder&&!matching.some(o=>o.id===lateOrder.id)?[lateOrder,...matching]:matching;
  const warning=riskItemIds.has(item.id)&&day===today&&Boolean(shown)&&!late;
  const blocked=!shown&&(['LAUNDRY','MAINTENANCE','MISSING'].includes(item.status)||!(item.replacementValue>0));
  const isPast=day<today;
@@ -52,7 +57,7 @@ export function calendarSlotState(
    blockedLabel:blocked&&['LAUNDRY','MAINTENANCE','MISSING'].includes(item.status)?{
      LAUNDRY:'Đang giặt',MAINTENANCE:'Bảo trì',MISSING:'Thất lạc'
    }[item.status as 'LAUNDRY'|'MAINTENANCE'|'MISSING']:'Chưa duyệt giá'});
- return {matching,shown,late,warning,blocked,isPast,visual};
+ return {matching:matchingForClick,shown,late,warning,blocked,isPast,visual};
 }
 
 /**

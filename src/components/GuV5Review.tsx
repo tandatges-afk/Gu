@@ -14,6 +14,7 @@ import {paymentReview} from '@/lib/payment-review';
 import {GuOrderPaymentPanel} from './GuOrderPaymentPanel';
 import {GuPrepaidAdjustment} from './GuPrepaidAdjustment';
 import {rentalCharge} from '@/lib/camera-rental';
+import {cameraLateAlert,cameraLiveQuote} from '@/lib/camera-live-status';
 import {localDateTimeToISO} from '@/lib/hourly-pricing';
 import {handoverLabel,collateralReturnQuote,collateralForLines,CLOTHING_SETTLEMENT_VERSION} from '@/lib/clothing-collateral';
 export function GuV5Review({api,onChanged,active=true}:{api:ApiCall;onChanged:()=>Promise<void>;active?:boolean}){
@@ -51,13 +52,18 @@ export function GuV5OrderDetail({order,items,api,onChanged,isAdmin,onCapture}:{o
  const [addOpen,setAddOpen]=useState(false);const [addQuery,setAddQuery]=useState('');const [extra,setExtra]=useState<string[]>([]);const [addResults,setAddResults]=useState<InventoryItem[]>([]);
  const [busy,setBusy]=useState(false);const [error,setError]=useState('');const [pay,setPay]=useState('');const [extension,setExtension]=useState('');
  const [refundMethod,setRefundMethod]=useState<'CASH'|'TRANSFER'>('CASH');const [refundReference,setRefundReference]=useState('');
+ const [cameraClock,setCameraClock]=useState(()=>Date.now());
+ useEffect(()=>{if(orderGroup(order)!=='CAMERA'||order.status!=='PICKED_UP')return;const interval=setInterval(()=>setCameraClock(Date.now()),30_000);return()=>clearInterval(interval);},[order.id,order.status]);
  const [movements,setMovements]=useState<Array<{id:string;kind:string;amount:number;method?:string;reference?:string;actorName?:string;createdAt:string}>>([]);
  const [liveItems,setLiveItems]=useState<InventoryItem[]|null>(null);
  useEffect(()=>{let live=true;setLiveItems(null);if(order.status!=='RESERVED')return;void api<{items:InventoryItem[]}>('v5/orders/'+order.id).then(r=>{if(live)setLiveItems(r.items);}).catch(()=>{});return()=>{live=false;};},[api,order.id,order.updatedAt,order.status]);
  useEffect(()=>{if(!isAdmin)return;let mounted=true;void api<{payments:typeof movements}>('v5/orders/'+order.id).then(res=>{if(mounted)setMovements(res.payments);}).catch(()=>{});return()=>{mounted=false;};},[isAdmin,api,order.id,order.paid,order.refundTotal]);
+ const cameraAlert=cameraLateAlert(order,cameraClock);
+ const liveCameraQuote=cameraAlert?cameraLiveQuote(order,cameraClock):null;
+ const displayedRent=liveCameraQuote?.total??order.total;
  const due=Math.max(0,order.total+(order.compensationTotal||0)+(order.otherFeeTotal||0)+(order.lateFeeTotal||0)-order.paid);
  const heldCashCredit=order.settlementPolicyVersion===CLOTHING_SETTLEMENT_VERSION&&!order.collateralReturnedAt?(order.handoverCashCollateralAmount||0):0;
- const extraCashNeeded=Math.max(0,due-heldCashCredit);
+ const extraCashNeeded=Math.max(0,(liveCameraQuote?.unpaid??due)-heldCashCredit);
  const refund=Math.max(0,order.paid-order.total-(order.compensationTotal||0)-(order.otherFeeTotal||0)-(order.lateFeeTotal||0));
  const clothingPolicy=order.settlementPolicyVersion===CLOTHING_SETTLEMENT_VERSION&&orderGroup(order)==='CLOTHING';
  const cameraOrder=orderGroup(order)==='CAMERA';
@@ -83,7 +89,8 @@ export function GuV5OrderDetail({order,items,api,onChanged,isAdmin,onCapture}:{o
  const act=async(action:string,extra:Record<string,unknown>={})=>{if(busy)return;setBusy(true);setError('');try{await api('v5/orders/'+order.id,{method:'PATCH',body:JSON.stringify({action,...extra})});await onChanged();}catch(e){setError(e instanceof Error?e.message:'Không thể lưu đơn.');}finally{setBusy(false);}};
  return <div className="modal-body detail-body"><h3>{order.code} · {order.customerName}</h3><p>Mã sản phẩm: {order.lines.map(l=>(l.hangerCode||l.sku)+(l.cameraSerial?' · Serial '+l.cameraSerial:'')).join(', ')}</p>
  <p>Giờ giao: <b>{order.pickupAt?formatVNDateTime(order.pickupAt):order.pickupDate}</b> · Giờ trả dự kiến: <b>{order.returnAt?formatVNDateTime(order.returnAt):order.returnDate}</b></p>
- <div className="gu-quick-money"><span><small>Tổng thuê</small><strong>{money(order.total)}</strong></span><span><small>Đã thu</small><strong>{money(order.paid)}</strong></span><span><small>{clothingPolicy?'Thu thêm sau cấn trừ':'Còn thiếu'}</small><strong>{money(extraCashNeeded)}</strong></span></div>
+ {cameraAlert&&<div role="status" className="gu-camera-live-alert"><strong>Máy ảnh trả trễ {cameraAlert.lateMinutes} phút</strong><span>{liveCameraQuote?`Tổng thuê tạm tính ${money(displayedRent)} · Bao gồm phí trễ ${money(liveCameraQuote.lateFee)} · Còn dự kiến ${money(liveCameraQuote.unpaid)}.`:'Chưa tính được phí trễ tạm tính. Nhân viên cần nhận trả để chốt tiền.'} Phí chính thức được ghi nhận khi nhận trả.</span></div>}
+ <div className="gu-quick-money"><span><small>{cameraAlert?'Tạm tính đến lúc này':'Tổng thuê'}</small><strong>{money(displayedRent)}</strong></span><span><small>Đã thu</small><strong>{money(order.paid)}</strong></span><span><small>{clothingPolicy?'Thu thêm sau cấn trừ':'Còn thiếu'}</small><strong>{money(extraCashNeeded)}</strong></span></div>
  <p className="gu-compact-meta">{order.status==='RESERVED'?'Chưa giao':order.status==='PICKED_UP'?'Đã giao · Đang thuê':order.status==='RETURNED'?'Đã nhận trả':order.status==='CANCELLED'?'Đã hủy':'Đơn đã đóng'} · Giao: {handoverLabel(order)} · Nhận: {order.returnProof?.byName||'Chưa nhận'}</p><details className="gu-optional-details"><summary>Nhân viên và các khoản gia hạn</summary><p>Nhân viên tạo: {order.createdByName||'—'}{extensionAdded>0&&<> · Phí gia hạn đã tính vào tổng: {money(extensionAdded)}</>}</p></details>
  {existingGroup==='LEGACY_MIXED'&&<p className="inline-alert">Đơn dữ liệu cũ chứa máy ảnh và trang phục chung. Vẫn xem và xử lý trả hàng bình thường, nhưng không được thêm sản phẩm mới. Hãy tạo hai đơn riêng nếu khách tiếp tục thuê.</p>}
  {clothingPolicy&&order.status==='RESERVED'&&<p className="gu-mini-note">Khi giao: cọc tài sản {money(order.collateralRequiredAmount||collateralForLines(order.lines))} hoặc CCCD có ảnh.</p>}{cameraOrder&&order.status==='RESERVED'&&<p className="gu-mini-note">Máy ảnh: chụp ảnh cọc/CCCD lúc giao, số tiền cọc theo quy định cửa hàng. Không tự cấn trừ.</p>}
@@ -98,7 +105,8 @@ export function GuV5OrderDetail({order,items,api,onChanged,isAdmin,onCapture}:{o
  {order.returnStage==='AWAITING_ADMIN'&&<div className="inline-alert danger-alert">Đơn dữ liệu cũ đang chờ duyệt. Nhân viên có thể hoàn tất nhận trả mà không đợi Admin.{order.status==='PICKED_UP'&&<button type="button" className="btn btn-white" disabled={busy} onClick={()=>void act('FINALIZE_LEGACY_RETURN')}>Hoàn tất nhận trả đơn cũ</button>}</div>}
  {notClean.length>0&&<p className="inline-alert danger-alert">Chưa thể bàn giao: {notClean.map(line=>line.name).join(', ')} đang giặt/chưa sẵn sàng. Chỉ bấm giao sau khi kho xác nhận “Đã giặt”.</p>}{['RESERVED','PICKED_UP'].includes(order.status)&&order.returnStage!=='AWAITING_ADMIN'&&<button type="button" className="btn btn-dark gu-v11-capture-button" disabled={busy||notClean.length>0} onClick={onCapture}>{notClean.length?'Chờ giặt xong mới giao':order.status==='RESERVED'?'Bàn giao · Chụp ảnh và cọc':order.pendingExtraItemIds?.length?'Giao thêm đồ':'Nhận trả · Quyết toán'}</button>}
  {order.cameraLateFeePending&&<p className="inline-alert danger-alert">Máy ảnh chưa đối soát phí trễ, Admin cần tính lại trước khi thu.</p>}
- {!order.cameraLateFeePending&&extraCashNeeded>0&&(!clothingPolicy||order.status==='RETURNED')&&<GuOrderPaymentPanel order={order} api={api} onPaid={onChanged}/>}
+ {cameraAlert&&order.status==='PICKED_UP'&&<p className="gu-mini-note">Máy ảnh đang quá giờ: hãy bấm “Nhận trả · Quyết toán” trước khi thu tiền để ghi nhận đúng số giờ trễ. Không thu theo giá cũ.</p>}
+ {!order.cameraLateFeePending&&!cameraAlert&&extraCashNeeded>0&&(!clothingPolicy||order.status==='RETURNED')&&<GuOrderPaymentPanel order={order} api={api} onPaid={onChanged}/>}
  {isAdmin&&order.status==='RESERVED'&&order.bookingKind==='RESERVE'&&<p className="gu-mini-note">Khách bỏ lịch: tiền thuê đã thu {money(order.paid)} không hoàn. Admin hủy sẽ giải phóng lịch giữ và giữ nguyên sổ thu.</p>}
  {isAdmin&&!clothingPolicy&&order.status==='RETURNED'&&refund>0&&<div className="gu-v5-payment-review"><h4>Đã thu thừa: {money(refund)}</h4><p>Thực hiện hoàn tiền ngoài hệ thống, sau đó mới xác nhận để ghi vào sổ quỹ.</p><select className="input" value={refundMethod} onChange={e=>setRefundMethod(e.target.value as 'CASH'|'TRANSFER')}><option value="CASH">Tiền mặt</option><option value="TRANSFER">Chuyển khoản</option></select>{refundMethod==='TRANSFER'&&<input className="input" placeholder="Mã giao dịch / nội dung hoàn tiền" value={refundReference} onChange={e=>setRefundReference(e.target.value)}/>}<button className="btn btn-white" disabled={busy||refundMethod==='TRANSFER'&&refundReference.trim().length<4} onClick={()=>{if(confirm(`Bạn xác nhận ĐÃ HOÀN ${money(refund)} cho khách?`))void act('REFUND_RETURN',{confirmRefund:true,method:refundMethod,reference:refundReference});}}>Ghi nhận đã hoàn đủ</button></div>}
  {isAdmin&&<details className="gu-cash-ledger"><summary>Chi tiết thu / hoàn tiền (100 giao dịch gần nhất)</summary>{movements.map(m=><p key={m.id}><b>{m.kind==='COLLATERAL_IN'?'Nhận cọc tài sản':m.kind==='COLLATERAL_REFUND'?'Hoàn tiền cọc':m.kind==='COLLATERAL_APPLIED'?'Cấn trừ cọc vào thuê':m.kind==='REFUND'?'Hoàn tiền thuê':m.kind==='RESERVATION_FORFEITED'?'Tiền giữ lịch không hoàn':'Thu tiền thuê'}: {money(m.amount)}</b> · {m.method||'Chưa phân loại'} · {m.actorName||'Nhân viên'} · {formatVNDateTime(m.createdAt)}</p>)}</details>}

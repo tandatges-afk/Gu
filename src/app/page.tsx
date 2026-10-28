@@ -43,6 +43,7 @@ import {GuInventoryFilters} from '@/components/GuInventoryFilters';
 import inventoryLayout from '@/components/GuInventoryTable.module.css';
 import {isCameraCategory} from '@/lib/camera-rental';
 import {orderGroup,productGroup,type RentalGroup} from '@/lib/order-group';
+import {cameraLateAlert,cameraLiveQuote} from '@/lib/camera-live-status';
 import calendarUi from '@/components/GuCalendarTimeline.module.css';
 import bookingStyle from '@/components/GuV5Booking.module.css';
 import {calendarDayTone,calendarSlotState,sortCalendarProductsForDay} from '@/lib/calendar-presentation';
@@ -378,7 +379,7 @@ export default function Home() {
   const active=liveOrders.filter(o=>o.status==='RESERVED'||o.status==='PICKED_UP');
   const picked=orders.filter(o=>o.status==='PICKED_UP');
   const dueToday=orders.filter(o=>o.returnDate===today&&o.status==='PICKED_UP');
-  const overdueOrders=orders.filter(o=>o.status==='PICKED_UP'&&o.returnDate<today);
+  const overdueOrders=orders.filter(o=>o.status==='PICKED_UP'&&(o.returnDate<today||cameraLateAlert(o,Date.now())));
   const isOverdue=(o:RentalOrder)=>o.status==='PICKED_UP'&&o.returnDate<today;
   const dueAmount=(o:RentalOrder)=>o.total+(o.compensationTotal||0)+(o.lateFeeTotal||0)+(o.otherFeeTotal||0);
   const collected=reportDaily?.reduce((s,o)=>s+o.amount,0);
@@ -451,14 +452,15 @@ export default function Home() {
   const chartMax=Math.max(1,...chartRows.map(r=>r.value));
   const calendarDays=Array.from({length:7},(_,i)=>addDays(calendarStart,i));
   const calendarActive=calendarOrderRows??active;
-  const calendarOverdue=calendarActive.filter(o=>o.status==='PICKED_UP'&&o.returnDate<today);
+  const calendarOverdue=calendarActive.filter(o=>o.status==='PICKED_UP'&&(o.returnDate<today||cameraLateAlert(o,Date.now())));
+  const cameraOverdueOrders=calendarActive.filter(o=>cameraLateAlert(o,Date.now()));
   const calendarCreators=Array.from(new Map(calendarActive.filter(o=>Boolean(o.createdBy)).map(o=>[o.createdBy,orderCreatorName(o,data?.staffNames)] as const)).entries()).sort((a,b)=>a[1].localeCompare(b[1],'vi'));
   const creatorName=(o:RentalOrder)=>orderCreatorName(o,data?.staffNames);
   const calendarBaseItems=calendarLoaded?calendarRemote:items.slice(0,25);
   const calendarSearchPool=calendarQuery.trim()?[...new Map([...calendarBaseItems,...items].map(item=>[item.id,item] as const)).values()]:calendarBaseItems;
   const calendarFilteredItems=calendarSearchPool.filter(i=>productGroup(i.category)===(page==='camera-calendar'?'CAMERA':'CLOTHING')&&(calendarCategory==='ALL'||i.category===calendarCategory)&&
     (calendarCreator==='ALL'||calendarActive.some(o=>o.createdBy===calendarCreator&&o.lines.some(l=>l.itemId===i.id)&&o.pickupDate<=calendarDays[6]&&o.returnDate>=calendarStart))&&
-    (calendarStatus==='ALL'||calendarItemState(i,calendarActive,calendarStart,7,today)===calendarStatus)&&
+    (calendarStatus==='ALL'||calendarItemState(i,calendarActive,calendarStart,7,today,Date.now())===calendarStatus)&&
     matchesCalendarSearch(i,calendarActive,calendarQuery));
   // Reorder ALL visible products using the first date on screen, not the next day's state.
   // Desktop and mobile receive the same order. Switching dates recalculates the groups.
@@ -476,15 +478,17 @@ export default function Home() {
   // Shared occupancy logic for desktop timeline and mobile product cards.
   // Keep both views on the exact same booking rules and click handlers.
   const renderCalendarCell=(item:InventoryItem,day:string,mobile=false)=>{
-    const {matching,shown,late,warning:nextDayRisk,blocked,isPast,visual}=calendarSlotState(item,day,calendarActive,today,riskIds);
-    const title=shown?shown.customerName+' · '+shown.code+' · Tạo bởi: '+creatorName(shown)+(late?' · TRẢ TRỄ':'')+(nextDayRisk?' · 17H: CHƯA TRẢ, MAI CÓ ĐƠN':''):blocked?statusLabels[item.status]||'Chưa được định giá':isPast?'Ngày đã qua':day===today?'Giao đồ ngay':'Đặt trước';
+    const {matching,shown,late,warning:nextDayRisk,blocked,isPast,visual}=calendarSlotState(item,day,calendarActive,today,riskIds,Date.now());
+    const cameraAlert=shown&&page==='camera-calendar'?cameraLateAlert(shown,Date.now()):null;
+    const liveQuote=shown&&cameraAlert?cameraLiveQuote(shown,Date.now()):null;
+    const title=shown?shown.customerName+' · '+shown.code+' · Tạo bởi: '+creatorName(shown)+(cameraAlert?` · TRẢ TRỄ ${cameraAlert.lateMinutes} phút`:(late?' · TRẢ TRỄ':''))+(liveQuote?` · Tiền tạm tính ${money(liveQuote.total)} (đã gồm trễ ${money(liveQuote.lateFee)})`:'')+(nextDayRisk?' · 17H: CHƯA TRẢ, MAI CÓ ĐƠN':''):blocked?statusLabels[item.status]||'Chưa được định giá':isPast?'Ngày đã qua':day===today?'Giao đồ ngay':'Đặt trước';
     const date=new Date(day+'T00:00:00Z');
     const week=['CN','T2','T3','T4','T5','T6','T7'][date.getUTCDay()];
     return <button key={day} type="button" title={title} aria-label={`${prettyDay(day)}: ${visual.label}. ${title}`} className={'calendar-cell '+calendarUi.slot+' '+calendarUi[visual.className]+' '+(mobile?'gu-calendar-mobile-cell ':'')+(nextDayRisk?'gu-next-day-risk ':late?'gu-calendar-late ':shown?(shown.status==='PICKED_UP'?'occupied-picked':'occupied-reserved'):blocked?'cell-blocked':'cell-free')} disabled={!shown&&(blocked||isPast)} onClick={()=>matching.length>1?setCalendarMatches(matching):shown?openDetail(shown):openBooking(day===today?'PICKUP':'RESERVE',item.id,day)}>
       {mobile&&<span className="gu-calendar-cell-date"><strong>{week}</strong><small>{day.slice(8,10)}/{day.slice(5,7)}</small></span>}
       {visual.className==='stateFree'?<span className={calendarUi.freeAction} aria-hidden="true">+</span>:<span className={'gu-calendar-cell-result '+calendarUi.stateLabel}>{visual.label}</span>}
       {shown&&<span className={calendarUi.customer} title={shown.customerName}>{matching.length>1?matching.length+' lượt':shown.customerName.split(' ').slice(-1)[0]}</span>}
-      {shown&&<span className="gu-calendar-cell-time" title={'Giờ nhận: '+vnDisplayHour(shown.pickupAt)+' · Giờ trả: '+vnDisplayHour(shown.returnAt)}>{calendarCellTime(shown)}</span>}
+      {shown&&<span className="gu-calendar-cell-time" title={'Giờ nhận: '+vnDisplayHour(shown.pickupAt)+' · Giờ trả: '+vnDisplayHour(shown.returnAt)}>{cameraAlert?`Trễ ${cameraAlert.lateMinutes} phút`:calendarCellTime(shown)}</span>}
       {shown&&<span className="gu-calendar-cell-creator" title={'Tạo bởi: '+creatorName(shown)}>NV: {creatorName(shown).split(/\s+/).slice(-1)[0]}</span>}
     </button>;
   };
@@ -574,6 +578,7 @@ export default function Home() {
           <div className="page-intro"><div><div className="eyebrow">LỊCH THEO NGÀY / THÁNG / NĂM</div><h1>{page==='camera-calendar'?'Lịch máy ảnh':'Lịch cho thuê'}</h1></div><div className="action-row"><button className="btn btn-white" onClick={()=>openBooking('RESERVE')}><CalendarDays size={17}/> Đặt lịch trước</button><button className="btn btn-dark" onClick={()=>openBooking('PICKUP')}><Plus size={18}/> Giao ngay</button></div></div>
           <div className="gu-catalog-pager"><div className="gu-search-wrap"><Search size={15}/><input className="input" value={calendarQuery} onChange={e=>setCalendarQuery(e.target.value)} placeholder="Tìm tên sản phẩm, mã GU-00234 / 234, khách đang thuê hoặc SĐT…"/></div><button type="button" className="btn btn-white" disabled={!calendarNext} onClick={()=>setCalendarPageCursor(calendarNext)}>25 món tiếp theo <ChevronRight size={14}/></button><button type="button" className="btn btn-white" disabled={!calendarPageCursor} onClick={()=>setCalendarPageCursor(null)}>Đầu danh sách</button></div>
 
+          {page==='camera-calendar'&&cameraOverdueOrders.length>0&&<div role="status" className="gu-camera-overdue-summary"><BellRing size={19}/><div><strong>{cameraOverdueOrders.length} đơn máy ảnh quá giờ trả</strong><span>{cameraOverdueOrders.slice(0,3).map(o=>`${o.customerName} · trễ ${cameraLateAlert(o,Date.now())?.lateMinutes||0} phút`).join(' · ')}. Mở đơn để xem tiền tạm tính và nhận trả để chốt phí.</span></div></div>}
           <section className="panel calendar-panel"><div className="calendar-toolbar gu-calendar-toolbar-v532">
             <div className="gu-calendar-toolbar-title"><div><h3>{page==='camera-calendar'?'Lịch sử dụng máy ảnh':'Lịch trang phục, phụ kiện và các mục khác'}</h3></div><div className={'legend '+calendarUi.legend} aria-label="Chú giải các trạng thái thuê"><span className={calendarUi.legendOverdue}><i/>Trả trễ</span><span className={calendarUi.legendWarning}><i/>Cảnh báo 17h</span><span className={calendarUi.legendPicked}><i/>Đã lấy</span><span className={calendarUi.legendReserved}><i/>Đã giữ</span><span className={calendarUi.legendFree}><i/>Còn trống</span></div></div>
             <div className="calendar-controls gu-calendar-controls-v532">

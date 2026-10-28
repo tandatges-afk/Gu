@@ -4,6 +4,7 @@ import {staffUser,handleError,jsonBody,ApiError,requireAdmin,requirePcStaff} fro
 import {billableBlocks,vnDayKey} from '@/lib/hourly-pricing';
 import {rentalCharge,cameraPackageSnapshot,chosenCameraPackageSnapshot,isCameraCategory,isCameraModel} from '@/lib/camera-rental';
 import {orderGroup,itemsBelongToGroup} from '@/lib/order-group';
+import {cameraLateAlert} from '@/lib/camera-live-status';
 import {collateralForLines,collateralReturnQuote,CLOTHING_SETTLEMENT_VERSION} from '@/lib/clothing-collateral';
 import {approvedLineQuote} from '@/lib/v5-review-pricing';
 import {returnReconciliation} from '@/lib/settlement-ledger';
@@ -346,6 +347,7 @@ export async function PATCH(req:NextRequest,ctx:{params:Promise<{id:string}>}){
       throw new ApiError(409,'Mã thu tiền đã dùng cho giao dịch khác.');
      return;
     }
+    if(cameraLateAlert(order,now))throw new ApiError(409,'Máy ảnh đã quá giờ trả. Nhân viên phải nhận lại máy và chốt phí trễ theo giờ thực tế trước khi thu tiền.');
     if(clothingPolicy&&order.status!=='RETURNED')throw new ApiError(409,'Tiền thuê đồ chỉ thu khi đặt lịch trước hoặc khi khách trả đồ.');
     const payEvidence=clothingPolicy?await readVerifiedEvidence(tx,String(b.paymentProofId||''),me.uid,'reservation',String(b.paymentDraftId||'')):null;
     const remaining=order.total+(order.compensationTotal||0)+(order.otherFeeTotal||0)+(order.lateFeeTotal||0)-(order.paid||0);
