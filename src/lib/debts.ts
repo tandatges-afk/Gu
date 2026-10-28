@@ -1,9 +1,11 @@
 import type {RentalOrder, OrderStatus} from './types';
+import {collectibleRentDue} from './debt-index.ts';
+import {orderGroup} from './order-group.ts';
 
 export type DebtOrder = {
   id:string; code:string; customerId:string; customerName:string; customerPhone:string;
   status:OrderStatus; pickupDate:string; returnDate:string;
-  amount:number; paid:number; outstanding:number; cameraLateFeePending?:boolean;
+  amount:number; paid:number; outstanding:number; cameraLateFeePending?:boolean;cameraBasePrice?:number;cameraOvertimeFeeTotal?:number;
 };
 export type DebtAccount = {
   key:string; customerId:string; customerName:string; customerPhone:string;
@@ -25,19 +27,22 @@ export function buildDebtSummary(orders:readonly RentalOrder[]):DebtSummary {
     if(order.status==='CANCELLED')continue;
     const amount=number(order.total)+number(order.compensationTotal)+number(order.lateFeeTotal)+number(order.otherFeeTotal);
     const paid=number(order.paid);
-    const outstanding=Math.max(0,amount-paid);
+    const outstanding=collectibleRentDue(order);
     if(order.status==='RESERVED'){
       if(outstanding>0){futureReservations++;reservationUnpaid+=outstanding;}
       continue;
     }
     if(order.status!=='PICKED_UP'&&order.status!=='RETURNED')continue;
+    if(order.status==='PICKED_UP'&&orderGroup(order)==='CAMERA')continue;
     if(outstanding<=0&&!order.cameraLateFeePending)continue;
     if(order.cameraLateFeePending)pendingCameraLateCount++;
     const key=accountKey(order);
     const record:DebtOrder={id:order.id,code:order.code,customerId:order.customerId,
       customerName:order.customerName||'Khách chưa có tên',customerPhone:order.customerPhone||'',
       status:order.status,pickupDate:order.pickupDate,returnDate:order.returnDate,
-      amount,paid,outstanding,cameraLateFeePending:Boolean(order.cameraLateFeePending)};
+      amount,paid,outstanding,cameraLateFeePending:Boolean(order.cameraLateFeePending),
+      cameraBasePrice:orderGroup(order)==='CAMERA'?order.lines.reduce((s,l)=>s+(l.cameraPackageBasePrice??l.lineTotal??0),0):0,
+      cameraOvertimeFeeTotal:order.cameraOvertimeFeeTotal||0};
     let account=accounts.get(key);
     if(!account){
       account={key,customerId:order.customerId,customerName:record.customerName,

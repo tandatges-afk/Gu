@@ -9,8 +9,10 @@ export function cameraLateAlert(order:RentalOrder,now:number|string):CameraLateA
  if(order.status!=='PICKED_UP'||orderGroup(order)!=='CAMERA')return null;
  const due=Date.parse(order.returnAt||'');
  const current=typeof now==='number'?now:Date.parse(now);
- if(!Number.isFinite(due)||!Number.isFinite(current)||current<=due)return null;
- return {lateMinutes:Math.ceil((current-due)/MINUTE),scheduledReturnAt:order.returnAt!};
+ if(!Number.isFinite(due)||!Number.isFinite(current))return null;
+ const overdueMinutes=Math.floor(current/MINUTE)-Math.floor(due/MINUTE);
+ if(overdueMinutes<=0)return null;
+ return {lateMinutes:overdueMinutes,scheduledReturnAt:order.returnAt!};
 }
 
 export type CameraLiveQuote={total:number;rent:number;unpaid:number;lateFee:number;lateMinutes:number};

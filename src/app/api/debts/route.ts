@@ -16,7 +16,7 @@ export async function GET(req:NextRequest){
   // Only read active/returned orders, never 90,000+ settled historical orders.
   const migration=await db().collection('systemMigrations').doc('debtLedger-v42').get();
   if(migration.data()?.completed!==true){
-   const scan=await pgPool().query<{data:RentalOrder}>(`SELECT data FROM gu_documents
+   const scan=await pgPool().query<{id:string;data:RentalOrder}>(`SELECT id,data FROM gu_documents
     WHERE collection='orders' AND data->>'status' IN ('RESERVED','PICKED_UP','RETURNED')
       AND (data->>'status' <> 'RETURNED'
         OR coalesce(data->>'cameraLateFeePending','false') = 'true'
@@ -27,7 +27,7 @@ export async function GET(req:NextRequest){
           > CASE WHEN data->>'paid' ~ '^[0-9]+([.][0-9]+)?$' THEN (data->>'paid')::numeric ELSE 0 END)
     LIMIT 10001`);
    if(scan.rowCount!==null&&scan.rowCount>10000)throw new ApiError(503,'Cần phân trang công nợ. Có hơn 10.000 đơn đang chờ đối soát.');
-   const result=buildDebtSummary(scan.rows.map(r=>r.data));
+   const result=buildDebtSummary(scan.rows.map(r=>({id:r.id,...r.data})));
    return NextResponse.json({...result,indexed:false,legacyMigrationRequired:true,legacyScanned:scan.rows.length},
     {headers:{'Cache-Control':'private, no-store'}});
   }
@@ -35,7 +35,13 @@ export async function GET(req:NextRequest){
   // GU_SERVER_ERROR even when the table was empty.
   const snap=await db().collection('debtLedger').limit(10000).get();
   if(snap.size>=10000)throw new ApiError(503,'Công nợ vượt giới hạn hiển thị. Cần phân trang.');
-  const rows=snap.docs.map(d=>d.data() as ReturnType<typeof debtIndexRecord>).filter(r=>r&&typeof r==='object')
+  // Existing V10 debtLedger entries may list cameras still being rented. Filter against
+  // the current orders table until they are re-indexed by the next state change.
+  const liveCameras=await pgPool().query<{id:string}>(`SELECT id FROM gu_documents WHERE collection='orders'
+   AND data->>'status'='PICKED_UP' AND (data->>'rentalGroup'='CAMERA'
+   OR (data->'lines'->0->>'category') ~* '(máy[[:space:]]*ảnh|may[[:space:]]*anh|camera)')`);
+  const activeCameraIds=new Set(liveCameras.rows.map(r=>r.id));
+  const rows=snap.docs.map(d=>d.data() as ReturnType<typeof debtIndexRecord>).filter(r=>r&&typeof r==='object'&&!activeCameraIds.has(r.orderId))
    .map(r=>({...r,customerName:String(r.customerName||'Khách chưa có tên'),customerPhone:String(r.customerPhone||''),
      outstanding:Math.max(0,Number(r.outstanding)||0),paid:Math.max(0,Number(r.paid)||0),amount:Math.max(0,Number(r.amount)||0)}));
   const result=summaryFromDebtIndex(rows);

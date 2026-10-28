@@ -9,11 +9,11 @@ test('reserved prepaid cancellation keeps collected money without second cash in
  assert.match(source,/tiền thuê đã thu; không phát sinh hoàn tiền/);
  assert.doesNotMatch(source,/if\(order\.paid>0\)throw new ApiError\(409,'Đơn đã thu tiền: cần hoàn tiền\/đối soát trước khi xóa\.'/);
 });
-test('camera handover requires an evidence photo but never stores a numeric cash deposit',()=>{
+test('camera handover requires a photo and fixed 18m or CCCD for newly created orders',()=>{
  const source=read('src/app/api/v5/orders/[id]/route.ts');
  assert.match(source,/orderGroup\(order\)==='CAMERA'&&\(!depositProofId/);
- assert.match(source,/const cashCollateral=clothingPolicy&&depositKind==='CASH'\?collateralRequired:0/);
- assert.match(source,/orderGroup\(order\)==='CAMERA'&&Math\.max\(0,order\.total/);
+ assert.match(source,/const cashCollateral=\(clothingPolicy\|\|cameraPolicy\)\&\&depositKind==='CASH'\?collateralRequired:0/);
+ assert.match(source,/const cameraPolicy=orderGroup\(order\)==='CAMERA'&&order\.settlementPolicyVersion===CAMERA_SETTLEMENT_VERSION/);
 });
 test('laundry locks handover button and the API still enforces availability',()=>{
  const review=read('src/components/GuV5Review.tsx');

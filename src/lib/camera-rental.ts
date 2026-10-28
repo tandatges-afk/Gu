@@ -59,10 +59,13 @@ function terms(line:CameraLine,actualHours:number):{hours:CameraPackageHours;bas
 export function cameraQuoteForLine(line:CameraLine,startedAt:string,endedAt:string):{amount:number;packageHours:CameraPackageHours;basePrice:number;lateHours:number;lateFee:number}{
  const start=Date.parse(startedAt),end=Date.parse(endedAt);
  if(!Number.isFinite(start)||!Number.isFinite(end)||end<=start)throw new Error('Giờ trả phải sau lúc giao thực tế.');
- const elapsed=end-start;
- const {hours,base}=terms(line,elapsed/HOUR_MS);
- // Exactly at the contracted deadline: 0 fee. Any commenced next hour: +10,000đ.
- const lateHours=Math.max(0,Math.ceil((elapsed-hours*HOUR_MS)/HOUR_MS));
+ // Staff schedule inputs have HH:MM precision. Do not invent a +10k fee from
+ // a few seconds spent uploading return photos or processing a server request.
+ // A completed next minute is the smallest billable late increment.
+ const elapsedMinutes=Math.max(0,Math.floor(end/60_000)-Math.floor(start/60_000));
+ const {hours,base}=terms(line,elapsedMinutes/60);
+ const lateMinutes=Math.max(0,elapsedMinutes-hours*60);
+ const lateHours=Math.ceil(lateMinutes/60);
  const lateFee=lateHours*CAMERA_LATE_HOURLY_FEE;
  if(!Number.isSafeInteger(lateFee)||!Number.isSafeInteger(base+lateFee))throw new Error('Tiền thuê máy ảnh vượt giới hạn tính toán.');
  return {amount:base+lateFee,packageHours:hours,basePrice:base,lateHours,lateFee};
