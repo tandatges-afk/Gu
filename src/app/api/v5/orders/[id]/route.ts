@@ -106,16 +106,16 @@ export async function PATCH(req:NextRequest,ctx:{params:Promise<{id:string}>}){
     // even when the customer comes later, so the planned slot remains authoritative.
     if(Date.parse(now)>=Date.parse(order.returnAt||''))throw new ApiError(409,'Giờ trả dự kiến đã qua; PC cần cập nhật lịch trước khi giao.');
     const billingStart=handoverBillingStart({bookingKind:order.bookingKind,scheduledPickupAt:order.scheduledPickupAt,pickupAt:order.pickupAt,actualHandoverAt:now});
-    const actualLines=order.lines.map(l=>{const startAt=order.bookingKind==='RESERVE'?(l.startAt||billingStart):billingStart;return {...l,startAt,lineTotal:rentalCharge(l,startAt,order.returnAt!)};});
+    const actualLines=order.lines.map(l=>({...l,startAt:billingStart,lineTotal:rentalCharge(l,billingStart,order.returnAt!)}));
     const computedTotal=actualLines.reduce((sum,l)=>sum+Number(l.lineTotal||0),0);
-    const actualTotal=order.bookingKind==='RESERVE'?Math.max(order.bookedRentTotal||order.total,computedTotal):computedTotal;
+    const actualTotal=Math.max(order.bookedRentTotal||order.total,computedTotal);
     if(earlySlots.length)createIntervalWrites(tx,earlySlots,earlyPrior,id);
     if(depositEvidence)tx.update(depositEvidence.ref,{consumedOrderId:id,consumedAt:now});
     if(cashCollateral>0){
       tx.create(ref.collection('cashMovements').doc(),{orderId:id,kind:'COLLATERAL_IN',amount:cashCollateral,actorUid:me.uid,actorName:me.name,createdAt:now,description:'Nhận tiền bảo đảm vật lý; chưa ghi nhận là tiền thuê'});
       tx.set(db().collection('cashDaily').doc(vnDayKey(now)),{amount:FieldValue.increment(cashCollateral),collateralReceived:FieldValue.increment(cashCollateral),updatedAt:now},{merge:true});
     }
-    tx.update(ref,{status:'PICKED_UP',scheduledPickupAt:order.scheduledPickupAt||order.pickupAt,lines:actualLines,total:actualTotal,...(depositEvidence?{handoverDepositProofId:depositProofId,handoverDepositKind:depositKind,hadHandoverDeposit:true}:{}),...((clothingPolicy||cameraPolicy)?{collateralRequiredAmount:collateralRequired,handoverCashCollateralAmount:cashCollateral}:{}),handoverProof:{status:'SUBMITTED',by:me.uid,byName:me.name,at:now,items:proofs},updatedAt:now,history:[...order.history,{action:'HANDOVER_PHOTOS',by:me.uid,at:now,detail:`Nhân viên ${me.name} đã chụp ${proofs.length} sản phẩm và giữ nguyên giờ thuê theo lịch hẹn`} ]});
+    tx.update(ref,{status:'PICKED_UP',scheduledPickupAt:order.scheduledPickupAt||order.pickupAt,lines:actualLines,total:actualTotal,rentalDays:billableBlocks(billingStart,order.returnAt!),...(depositEvidence?{handoverDepositProofId:depositProofId,handoverDepositKind:depositKind,hadHandoverDeposit:true}:{}),...((clothingPolicy||cameraPolicy)?{collateralRequiredAmount:collateralRequired,handoverCashCollateralAmount:cashCollateral}:{}),handoverProof:{status:'SUBMITTED',by:me.uid,byName:me.name,at:now,items:proofs},updatedAt:now,history:[...order.history,{action:'HANDOVER_PHOTOS',by:me.uid,at:now,detail:`${me.name} chụp ${proofs.length} sản phẩm; giờ tính thuê: ${billingStart}; giờ hẹn: ${order.scheduledPickupAt||order.pickupAt}`} ]});
     itemRefs.forEach(r=>tx.update(r,{status:'RENTED',currentOrderId:id,expectedReturnDate:order.returnDate}));
     tx.set(job,{stage:'OUT',code:order.code,orderId:id,customerName:order.customerName,returnAt:order.returnAt,updatedAt:now},{merge:true});
     syncDebtIndex(tx,db(),{...order,lines:actualLines,total:actualTotal,status:'PICKED_UP',...((clothingPolicy||cameraPolicy)?{handoverCashCollateralAmount:cashCollateral}:{}),updatedAt:now});
@@ -161,10 +161,9 @@ export async function PATCH(req:NextRequest,ctx:{params:Promise<{id:string}>}){
     const snaps=await Promise.all(itemRefs.map(r=>tx.get(r)));
     if(snaps.some(s=>!s.exists||s.data()?.status!=='RENTED'||s.data()?.currentOrderId!==id))throw new ApiError(409,'Kho không còn thuộc đơn này, không thể tự nhận trả.');
     const endTime=now;
-    const quote=order.lines.map(l=>approvedLineQuote(l,
-      order.bookingKind==='RESERVE'&&Date.parse(endTime)>Date.parse(order.returnAt||'')
-       ? (order.scheduledPickupAt||order.pickupAt!)
-       : (l.startAt||order.handoverProof!.at||order.pickupAt!),endTime));
+    const fallbackStart=order.scheduledPickupAt||order.pickupAt||order.handoverProof?.at;
+    if(!fallbackStart||!Number.isFinite(Date.parse(fallbackStart)))throw new ApiError(409,'Đơn thiếu giờ nhận hàng hợp lệ, cần đối soát trước khi nhận trả.');
+    const quote=order.lines.map(l=>approvedLineQuote(l,l.startAt||fallbackStart,endTime));
     const pendingCameraIds=order.lines.flatMap((l,i)=>quote[i].pendingCameraLatePricing?[l.itemId]:[]);
     const quoted=quote.reduce((sum,v)=>sum+v.amount,0);
     const wasExtended=orderGroup(order)==='CLOTHING'&&order.history.some(h=>h.action==='EXTEND');
@@ -174,7 +173,7 @@ export async function PATCH(req:NextRequest,ctx:{params:Promise<{id:string}>}){
     const nextDue=rent+compensation+(order.otherFeeTotal||0);
     const refundPending=Math.max(0,(order.paid||0)-nextDue);
     const release=await removeOrderIntervals(tx,order);
-    const actualBlocks=billableBlocks(order.handoverProof!.at||order.pickupAt!,endTime);
+    const actualBlocks=billableBlocks(order.lines[0]?.startAt||fallbackStart,endTime);
     const returnProof={status:'SUBMITTED' as const,by:me.uid,byName:me.name,at:endTime,items:proofs};
     const revised={...order,status:'RETURNED' as const,returnStage:'APPROVED' as const,returnProof,total:rent,compensationTotal:compensation,lateFeeTotal:0,rentalDays:actualBlocks,returnedAt:now,refundPending,photoReviewStatus:'PENDING' as const,cameraLatePendingItemIds:pendingCameraIds,cameraLateFeePending:pendingCameraIds.length>0,cameraOvertimeFeeTotal:quote.reduce((sum,v)=>sum+v.cameraLateFee,0),updatedAt:now};
     // Register each completed handover+return pair immediately upon physical return.
@@ -258,7 +257,7 @@ export async function PATCH(req:NextRequest,ctx:{params:Promise<{id:string}>}){
     const [snaps,trackers]=await Promise.all([Promise.all(itemRefs.map(r=>tx.get(r))),Promise.all(trackerRefs.map(r=>tx.get(r)))]);
     if(snaps.some(s=>!s.exists||s.data()?.status!=='RENTED'||s.data()?.currentOrderId!==id))throw new ApiError(409,'Có sản phẩm không còn thuộc đơn, cần đối chiếu.');
     const release=await removeOrderIntervals(tx,order);
-    const actualBlocks=billableBlocks(order.handoverProof?.at||order.pickupAt,order.returnProof.at);
+    const actualBlocks=billableBlocks(order.lines[0]?.startAt||order.pickupAt||order.handoverProof?.at||order.returnProof.at,order.returnProof.at);
     const quote=order.lines.map(l=>approvedLineQuote(l,l.startAt||order.handoverProof!.at||order.pickupAt!,order.returnProof!.at!));
     const pendingCameraIds=order.lines.flatMap((l,i)=>quote[i].pendingCameraLatePricing?[l.itemId]:[]);
     const cameraOvertimeFeeTotal=quote.reduce((sum,q)=>sum+q.cameraLateFee,0);
@@ -410,7 +409,7 @@ export async function PATCH(req:NextRequest,ctx:{params:Promise<{id:string}>}){
     if(!order.pickupAt||!order.returnAt||order.returnStage==='AWAITING_ADMIN')throw new ApiError(409,'Không thể gia hạn khi chờ nhận đồ.');
     const candidate=String(b.returnAt||'');if(!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(candidate))throw new ApiError(400,'Chọn giờ trả mới.');
     const next=new Date(candidate+':00+07:00').toISOString();if(Date.parse(next)<=Date.parse(order.returnAt))throw new ApiError(400,'Giờ trả mới phải muộn hơn giờ cũ.');
-    const blocks=billableBlocks(order.handoverProof?.at||order.pickupAt,next);
+    const blocks=billableBlocks(order.lines[0]?.startAt||order.pickupAt,next);
     const more=intervalRefs(order.lines.map(l=>l.itemId),order.returnAt,next);
     const prior=await checkIntervalAvailability(tx,more,id);
     const itemSnaps=await Promise.all(itemRefs.map(r=>tx.get(r)));

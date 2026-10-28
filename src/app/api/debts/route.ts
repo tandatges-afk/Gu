@@ -27,7 +27,7 @@ export async function GET(req:NextRequest){
           > CASE WHEN data->>'paid' ~ '^[0-9]+([.][0-9]+)?$' THEN (data->>'paid')::numeric ELSE 0 END)
     LIMIT 10001`);
    if(scan.rowCount!==null&&scan.rowCount>10000)throw new ApiError(503,'Cần phân trang công nợ. Có hơn 10.000 đơn đang chờ đối soát.');
-   const result=buildDebtSummary(scan.rows.map(r=>({id:r.id,...r.data})));
+   const result=buildDebtSummary(scan.rows.map(r=>({...r.data,id:r.id})));
    return NextResponse.json({...result,indexed:false,legacyMigrationRequired:true,legacyScanned:scan.rows.length},
     {headers:{'Cache-Control':'private, no-store'}});
   }

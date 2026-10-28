@@ -1,12 +1,19 @@
 /** Rental policy shared by client previews and all V5 server actions. */
 /**
- * A pre-booked rental starts at the time the customer agreed to, even if the
- * handover photos are taken hours later. A walk-in begins at actual handover.
- * The actual handover remains available separately as handoverProof.at.
+ * A scheduled pickup is billable from the earlier of its agreed time and the
+ * actual handover. Customers arriving late do not push the clock forward;
+ * customers receiving stock early start being billed at that earlier handover.
+ * The physical handover remains recorded separately in handoverProof.at.
+ * Applicable to both camera and clothing/accessory calendars, including a
+ * same-day booking stored as WALK_IN.
  */
 export function handoverBillingStart(input:{bookingKind?:string;scheduledPickupAt?:string|null;pickupAt?:string|null;actualHandoverAt:string}):string{
- if(input.bookingKind!=='RESERVE')return input.actualHandoverAt;
- return input.scheduledPickupAt||input.pickupAt||input.actualHandoverAt;
+ const scheduled=input.scheduledPickupAt||input.pickupAt;
+ const actual=Date.parse(input.actualHandoverAt);
+ const planned=scheduled?Date.parse(scheduled):NaN;
+ if(!Number.isFinite(actual))throw new Error('Giờ giao thực tế không hợp lệ.');
+ if(!Number.isFinite(planned))return input.actualHandoverAt;
+ return new Date(Math.min(planned,actual)).toISOString();
 }
 export function requiresFullPrepayment(pickupAt:string, createdAt:string, requestedReserve=false){
  const localDay=(s:string)=>new Date(s).toLocaleDateString('en-CA',{timeZone:'Asia/Ho_Chi_Minh'});

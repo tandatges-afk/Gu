@@ -31,7 +31,11 @@ export function createIntervalWrites(tx:Transaction,slots:IntervalRef[],prior:Aw
 }
 export async function removeOrderIntervals(tx:Transaction,order:RentalOrder){
  if(!order.pickupAt||!order.returnAt)return;
- const slots=intervalRefs(order.lines.map(l=>l.itemId),order.pickupAt,order.returnAt);
+ // Early pickup creates extra interval locks before the original slot.
+ // Release both the early and contracted parts, so availability is restored.
+ const starts=[order.pickupAt,...order.lines.map(l=>l.startAt)].filter((v):v is string=>Boolean(v)&&Number.isFinite(Date.parse(v!)));
+ const from=starts.reduce((a,b)=>Date.parse(a)<Date.parse(b)?a:b,order.pickupAt);
+ const slots=intervalRefs(order.lines.map(l=>l.itemId),from,order.returnAt);
  const prior=await Promise.all(slots.map(s=>tx.get(s.ref)));
  return ()=>slots.forEach((s,i)=>{
   const entries=((prior[i].data()?.entries||[]) as IntervalEntry[]).filter(x=>x.orderId!==order.id);

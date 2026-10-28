@@ -7,9 +7,18 @@ const MINUTE=60_000;
 export type CameraLateAlert={lateMinutes:number;scheduledReturnAt:string};
 export function cameraLateAlert(order:RentalOrder,now:number|string):CameraLateAlert|null{
  if(order.status!=='PICKED_UP'||orderGroup(order)!=='CAMERA')return null;
- const due=Date.parse(order.returnAt||'');
+ const scheduledDue=Date.parse(order.returnAt||'');
  const current=typeof now==='number'?now:Date.parse(now);
- if(!Number.isFinite(due)||!Number.isFinite(current))return null;
+ if(!Number.isFinite(scheduledDue)||!Number.isFinite(current))return null;
+ // The contractual return may be later than the selected 3h/6h camera tier.
+ // If the camera is handed over early, its paid package can expire before
+ // that scheduled return. Warn at the FIRST of those deadlines.
+ const packageDeadlines=order.lines.flatMap(line=>{
+  const start=Date.parse(line.startAt||order.scheduledPickupAt||order.pickupAt||'');
+  const hours=Number(line.cameraPackageHours);
+  return Number.isFinite(start)&&Number.isFinite(hours)&&hours>0?[start+hours*60*MINUTE]:[];
+ });
+ const due=Math.min(scheduledDue,...packageDeadlines);
  const overdueMinutes=Math.floor(current/MINUTE)-Math.floor(due/MINUTE);
  if(overdueMinutes<=0)return null;
  return {lateMinutes:overdueMinutes,scheduledReturnAt:order.returnAt!};
@@ -30,9 +39,10 @@ export function cameraLiveQuote(order:RentalOrder,now:number|string):CameraLiveQ
    if(!isCameraCategory(line.category||''))return null;
    // Mirror the RECEIVE server action: overdue pre-bookings bill from the
    // agreed pickup time, even when handover was photographed later.
-   const startedAt=order.bookingKind==='RESERVE'
-    ? (order.scheduledPickupAt||order.pickupAt||line.startAt)
-    : (line.startAt||order.handoverProof?.at||order.pickupAt);
+   // Each line stores the billing start agreed at HANDOVER. It is the
+   // earlier of scheduled pickup and actual handover; never overwrite it
+   // with the scheduled time when estimating overdue camera fees.
+   const startedAt=line.startAt||order.scheduledPickupAt||order.pickupAt||order.handoverProof?.at;
    if(!startedAt||Date.parse(startedAt)>=current)return null;
    const quote=cameraQuoteForLine(line,startedAt,endedAt);
    rent+=quote.amount;lateFee+=quote.lateFee;seen++;

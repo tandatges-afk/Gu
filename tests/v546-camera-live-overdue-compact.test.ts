@@ -57,7 +57,8 @@ test('camera payment cannot collect an outdated pre-return amount once time is o
  assert.match(capture,/settling\?'Nhận trả · Quyết toán'/);
 });
 
-test('prebooked camera estimates use the same scheduled start time as server RECEIVE',()=>{
- const prebooked={...cameraOrder,bookingKind:'RESERVE' as const,scheduledPickupAt:start,lines:[{...cameraOrder.lines[0],startAt:'2026-10-28T01:30:00.000Z'}]};
- assert.equal(cameraLiveQuote(prebooked,when(31))?.total,120000);
+test('camera live estimate honors persisted billing start even for reserved orders',()=>{
+ const early='2026-10-28T00:00:00.000Z'; // 07:00 actual, 08:00 scheduled
+ const prebooked={...cameraOrder,bookingKind:'RESERVE' as const,scheduledPickupAt:start,lines:[{...cameraOrder.lines[0],startAt:early}]};
+ assert.equal(cameraLiveQuote(prebooked,when(1))?.total,130000); // 07:00 -> 11:01 = 4h01m
 });
