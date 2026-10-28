@@ -44,3 +44,21 @@ test('GU system shows VPS capacity and images only once, with diagnostics collap
  assert.match(detail,/Thông tin & thao tác khác/);
  assert.ok(detail.indexOf('gu-v11-capture-button')<detail.indexOf('gu-order-more'));
 });
+
+test('GU order other information is grouped into consistent accessible rows without duplicate buttons',()=>{
+ const detail=readFileSync('src/components/GuV5Review.tsx','utf8');
+ const css=readFileSync('src/app/gu-redesign.css','utf8');
+ assert.match(detail,/gu-order-more-section/);
+ assert.match(detail,/gu-order-more-item gu-order-more-item--admin/);
+ assert.match(detail,/Nhân viên & trạng thái/);
+ assert.match(detail,/Chứng từ & bảo đảm/);
+ assert.match(detail,/Chi tiết thu \/ hoàn tiền/);
+ assert.match(detail,/Gia hạn giờ trả/);
+ assert.match(detail,/Thêm sản phẩm vào đơn/);
+ assert.doesNotMatch(detail,/setAddOpen/);
+ assert.match(css,/\.gu-order-more-item>summary:focus-visible/);
+ assert.match(css,/\.gu-order-more-admin-actions/);
+ // Destructive operations remain admin gated, and server actions are unchanged.
+ assert.match(detail,/act\('VOID'/);
+ assert.match(detail,/act\('CANCEL'/);
+});
