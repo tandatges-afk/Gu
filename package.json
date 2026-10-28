@@ -1,15 +1,15 @@
 {
   "name": "gu-thue-do-xinh-vps",
-  "version": "5.4.6-vps.fast-rc.1",
+  "version": "5.4.6-fix20.0",
   "private": true,
   "type": "module",
   "scripts": {
     "dev": "next dev",
-    "build": "node scripts/check-local-imports.mjs && node scripts/check-client-directives.mjs && node scripts/check-lucide-icons.mjs && next build",
+    "build": "node scripts/gu-fix20-source-guard.mjs --check && node scripts/check-local-imports.mjs && node scripts/check-client-directives.mjs && node scripts/check-lucide-icons.mjs && next build",
     "start": "next start",
     "typecheck": "tsc --noEmit",
     "test": "node scripts/test-vps.mjs",
-    "verify:release": "node scripts/verify-release-vps.mjs && node scripts/check-local-imports.mjs && node scripts/check-client-directives.mjs",
+    "verify:release": "node scripts/gu-fix20-package-check.mjs && node scripts/gu-fix20-source-guard.mjs --check && node scripts/verify-release-vps.mjs && node scripts/check-local-imports.mjs && node scripts/check-client-directives.mjs",
     "verify:imports": "node scripts/check-local-imports.mjs && node scripts/check-client-directives.mjs",
     "verify:client": "node scripts/check-client-directives.mjs",
     "verify:icons": "node scripts/check-lucide-icons.mjs",
@@ -24,7 +24,15 @@
     "db:bench": "node --env-file=.env.local scripts/benchmark-postgresql.mjs",
     "verify:legacy": "node scripts/verify-release.mjs",
     "stage:check": "node --env-file=.env.local scripts/check-staging-env.mjs",
-    "prod:check": "node --env-file=.env.local scripts/check-production-env.mjs"
+    "prod:check": "node --env-file=.env.local scripts/check-production-env.mjs",
+    "db:preflight": "node --env-file=.env.local scripts/gu-fix20-preflight.mjs",
+    "db:audit:read-only": "node --env-file=.env.local scripts/gu-fix20-audit.mjs",
+    "test:fix20": "node --experimental-strip-types --test tests/fix20-safety.test.ts",
+    "photos:gc:dry-run": "node --env-file=.env.local scripts/gu-fix20-product-photo-gc.mjs",
+    "test:concurrency:stage": "node --env-file=.env.local scripts/gu-fix20-concurrency-stage.mjs",
+    "verify:versions": "node scripts/gu-fix20-versions.mjs",
+    "source:check": "node scripts/gu-fix20-source-guard.mjs --check",
+    "source:prune": "node scripts/gu-fix20-source-guard.mjs --prune"
   },
   "dependencies": {
     "lucide-react": "^0.468.0",

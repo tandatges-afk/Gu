@@ -16,16 +16,21 @@ export async function savePhoto(dir:'products'|'inspections'|'secure',uid:string
  if(!validUUID(id)||!validUid(uid))throw new ApiError(400,'Mã ảnh không hợp lệ');
  const file=id+'.'+extension(mime),target=safePath(dir,uid,file);
  if(!bytes.length||bytes.length>3*1024*1024)throw new ApiError(413,'Ảnh phải từ 1 byte đến 3 MB');
- await mkdir(join(base(),dir,uid),{recursive:true,mode:0o700});await writeFile(target,bytes,{flag:'wx',mode:0o600});
+ // This is runtime media outside the Next.js bundle (GU_UPLOAD_DIR). Do not trace it.
+ const uploadFolder=join(base(),dir,uid);
+ await mkdir(/* turbopackIgnore: true */ uploadFolder,{recursive:true,mode:0o700});
+ await writeFile(/* turbopackIgnore: true */ target,bytes,{flag:'wx',mode:0o600});
  return {path:target,filename:file};
 }
 export async function readPhoto(dir:'products'|'inspections'|'secure',uid:string,id:string,ext:string){
  if(!validUUID(id)||!validExtension(ext))throw new ApiError(400,'Mã ảnh không hợp lệ');
- const file=id+'.'+ext;try{return await readFile(safePath(dir,uid,file));}catch(e){if((e as NodeJS.ErrnoException).code==='ENOENT')throw new ApiError(404,'Ảnh không tồn tại');throw e;}
+ const file=id+'.'+ext;const target=safePath(dir,uid,file);
+ try{return await readFile(/* turbopackIgnore: true */ target);}catch(e){if((e as NodeJS.ErrnoException).code==='ENOENT')throw new ApiError(404,'Ảnh không tồn tại');throw e;}
 }
 export async function deletePhoto(dir:'products'|'inspections'|'secure',uid:string,id:string,ext:string){
  if(!validUUID(id)||!validExtension(ext))throw new ApiError(400,'Mã ảnh không hợp lệ');
- try{await unlink(safePath(dir,uid,id+'.'+ext));}catch(e){if((e as NodeJS.ErrnoException).code!=='ENOENT')throw e;}
+ const target=safePath(dir,uid,id+'.'+ext);
+ try{await unlink(/* turbopackIgnore: true */ target);}catch(e){if((e as NodeJS.ErrnoException).code!=='ENOENT')throw e;}
 }
 export async function deleteByURL(url:string){
  const found=/^\/api\/local-media\/(products|inspections)\/([A-Za-z0-9_-]{10,128})\/([a-f0-9-]{36})\.(jpg|png|webp)$/.exec(url);
@@ -34,9 +39,9 @@ export async function deleteByURL(url:string){
 }
 export async function mediaStats(){
  async function walk(dir:string):Promise<{bytes:number;count:number}>{
-  let bytes=0,count=0;try{for(const e of await readdir(dir,{withFileTypes:true})){
+  let bytes=0,count=0;try{for(const e of await readdir(/* turbopackIgnore: true */ dir,{withFileTypes:true})){
    if(e.isSymbolicLink())continue;const next=join(dir,e.name);if(e.isDirectory()){const v=await walk(next);bytes+=v.bytes;count+=v.count;}
-   else if(e.isFile()){const s=await stat(next);bytes+=s.size;count++;}
+   else if(e.isFile()){const s=await stat(/* turbopackIgnore: true */ next);bytes+=s.size;count++;}
   }}catch(e){if((e as NodeJS.ErrnoException).code!=='ENOENT')throw e;}return {bytes,count};
  }
  return walk(base());

@@ -1,3 +1,7 @@
+> **REV6 / STAGING CANDIDATE (CHƯA NGHIỆM THU PRODUCTION).** Trạng thái test thực tế và cách cài mới: [`00-BAT-DAU-REV6.md`](00-BAT-DAU-REV6.md). Các số liệu RC1 bên dưới là lịch sử, không phải kết quả Rev6.
+
+> **ĐÃ THAY THẾ:** Đây là trạng thái release cũ. Trạng thái hiện tại và yêu cầu nghiệm thu: `FIX20-HUONG-DAN-TRIEN-KHAI.md`.
+
 # GU V5.4.6 VPS Fast RC1 — Kiểm tra trước bàn giao
 
 ## Đã kiểm tra trên bản mã nguồn này

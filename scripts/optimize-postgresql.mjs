@@ -4,9 +4,13 @@
  */
 import pg from 'pg';
 if(!process.env.DATABASE_URL){console.error('DATABASE_URL is required');process.exit(1);}
-const dbName=new URL(process.env.DATABASE_URL).pathname.replace(/^\//,'');
-if(dbName!=='gu_v546_stage' && process.env.GU_OPTIMIZE_ALLOW_OTHER_DB!=='yes'){
- console.error('Safety: index migration defaults to gu_v546_stage only.');process.exit(1);
+const dbUrl=new URL(process.env.DATABASE_URL);
+const dbName=decodeURIComponent(dbUrl.pathname.slice(1));
+if(!['gu_v546_stage','gu_v546_prod'].includes(dbName)||!['127.0.0.1','localhost'].includes(dbUrl.hostname)){
+ console.error('Safety: optimization is restricted to local gu_v546_stage / gu_v546_prod.');process.exit(1);
+}
+if(dbName==='gu_v546_prod'&&process.env.GU_OPTIMIZE_ALLOW_OTHER_DB!=='yes'){
+ console.error('Safety: production optimization requires explicit GU_OPTIMIZE_ALLOW_OTHER_DB=yes after a verified backup.');process.exit(1);
 }
 const indexes=[
  ['gu_docs_by_status',"CREATE INDEX CONCURRENTLY IF NOT EXISTS gu_docs_by_status ON gu_documents(collection,(data->>'status'),id)"],
@@ -18,6 +22,7 @@ const indexes=[
  ['gu_docs_by_return_date',"CREATE INDEX CONCURRENTLY IF NOT EXISTS gu_docs_by_return_date ON gu_documents(collection,(data->>'returnDate'),id)"],
  ['gu_docs_by_item_id',"CREATE INDEX CONCURRENTLY IF NOT EXISTS gu_docs_by_item_id ON gu_documents(collection,(data->>'itemId'),id)"],
  ['gu_docs_by_code',"CREATE INDEX CONCURRENTLY IF NOT EXISTS gu_docs_by_code ON gu_documents(collection,(data->>'code'),id)"],
+ ['gu_docs_unique_active_order_code',"CREATE UNIQUE INDEX CONCURRENTLY IF NOT EXISTS gu_docs_unique_active_order_code ON gu_documents((data->>'code')) WHERE collection='orders' AND NULLIF(data->>'code','') IS NOT NULL"],
  ['gu_docs_by_role',"CREATE INDEX CONCURRENTLY IF NOT EXISTS gu_docs_by_role ON gu_documents(collection,(data->>'role'),id)"],
  ['gu_docs_by_stage',"CREATE INDEX CONCURRENTLY IF NOT EXISTS gu_docs_by_stage ON gu_documents(collection,(data->>'stage'),id)"],
  ['gu_docs_by_approved_date',"CREATE INDEX CONCURRENTLY IF NOT EXISTS gu_docs_by_approved_date ON gu_documents(collection,(data->>'archivedAt'),id)"],

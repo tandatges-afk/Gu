@@ -71,9 +71,38 @@ export function handleError(err: unknown, endpoint?: string) {
 export async function jsonBody(req: NextRequest): Promise<Record<string, unknown>> {
   const size = Number(req.headers.get('content-length') || '0');
   if (size > 32_000) throw new ApiError(413, 'Dữ liệu gửi lên quá lớn.');
+  // Enforce the limit while reading, not just Content-Length (often absent).
+  if (!req.body) throw new ApiError(400,'Thiếu dữ liệu JSON.');
+  const reader=req.body.getReader();
+  const chunks:Uint8Array[]=[];let total=0;
   try {
-    const body: unknown = await req.json();
-    if (!body || typeof body !== 'object' || Array.isArray(body)) throw new Error();
-    return body as Record<string, unknown>;
-  } catch { throw new ApiError(400, 'Dữ liệu JSON không hợp lệ.'); }
+    while(true){
+      const {done,value}=await reader.read();if(done)break;
+      total+=value.byteLength;
+      if(total>32_000)throw new ApiError(413,'Dữ liệu gửi lên quá lớn.');
+      chunks.push(value);
+    }
+    const body:unknown=JSON.parse(new TextDecoder().decode(Buffer.concat(chunks)));
+    if (!body || typeof body !== 'object' || Array.isArray(body)) throw new Error('Invalid JSON object');
+    return body as Record<string,unknown>;
+  }catch(e){
+    if(e instanceof ApiError)throw e;
+    throw new ApiError(400,'Dữ liệu JSON không hợp lệ.');
+  }finally{reader.releaseLock();}
+}
+/** Hard-stop binary upload streams, including chunked requests with no Content-Length. */
+export async function boundedUploadBytes(req:NextRequest,max=3*1024*1024):Promise<Buffer>{
+ const size=Number(req.headers.get('content-length')||0);
+ if(size>max)throw new ApiError(413,'Ảnh tối đa 3 MB.');
+ if(!req.body)throw new ApiError(400,'Ảnh trống.');
+ const reader=req.body.getReader();const chunks:Uint8Array[]=[];let total=0;
+ try{
+  while(true){
+   const {done,value}=await reader.read();if(done)break;
+   total+=value.byteLength;
+   if(total>max){await reader.cancel().catch(()=>{});throw new ApiError(413,'Ảnh tối đa 3 MB.');}
+   chunks.push(value);
+  }
+  return Buffer.concat(chunks);
+ }finally{reader.releaseLock();}
 }

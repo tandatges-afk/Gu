@@ -29,7 +29,7 @@ export function GuOrderPaymentPanel({order,api,onPaid}:{order:RentalOrder;api:Ap
   const key=pending.current?.amount===amount?pending.current:{requestId:crypto.randomUUID(),amount};pending.current=key;
   try{
    await api('v5/orders/'+order.id,{method:'PATCH',body:JSON.stringify({action:'PAY',amount,method:clothingPolicy?'PHOTO_PROOF':method,reference:clothingPolicy?'':reference,requestId:key.requestId,...(clothingPolicy?{paymentProofId:photoId,paymentDraftId:photoDraftId}:{})})});
-   pending.current=null;setCustom('');setPhotoId('');await onPaid();
+   await onPaid();pending.current=null;setCustom('');setPhotoId('');
   }catch(e){setError(e instanceof Error?e.message:'Không lưu được tiền đã thu.');}
   finally{setBusy(false);}
  };

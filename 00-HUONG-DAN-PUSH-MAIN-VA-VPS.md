@@ -1,3 +1,5 @@
+> **KHÔNG DÙNG HƯỚNG DẪN RC1 NÀY ĐỂ PUSH/DEPLOY FIX20.** Nội dung bên dưới thuộc phiên bản cũ và có hướng dẫn Production tự động không còn đúng. Cách push bằng terminal vào repo `C:\Users\Admin\Desktop\GU-MAIN-READY`: `PUSH-FIX20-TERMINAL-WINDOWS.md`. Cách staging/production: `FIX20-HUONG-DAN-TRIEN-KHAI.md`.
+
 # GU 5.4.6 VPS Fast RC1 — Thay mã nguồn GitHub `main` và triển khai VPS
 
 > **Bản ứng viên phát hành (RC), chưa được xác nhận sản xuất.** Giữ nguyên GU 6.1 trên cổng 3200 cho đến khi GU V5 build/test tích hợp trên VPS, chứng từ riêng tư, tiền, phân quyền và đồng thời đặt đồ đạt. Mã nguồn lấy GU 5.4.6 và tối ưu truy xuất ý tưởng từ GU 5.0.0. Không xóa khách/đơn/ảnh, không xóa Git history.

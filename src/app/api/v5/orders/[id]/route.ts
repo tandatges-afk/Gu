@@ -1,4 +1,5 @@
 import {NextRequest,NextResponse,after} from 'next/server';
+import {createHash} from 'node:crypto';
 import {db} from '@/lib/firebase-admin';
 import {staffUser,handleError,jsonBody,ApiError,requireAdmin,requirePcStaff} from '@/lib/http';
 import {billableBlocks,vnDayKey} from '@/lib/hourly-pricing';
@@ -73,10 +74,24 @@ export async function PATCH(req:NextRequest,ctx:{params:Promise<{id:string}>}){
   if(['VOID','CANCEL','APPROVE_RETURN','AUTO_RESOLVE_CAMERA_LATE','REVIEW_PHOTOS','REFUND_RETURN','REFUND_RESERVATION'].includes(action))requireAdmin(me);
   if(['PAY','EXTEND','ADD_ITEMS'].includes(action))requirePcStaff(me);
   const ref=db().collection('orders').doc(id);const job=db().collection('mobileJobs').doc(id);
+  // Fix17/20: durable replay guard for every action when client supplies a UUID.
+  // It prevents two tabs or an HTTP retry from applying a surcharge twice.
+  const mutationId=String(b.requestId||'');
+  if(mutationId&&!/^[a-f0-9-]{36}$/.test(mutationId))throw new ApiError(400,'Mã lượt thao tác không hợp lệ.');
+  const mutationRef=mutationId?ref.collection('mutationRequests').doc(mutationId):null;
+  const mutationFingerprint=createHash('sha256').update(JSON.stringify({actor:me.uid,action,
+   ...Object.fromEntries(Object.entries(b).filter(([key])=>key!=='requestId'))})).digest('hex');
   const now=new Date().toISOString();
   await db().runTransaction(async tx=>{
    const orderSnap=await tx.get(ref);if(!orderSnap.exists||!orderSnap.data()?.pricingVersion)throw new ApiError(404,'Đơn không thuộc quy trình mới.');
    const order={id:orderSnap.id,...orderSnap.data()} as RentalOrder;
+   if(mutationRef){
+    const prior=await tx.get(mutationRef);
+    if(prior.exists){
+     if(prior.data()?.fingerprint!==mutationFingerprint)throw new ApiError(409,'Mã thao tác đã được dùng cho nội dung khác.');
+     return; // previous transaction already committed the order and its cash ledger
+    }
+   }
    if(['CANCELLED','VOIDED'].includes(order.status)||(order.status==='RETURNED'&&!['PAY','VOID','AUTO_RESOLVE_CAMERA_LATE','REVIEW_PHOTOS','REFUND_RETURN','REFUND_RESERVATION','APPLY_SURCHARGE','RETURN_COLLATERAL','FINALIZE_LEGACY_RETURN'].includes(action)))throw new ApiError(409,'Đơn đã đóng.');
    const itemRefs=order.lines.map(l=>db().collection('items').doc(l.itemId));
    if(action==='HANDOVER'){
@@ -433,6 +448,7 @@ export async function PATCH(req:NextRequest,ctx:{params:Promise<{id:string}>}){
     tx.update(ref,{returnAt:next,returnDate:vnDayKey(next),rentalDays:blocks,lines,total,bookedRentTotal:total,paid:paidAfter,prepaidRentTotal:order.bookingKind==='RESERVE'&&order.status==='RESERVED'?paidAfter:order.prepaidRentTotal||0,updatedAt:now,history:[...order.history,{action:'EXTEND',at:now,by:me.uid,amount:total-order.total,detail:'Gia hạn theo chu kỳ 24 giờ'}]});
     tx.set(job,{returnAt:next,updatedAt:now},{merge:true});
    }
+   if(mutationRef)tx.create(mutationRef,{fingerprint:mutationFingerprint,actor:me.uid,action,createdAt:now});
    auditInTransaction(tx,me,'V5_'+action,'order',id,`${order.code} / ${me.name}`);
   });
   if(['RECEIVE','REVIEW_PHOTOS','APPROVE_RETURN','FINALIZE_LEGACY_RETURN','CANCEL','VOID'].includes(action)){

@@ -1,0 +1,9 @@
+[Unit]
+Description=GU Fix20 production safety monitor every 15 minutes
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec=15min
+Persistent=true
+Unit=gu-fix20-monitor.service
+[Install]
+WantedBy=timers.target

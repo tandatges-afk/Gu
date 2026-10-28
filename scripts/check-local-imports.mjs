@@ -49,7 +49,7 @@ for(const dir of sourceDirs)for(const file of filesUnder(join(root,dir))){
 if(missing.length){
  console.error('GU IMPORT CHECK FAILED: file nguồn đang thiếu hoặc tên không khớp chữ hoa/thường.');
  for(const path of missing)console.error('  MISSING:',path);
- console.error('Giải nén FULL-CODESPACES.zip vào thư mục gốc repository rồi chạy lại kiểm tra.');
+ console.error('Hãy giải nén đầy đủ ZIP Fix20 vào worktree mới, không trộn với source cũ.');
  process.exitCode=1;
 }else{
  console.log(`GU IMPORT CHECK OK: ${localRefs} local imports resolved across ${scanned} source files.`);
