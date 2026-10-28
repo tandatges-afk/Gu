@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "release": "5.4.6-fix20.0-rev7",
-  "source": "GU Rev7.9: username login, >=6 character passwords, legacy account migration, clean repository, Next.js VPS route cleanup",
+  "source": "GU Rev7.9.1: single VPS capacity overview, compact rental order details and preserved payment flows",
   "files": {
     ".env.example": "81df7902d420c6e511dab9449268fc4f096fc4dc74302f3c3893feb41fb4e785",
     ".env.vps.example": "f73165e145a3524858535fce2a0301e81628858f2372d2783e8da0e3736027e4",
@@ -101,7 +101,7 @@
     "src/app/api/v5/visual-availability/route.ts": "249de42d8952736d29a473bc4218a263f1a090d97801cb72f59514b336629db5",
     "src/app/api/v5/visual-catalog/route.ts": "41390d294985f8c2518c55395db7c65a1de79c2b344543ab8e9f0f5568d2a56c",
     "src/app/api/version/route.ts": "73f185b8ca7c2299c7bccaa2f8f9fa1ef21a6d65394bb573901ae04a644ef12c",
-    "src/app/globals.css": "861cc6c5a3b7baec2d6e6d786abc79c6358e95fdc1999bc299fe4b379fad63af",
+    "src/app/globals.css": "b96807e46636de1f048cd6bd8ad9ef1e05511d7c9ad380423074b8d67e1cdf28",
     "src/app/gu-premium.css": "2dacf272ebaa15c636902aecc3e6deca569d19e91e9e4b49cd7047b0c52c50a5",
     "src/app/gu-redesign.css": "ba88b57a1eaf602cff895df0aa2f7557e1f8d0109dd58de2dd2f7e93e4669ca3",
     "src/app/layout.tsx": "e9dbee4dfd9a1a6b71394b8fe0f35cb922f3bd253a7ada6a7c786345deaa29b9",
@@ -129,10 +129,10 @@
     "src/components/GuSecurePhoto.tsx": "6eea0be8e8df0b06920e8e61c1ffd4373f9297e95ee38f763d99f3c1c05070bb",
     "src/components/GuSecureUpload.tsx": "cd57ed5e8b601059c3ce649385358fd88cf95601edce1fc3db042c267d8ea3a7",
     "src/components/GuStaffShifts.tsx": "c17437a68d7ec743a6c13b089368dc5c21acb6033218f01d45b54a5157966e4f",
-    "src/components/GuSystem.tsx": "3dfc1ed921045e139b3c0bea5a8728299d1ba838aa500571beff511e2832fb1a",
+    "src/components/GuSystem.tsx": "6690c3013f53f15b42e6d8e10f79675be9074bc2f9a38453af8e15c72f6b3a45",
     "src/components/GuV5Booking.module.css": "a12b630e64ecba16acaeba5939210ee1ebcf81ad2ca0f5672ca7e3a8a361010a",
     "src/components/GuV5Booking.tsx": "71c5da7e9c1f835ad2d422fad41ff4d574381ea5cd460d29607560bfc67e0ac9",
-    "src/components/GuV5Review.tsx": "c1411265ed73abd4f4a43e9c94db848f4a8cfdb6c1a434e314968ce9ba159d64",
+    "src/components/GuV5Review.tsx": "091a292626bce66cae838ff5772d946af1e6327a48a8d4f81f36f023e027ff68",
     "src/components/GuVNDateTimeInput.tsx": "ec5879be14375506bf8e29098745df6ef43d2df77e9af3cb872c034a7bad9eed",
     "src/components/GuVisualFinder.module.css": "7fa2bfbf5db12bda1b9bfabd8666ebad609b9d26560da27603c3e9c8bc30740f",
     "src/components/GuVisualFinder.tsx": "7109def1d377509a2ddcdcfc2f2cdd94753de44dec2e867162aa12d42e149627",
@@ -287,7 +287,7 @@
     "tests/v546-ui-upload-hotfix.test.ts": "47e57a6e3f901266f4b4164cb75329de9e21e2e432a91358324a0f84e0300d43",
     "tests/visual-availability-v532.test.ts": "28e5bda2a49644c39b46896f5c75cb2d168e54492dbf6d80636bf14bcd224e9f",
     "tests/visual-search-v538.test.ts": "d26aace03ddc0b682000b2980b5328b5c9659ebe38c4a4999608d4f1f58179e8",
-    "tests/vnd-input-v421.test.ts": "86f6fc6cccbdd0df998822f226e56a56f206b93d6aa913235df2896e86ce6803",
+    "tests/vnd-input-v421.test.ts": "765a73502401a0605c4d54de988da4048d69e367d38555ca222004b0846bb01b",
     "tests/vps-performance.test.ts": "4eee27da027255894634c10e8c4c0d58ba0af1ed5b3c6b9fc5698f39c1839cfe",
     "tests/vps-port.test.ts": "cada5e5f597aec3c9fa8e7657c6a88bfe70e0908791ff0c2c7cedba91e979805",
     "tsconfig.json": "e95e8bb140561c042400288fb07f7c28591e215440b01e475eb00095794c6ef7",
@@ -297,6 +297,6 @@
     "vps-main/prepare-v5-vps.sh": "29f036194cce2383b9f800459165d3a82e4dd332d87486df04b81725a1c9d7a3",
     "windows/01-replace-main-safely.ps1": "926496253b2cef8a881235971454b0eade20cd056028fec1a4b739c9c12c1ca3",
     "windows/apply-full-source.ps1": "cc3ac34c02e5e460475a3cfd200a571b682ade51497eeb1fa777b302a4b5286b",
-    "SOURCE-SHA256SUMS.txt": "99e2d29d0987f6a5d459730bb47a4a94b760e3fa29a72e8a5d1228bd85287ad8"
+    "SOURCE-SHA256SUMS.txt": "c9f46daf6e891e10d9a1312b751de8caaadaaf98e4c3b2a0bf6054e39d118469"
   }
 }

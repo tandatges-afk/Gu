@@ -1,54 +1,51 @@
 'use client';
-import {formatVNDateTime} from '@/lib/vn-datetime';
 import {useEffect,useState} from 'react';
-import {Cloud,HardDrive,RefreshCw} from 'lucide-react';
-import {usageStatus,type UsageValue} from '@/lib/usage-metrics';
+import {HardDrive,RefreshCw} from 'lucide-react';
+import {formatVNDateTime} from '@/lib/vn-datetime';
+
 type Api=<T=unknown>(path:string,init?:RequestInit)=>Promise<T>;
-type CloudinaryReport={source:'provider'|'unavailable';message?:string;updatedAt?:string|null;plan?:string;credits?:UsageValue;freeReferenceCredits?:number;resources?:number|null;storage?:UsageValue;bandwidth?:UsageValue;transformations?:UsageValue};
-type Response={vps?:{disk:{used:number;limit:number;free:number};mediaBytes:number;mediaFiles:number};cloudinary:CloudinaryReport;checkedAt:string;cacheMinutes:number};
+type SystemReport={vps?:{disk:{used:number;limit:number;free:number};mediaBytes:number;mediaFiles:number};checkedAt:string};
 type StorageHealth={ok:boolean;bucket:string;location:string|null;projectId:string|null;writeVerified:boolean};
-const fmt=(value:number|null|undefined)=>value==null?'—':value>0&&value<0.01?'< 0,01':value.toLocaleString('vi-VN',{maximumFractionDigits:2});
-const fmtBytes=(value:number|null|undefined)=>value==null?'—':value<1024**2?`${(value/1024).toFixed(1)} KB`:`${(value/1024**3).toFixed(2)} GB`;
-function Measure({title,data,bytes=false}:{title:string;data?:UsageValue;bytes?:boolean}){
- const used=data?.used??null,limit=data?.limit??null;
- const percent=limit&&used!==null?Math.min(100,Math.round(used/limit*100)):null;
- const state=usageStatus(used,limit);
- return <div className={'gu-system-meter gu-system-'+state}>
-  <div className="gu-system-meter-title"><strong>{title}</strong><span>{percent===null?'—':percent+'%'}</span></div>
-  <div className="gu-system-meter-value">{bytes?fmtBytes(used):fmt(used)} <span>/ {bytes?fmtBytes(limit):fmt(limit)}</span></div>
-  <div className="gu-system-progress" role="progressbar" aria-label={title} aria-valuemin={0} aria-valuemax={100} aria-valuenow={percent??undefined}><span style={{width:(percent??0)+'%'}}/></div>
- </div>;
-}
+const fmtBytes=(v:number|null|undefined)=>v==null?'—':v<1024?`${Math.round(v)} B`:v<1024**2?`${(v/1024).toFixed(1)} KB`:v<1024**3?`${(v/1024**2).toFixed(1)} MB`:`${(v/1024**3).toFixed(2)} GB`;
+
+/** Admin-only summary: disk and media metrics are shown exactly once. No estimated bandwidth. */
 export function GuSystem({api}:{api:Api}){
- const [data,setData]=useState<Response|null>(null);
+ const [data,setData]=useState<SystemReport|null>(null);
  const [error,setError]=useState('');const [busy,setBusy]=useState(false);
- const [storage,setStorage]=useState<StorageHealth|null>(null);const [storageError,setStorageError]=useState('');const [checkingStorage,setCheckingStorage]=useState(false);
- const checkStorage=async(write=false)=>{setCheckingStorage(true);setStorageError('');setStorage(null);try{const result=await api<StorageHealth>('v5/storage-health',write?{method:'POST'}:undefined);setStorage(result);}catch(e){setStorageError(e instanceof Error?e.message:'Không kiểm tra được Storage.');}finally{setCheckingStorage(false);}};
- const load=async(refresh=false)=>{setBusy(true);try{setData(await api<Response>(refresh?'system?refresh=1':'system'));setError('');}catch(e){setError(e instanceof Error?e.message:'Không thể tải thống kê lưu trữ VPS.');}finally{setBusy(false);}};
+ const [storage,setStorage]=useState<StorageHealth|null>(null);
+ const [storageError,setStorageError]=useState('');const [checkingStorage,setCheckingStorage]=useState(false);
+ const checkStorage=async(write=false)=>{
+  setCheckingStorage(true);setStorageError('');setStorage(null);
+  try{setStorage(await api<StorageHealth>('v5/storage-health',write?{method:'POST'}:undefined));}
+  catch(e){setStorageError(e instanceof Error?e.message:'Không kiểm tra được nơi lưu ảnh.');}
+  finally{setCheckingStorage(false);}
+ };
+ const load=async(refresh=false)=>{
+  setBusy(true);
+  try{setData(await api<SystemReport>(refresh?'system?refresh=1':'system'));setError('');}
+  catch(e){setError(e instanceof Error?e.message:'Không thể tải dung lượng VPS.');}
+  finally{setBusy(false);}
+ };
  useEffect(()=>{void load();},[]);
- const cloud=data?.cloudinary;
- return <>
-  <div className="page-intro"><div><h1>Dung lượng lưu trữ VPS</h1></div><button className="btn btn-white" disabled={busy} onClick={()=>void load(true)}><RefreshCw size={16}/>{busy?'Đang tải…':'Cập nhật'}</button></div>
+ const disk=data?.vps?.disk;
+ const percent=disk?.limit?Math.min(100,Math.max(0,Math.round(disk.used/disk.limit*100))):0;
+ return <section className="gu-system-compact">
+  <div className="page-intro"><div><h1>Hệ thống & lưu trữ</h1><p className="gu-system-subtitle">Một nơi theo dõi dung lượng VPS và ảnh của cửa hàng.</p></div><button type="button" className="btn btn-white" disabled={busy} onClick={()=>void load(true)}><RefreshCw size={16}/>{busy?'Đang cập nhật…':'Cập nhật'}</button></div>
   {error&&<div className="inline-alert danger-alert" role="alert">{error}</div>}
-  {data?.vps&&<section className="panel gu-system-card" aria-label="Ổ đĩa VPS"><div className="gu-system-heading"><HardDrive size={21}/><h2>Ổ đĩa VPS · Tổng / Đã dùng / Còn trống</h2></div><Measure title="Dung lượng ổ đĩa VPS" data={{used:data.vps.disk.used,limit:data.vps.disk.limit}} bytes/><p>Còn trống: <b>{fmtBytes(data.vps.disk.free)}</b> · Ảnh GU: <b>{fmtBytes(data.vps.mediaBytes)}</b> ({data.vps.mediaFiles.toLocaleString('vi-VN')} file)</p></section>}
-  <section className="panel gu-system-card gu-cloudinary-only" aria-label="Thống kê VPS">
-   <div className="gu-system-heading"><Cloud size={21}/><div><h2>Dung lượng & băng thông</h2><small>{cloud?.plan||'GU VPS'}</small></div></div>
-   {cloud?.source==='unavailable'&&<p className="inline-alert danger-alert">{cloud.message||'Không lấy được thống kê VPS.'}</p>}
-   
-   <Measure title="Dung lượng ảnh" data={cloud?.storage} bytes/>
-   
-   
-   <div className="gu-system-detail"><HardDrive size={16}/><span>Số ảnh/tài nguyên: <b>{fmt(cloud?.resources)}</b></span></div>
-   {cloud?.updatedAt&&<small className="gu-system-updated">Cập nhật: {formatVNDateTime(cloud.updatedAt)}</small>}
+  <section className="panel gu-system-card gu-system-overview" aria-label="Dung lượng lưu trữ VPS">
+   <div className="gu-system-heading"><HardDrive size={20}/><h2>Dung lượng VPS</h2></div>
+   {disk?<>
+    <div className="gu-system-kpis"><div><span>Đã dùng</span><strong>{fmtBytes(disk.used)}</strong></div><div><span>Còn trống</span><strong>{fmtBytes(disk.free)}</strong></div><div><span>Tổng dung lượng</span><strong>{fmtBytes(disk.limit)}</strong></div></div>
+    <div className="gu-system-progress" role="progressbar" aria-label="Dung lượng ổ đĩa đã sử dụng" aria-valuemin={0} aria-valuemax={100} aria-valuenow={percent}><span style={{width:percent+'%'}}/></div>
+    <div className="gu-system-media"><span>Ảnh GU: <b>{fmtBytes(data?.vps?.mediaBytes)}</b></span><span>Số ảnh: <b>{(data?.vps?.mediaFiles??0).toLocaleString('vi-VN')}</b></span></div>
+    {data?.checkedAt&&<small className="gu-system-updated">Cập nhật: {formatVNDateTime(data.checkedAt)}</small>}
+   </>:<p className="gu-system-subtitle">{busy?'Đang đọc thống kê VPS…':'Chưa có dữ liệu. Chọn Cập nhật để thử lại.'}</p>}
   </section>
-  <section className="panel gu-system-card" aria-label="Kiểm tra lưu trữ ảnh bảo mật trên VPS">
-   <div className="gu-system-heading"><HardDrive size={21}/><h2>VPS · Ảnh cọc</h2></div>
-   <div className="action-row">
-    <button type="button" className="btn btn-white" disabled={checkingStorage} onClick={()=>void checkStorage()}>{checkingStorage?'Đang kiểm tra…':'Kiểm tra kết nối'}</button>
-    <button type="button" className="btn btn-white" disabled={checkingStorage} onClick={()=>void checkStorage(true)}>Thử ghi / xóa</button>
-   </div>
-   {storage&&<p role="status">Chế độ: <b>{storage.bucket}</b> · Nguồn: <b>{storage.projectId||'—'}</b>{storage.writeVerified?' · Ghi/xóa: Đạt':''}</p>}
+  <details className="panel gu-system-storage-extra"><summary>Kiểm tra kho ảnh nhạy cảm <span>Chỉ dành cho Admin</span></summary>
+   <p className="gu-system-subtitle">Chỉ dùng khi ảnh cọc/CCCD gặp sự cố. Thao tác thử ghi/xóa chỉ tạo và xóa một ảnh thử.</p>
+   <div className="action-row"><button type="button" className="btn btn-white" disabled={checkingStorage} onClick={()=>void checkStorage()}>{checkingStorage?'Đang kiểm tra…':'Kiểm tra kết nối'}</button><button type="button" className="btn btn-white" disabled={checkingStorage} onClick={()=>void checkStorage(true)}>Thử ghi / xóa</button></div>
+   {storage&&<p role="status">{storage.ok?'Kết nối tốt':'Cần kiểm tra'} · {storage.bucket}{storage.writeVerified?' · Ghi/xóa đạt':''}</p>}
    {storageError&&<p className="inline-alert danger-alert" role="alert">{storageError}</p>}
-  </section>
- </>;
+  </details>
+ </section>;
 }

@@ -30,8 +30,17 @@ test('all GU monetary entry points use reusable formatter',()=>{
   assert.match(component,/onValueChange\(raw\)/);
   assert.match(component,/inputMode="numeric"/);
 });
-test('Cloudinary fractional credits remain visible without Firestore monitoring hint',()=>{
+test('GU system shows VPS capacity and images only once, with diagnostics collapsed',()=>{
  const admin=readFileSync('src/components/GuSystem.tsx','utf8');
- assert.match(admin,/maximumFractionDigits:2/);
- assert.doesNotMatch(admin,/monitoring\.viewer|Firebase Firestore|Vercel · Web\/API/);
+ assert.match(admin,/Hệ thống & lưu trữ/);
+ assert.match(admin,/Dung lượng VPS/);
+ assert.match(admin,/Còn trống/);
+ assert.match(admin,/Ảnh GU:/);
+ assert.match(admin,/Số ảnh:/);
+ assert.match(admin,/<details className="panel gu-system-storage-extra"/);
+ assert.doesNotMatch(admin,/Dung lượng & băng thông|cloudinary-only|monitoring\.viewer|Firebase Firestore/);
+ const detail=readFileSync('src/components/GuV5Review.tsx','utf8');
+ assert.match(detail,/gu-order-more/);
+ assert.match(detail,/Thông tin & thao tác khác/);
+ assert.ok(detail.indexOf('gu-v11-capture-button')<detail.indexOf('gu-order-more'));
 });

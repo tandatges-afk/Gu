@@ -1178,3 +1178,51 @@ html,body{background:var(--paper);color:var(--ink)}
 .gu-camera-live-alert strong{display:block;font-size:14px;margin-bottom:4px}
 .gu-camera-settlement-note{border:1px solid #d9e8e4;background:#f4f9f7;color:#264c48;border-radius:10px;padding:11px 13px;font-size:13px;line-height:1.55;margin:8px 0 14px}
 @media(max-width:620px){.gu-camera-overdue-summary,.gu-camera-live-alert{padding:10px 12px;margin:8px 0}.gu-camera-settlement-note{font-size:12px}}
+
+/* Rev7.9.1 · compact system metrics and order summary. Scoped to avoid legacy overrides. */
+.gu-system-compact{display:grid;gap:14px;max-width:1050px}
+.gu-system-compact .page-intro{margin-bottom:2px}
+.gu-system-subtitle{font-size:13px;line-height:1.55;color:#667786;margin:6px 0 0}
+.gu-system-compact .gu-system-overview{padding:22px 24px}
+.gu-system-compact .gu-system-heading{margin-bottom:12px}
+.gu-system-kpis{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:18px 0}
+.gu-system-kpis>div{display:grid;gap:6px;background:#f5f8f9;border:1px solid #e0e9eb;padding:14px 16px;border-radius:12px}
+.gu-system-kpis span{font-size:12px;color:#60717c}
+.gu-system-kpis strong{font-size:clamp(17px,2.5vw,25px);font-weight:800;color:#183d48;font-variant-numeric:tabular-nums}
+.gu-system-compact .gu-system-progress{height:9px;margin:8px 0 15px}
+.gu-system-compact .gu-system-progress span{background:#245c62}
+.gu-system-media{display:flex;flex-wrap:wrap;gap:8px 20px;margin:0 0 10px;font-size:13px;color:#48636b}
+.gu-system-storage-extra{padding:0!important;overflow:hidden}
+.gu-system-storage-extra>summary{cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:15px;min-height:56px;padding:14px 22px;font-weight:750;color:#214750}
+.gu-system-storage-extra>summary span{font-weight:500;font-size:12px;color:#71828b}
+.gu-system-storage-extra[open]>summary{border-bottom:1px solid #e2e9eb}
+.gu-system-storage-extra>p,.gu-system-storage-extra>.action-row{margin:12px 22px}
+.gu-order-compact .gu-order-title{display:flex;justify-content:space-between;align-items:start;gap:10px;margin:0 0 14px}
+.gu-order-compact .gu-order-title h3{font-size:17px;margin:0 0 4px;overflow-wrap:anywhere}
+.gu-order-compact .gu-order-title p{margin:0;font-size:12px;color:#677c88;line-height:1.45;overflow-wrap:anywhere}
+.gu-order-status{font-size:11px;font-weight:800;white-space:nowrap;background:#e7f3ec;color:#266145;border-radius:999px;padding:6px 10px}
+.gu-order-compact .gu-pickup-summary{margin:0 0 12px}
+.gu-order-compact .gu-quick-money{margin:10px 0 12px}
+.gu-order-compact .gu-v11-capture-button{margin:12px 0 14px;min-height:48px}
+.gu-order-more{border:1px solid #dce5e8;border-radius:14px;background:#fff;margin:14px 0 4px;overflow:hidden}
+.gu-order-more>summary{display:flex;align-items:center;justify-content:space-between;gap:12px;cursor:pointer;min-height:52px;padding:12px 15px;color:#244c58;font-size:13px;font-weight:800}
+.gu-order-more>summary small{font-size:11px;color:#73838d;font-weight:500;text-align:right}
+.gu-order-more[open]>summary{border-bottom:1px solid #e0e8e9;background:#f8fbfb}
+.gu-order-more-body{padding:13px 15px;display:grid;gap:9px;min-width:0}
+.gu-order-more-body>.gu-optional-details,.gu-order-more-body>.gu-cash-ledger{margin:0}
+.gu-order-more-body>.gu-v5-add-items{margin:0}
+.gu-order-more-body>.gu-mini-note{margin:0}
+@media(max-width:650px){
+ .gu-system-compact .gu-system-overview{padding:16px}
+ .gu-system-kpis{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+ .gu-system-kpis>div:last-child{grid-column:1/-1}
+ .gu-system-compact .page-intro{flex-direction:column}
+ .gu-system-storage-extra>summary{padding:12px 15px}
+ .gu-order-compact .gu-order-title{align-items:flex-start}
+ .gu-order-more>summary{display:grid;gap:3px}
+ .gu-order-more>summary small{text-align:left}
+ .gu-order-compact .gu-quick-money{grid-template-columns:repeat(3,minmax(0,1fr));gap:5px}
+ .gu-order-compact .gu-quick-money>span{display:grid;gap:4px;padding:9px 8px;min-width:0}
+ .gu-order-compact .gu-quick-money strong{font-size:clamp(12px,3.3vw,15px);overflow-wrap:anywhere}
+ .gu-order-more-body{padding:10px}
+}
