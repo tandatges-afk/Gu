@@ -1,7 +1,7 @@
 'use client';
 import {uploadImageToApi} from '@/lib/upload-client';
 import {useEffect,useMemo,useState} from 'react';
-import {Camera,CheckCircle2,X} from 'lucide-react';
+import {Camera,CheckCircle2,X,Wallet,ShieldCheck,PackageCheck} from 'lucide-react';
 import {clientAuth} from '@/lib/firebase-client';
 import {preparePhonePhoto} from '@/lib/mobile-images';
 import {ProductImage,type ApiCall} from './GuExtras';
@@ -97,14 +97,40 @@ export function GuOrderCapture({orderId,api,onClose,onDone}:{orderId:string;api:
    {phase==='RETURN'&&<details className="gu-v52-deposit-panel gu-optional-details"><summary>Kiểm tra chứng từ cọc / CCCD</summary>{(order.handoverDepositProofId||order.hadHandoverDeposit)?<><p>Đã nhận: {order.handoverDepositKind==='CCCD'?'CCCD / Giấy tờ':order.handoverDepositKind==='CASH'?(cameraOrder&&!cameraPolicy?'Tiền cọc · đơn cũ tự đối soát':money(order.handoverCashCollateralAmount||0)+' tiền cọc'):'Vật cọc khác'}. Kiểm tra và trao trả trực tiếp cho khách, không cần chụp lại.</p>{order.handoverDepositProofId?<GuSecurePhoto id={order.handoverDepositProofId} alt="Vật cọc khách khi giao"/>:<small>Ảnh đã được xóa sau khi Admin duyệt.</small>}</>:<p>Đơn này không lưu ảnh vật cọc.</p>}</details>}
    <footer className="gu-capture-footer"><button type="button" className="btn btn-white" onClick={onClose}>Để sau</button><button type="button" className="btn btn-dark" disabled={!canSend} onClick={()=>void submit()}><CheckCircle2 size={18}/>{busy?'Đang lưu…':phase==='RETURN'?'Nhận đồ · mở thanh toán':'Xác nhận giao hàng'}</button></footer>
   </>}
-  {order&&settling&&<section className="gu-v52-settlement"><h3>✓ Đã nhận {cameraOrder?'máy ảnh':'đồ'} · Quyết toán</h3>{cameraOrder?<p className="gu-camera-settlement-note">Tổng thuê sau khi tính giờ trả: <b>{money(order.total)}</b>{order.cameraOvertimeFeeTotal?<> · Đã gồm trễ <b>{money(order.cameraOvertimeFeeTotal)}</b></>:null} · Đã thu <b>{money(order.paid)}</b>. Tiền cọc theo chính sách mới được khấu trừ một lần khi nhân viên xác nhận trả cọc.</p>:<div className="gu-quick-money"><span><small>Tổng thuê & phí</small><strong>{money(order.total+(order.otherFeeTotal||0)+(order.compensationTotal||0)+(order.lateFeeTotal||0))}</strong></span><span><small>Đã thu tiền thuê</small><strong>{money(order.paid)}</strong></span><span><small>{clothingPolicy?'Còn thiếu trước cấn trừ':'Còn thu tiền thuê'}</small><strong>{money(due)}</strong></span></div>}
-   {(cameraOrder&&cameraPolicy?Boolean(returnQuote?.collect):cameraOrder?due>0:clothingPolicy?Boolean(returnQuote?.collect):due>0)&&<GuOrderPaymentPanel order={order} api={api} onPaid={async()=>{const fresh=await api<{order:RentalOrder}>('v5/orders/'+order.id);setOrder(fresh.order);await onDone();}}/>}
-   {returnQuote&&<p className="gu-mini-note">{returnQuote.returnId?'Trả CCCD':`Hoàn cọc ${money(returnQuote.refund)}`} · Đã cấn trừ {money(returnQuote.applied)}{returnQuote.collect>0?` · Cần thu thêm ${money(returnQuote.collect)}`:''}</p>}
-   
-   {order.handoverDepositProofId&&<div className="gu-v52-deposit-panel"><strong>{cameraOrder?(cameraPolicy?'Hoàn cọc 18 triệu / Trả CCCD':'Đối soát cọc máy ảnh (đơn cũ)'):'Hoàn cọc / Trả CCCD'}</strong><p>{cameraOrder&&!cameraPolicy?'Đơn cũ: cửa hàng đối soát cọc thủ công.':returnQuote?returnQuote.returnId?'Trả CCCD cho khách':`Hoàn lại ${money(returnQuote.refund)} (đã cấn trừ ${money(returnQuote.applied)})`:'Trao trả trực tiếp, không cần chụp ảnh lần nữa.'}</p><details className="gu-optional-details"><summary>Xem ảnh cọc / CCCD đã giữ</summary><GuSecurePhoto id={order.handoverDepositProofId} alt="Vật cọc cần hoàn"/></details>{order.collateralReturnedAt?<p>✓ Đã xác nhận trả vật cọc.</p>:<button className="btn btn-white" disabled={busy||Boolean(returnQuote?.collect)||(cameraOrder&&!cameraPolicy&&due>0)} onClick={()=>void confirmCollateral()}>Xác nhận đã hoàn cọc / CCCD</button>}</div>}
-   {(order.refundPending||0)>0&&<div className="inline-alert danger-alert">Đã thu thừa {money(order.refundPending||0)}. Admin cần đối soát và ghi nhận hoàn tiền thực tế; hàng vẫn đã nhận về.</div>}
-   <details><summary>Thêm phụ thu khi có phát sinh</summary><div className="form-grid"><label className="form-field">Số tiền phụ thu<GuMoneyInput className="input" placeholder="Tiền phát sinh" value={surcharge} onValueChange={setSurcharge}/></label><label className="form-field">Lý do phụ thu<input className="input" value={surchargeReason} onChange={e=>setSurchargeReason(e.target.value)} placeholder="VD: Hỏng phụ kiện"/></label></div><button className="btn btn-white" disabled={busy||!(Number(surcharge)>0)||surchargeReason.trim().length<3} onClick={()=>void saveSurcharge(Number(surcharge),surchargeReason)}>Cộng phụ thu vào đơn</button></details>
-   <footer className="gu-v52-settlement-actions">{Boolean(order.handoverDepositProofId)&&!order.collateralReturnedAt&&<p className="inline-alert danger-alert">Chưa hoàn tất việc trả cọc hoặc CCCD cho khách. Phải quyết toán trước khi đánh dấu hoàn thành.</p>}<button className="btn btn-dark" disabled={busy||Boolean(order.handoverDepositProofId&&!order.collateralReturnedAt)} onClick={onClose}>Hoàn thành · Đóng</button></footer>
+  {order&&settling&&<section className="gu-v52-settlement gu-settlement-v77" aria-label="Các bước quyết toán khi nhận trả">
+   {(()=>{
+    const needsPayment=cameraOrder&&cameraPolicy?Boolean(returnQuote?.collect):cameraOrder?due>0:clothingPolicy?Boolean(returnQuote?.collect):due>0;
+    const remaining=returnQuote?returnQuote.collect:due;
+    const hasCollateral=Boolean(order.handoverDepositProofId||order.hadHandoverDeposit);
+    const collateralDone=Boolean(order.collateralReturnedAt);
+    const completed=remaining===0&&(!hasCollateral||collateralDone);
+    return <>
+     <div className="gu-settlement-success"><PackageCheck size={23}/><div><strong>Đã nhận {cameraOrder?'máy ảnh':'sản phẩm'} thành công</strong><span>Hàng đã được ghi nhận. Kiểm tra tiền và hoàn cọc/CCCD để kết thúc.</span></div></div>
+     <div className="gu-settlement-money" aria-label="Tóm tắt quyết toán">
+      <div><span>Tổng tiền thuê & phụ phí</span><strong>{money(order.total+(order.otherFeeTotal||0)+(order.compensationTotal||0)+(order.lateFeeTotal||0))}</strong></div>
+      <div><span>Đã thu tiền thuê</span><strong>{money(order.paid)}</strong></div>
+      <div className={remaining>0?'gu-money-attention':'gu-money-complete'}><span>{remaining>0?'Cần khách thanh toán thêm':'Tiền thuê cần thu thêm'}</span><strong>{remaining>0?money(remaining):'0 đ'}</strong></div>
+     </div>
+     {cameraOrder&&order.cameraOvertimeFeeTotal? <p className="gu-settlement-subnote">Tổng tiền đã bao gồm {money(order.cameraOvertimeFeeTotal)} phí quá giờ máy ảnh đã chốt.</p>:null}
+     {returnQuote&&order.handoverDepositKind==='CASH'&&<p className="gu-settlement-subnote">Đã đối chiếu cọc tiền: cấn trừ {money(returnQuote.applied)}. Tiền cọc không được cộng vào doanh thu thuê lần hai.</p>}
+     <section className="gu-settlement-step" aria-label="Bước thu tiền">
+      <div className="gu-settlement-step-heading"><span className="gu-step-number">1</span><div><h3>Thu tiền còn thiếu</h3><p>{needsPayment?'Ghi nhận số tiền khách vừa trả, nếu chưa thu đủ.':'Không cần thu thêm tiền thuê.'}</p></div><span className={'gu-step-state '+(!needsPayment?'gu-step-done':'')}>{needsPayment?'Cần xử lý':'Đã đủ'}</span></div>
+      {needsPayment?<GuOrderPaymentPanel order={order} api={api} onPaid={async()=>{const fresh=await api<{order:RentalOrder}>('v5/orders/'+order.id);setOrder(fresh.order);await onDone();}}/>:<p className="gu-step-ok"><CheckCircle2 size={17}/> Không còn tiền thuê phải thu tại bước này.</p>}
+     </section>
+     <section className="gu-settlement-step" aria-label="Bước hoàn cọc hoặc giấy tờ">
+      <div className="gu-settlement-step-heading"><span className="gu-step-number">2</span><div><h3>Hoàn cọc / trả CCCD</h3><p>{!hasCollateral?'Đơn không ghi nhận vật cọc.':collateralDone?'Đã xác nhận hoàn cọc hoặc giấy tờ.':'Kiểm tra và trả vật cọc trực tiếp cho khách.'}</p></div><span className={'gu-step-state '+(collateralDone||!hasCollateral?'gu-step-done':'')}>{!hasCollateral?'Không có':collateralDone?'Đã xong':'Chưa hoàn'}</span></div>
+      {hasCollateral&&<div className="gu-settlement-collateral">
+        <div className="gu-collateral-amount"><ShieldCheck size={18}/><span>{cameraOrder&&!cameraPolicy?'Cọc máy ảnh (đơn cũ, đối soát thủ công)':returnQuote?.returnId?'Trả CCCD cho khách':returnQuote?`Hoàn lại ${money(returnQuote.refund)} tiền cọc`:'Đối chiếu vật cọc đã giữ'}</span></div>
+        {returnQuote&&returnQuote.collect>0&&<p className="gu-settlement-warning">Cần thu đủ {money(returnQuote.collect)} trước khi xác nhận hoàn cọc / CCCD.</p>}
+        {order.handoverDepositProofId&&<details className="gu-optional-details"><summary>Kiểm tra ảnh cọc / CCCD đã giữ</summary><GuSecurePhoto id={order.handoverDepositProofId} alt="Vật cọc cần hoàn"/></details>}
+        {collateralDone?<p className="gu-step-ok"><CheckCircle2 size={17}/> Đã xác nhận hoàn cọc / CCCD.</p>:<button type="button" className="btn btn-dark gu-collateral-confirm" disabled={busy||Boolean(returnQuote?.collect)||(cameraOrder&&!cameraPolicy&&due>0)} onClick={()=>void confirmCollateral()}>Xác nhận đã hoàn cọc / trả CCCD</button>}
+      </div>}
+     </section>
+     {(order.refundPending||0)>0&&<div className="inline-alert danger-alert">Đã thu thừa {money(order.refundPending||0)}. Admin cần đối soát và ghi nhận hoàn tiền thực tế; hàng đã nhận về kho.</div>}
+     <details className="gu-optional-details gu-settlement-surcharge"><summary>Phụ thu phát sinh (chỉ nhập nếu thực sự có)</summary><div className="form-grid"><label className="form-field">Số tiền phụ thu<GuMoneyInput className="input" placeholder="Số tiền phát sinh" value={surcharge} onValueChange={setSurcharge}/></label><label className="form-field">Lý do phụ thu<input className="input" value={surchargeReason} onChange={e=>setSurchargeReason(e.target.value)} placeholder="Ví dụ: Hỏng phụ kiện"/></label></div><button type="button" className="btn btn-white" disabled={busy||!(Number(surcharge)>0)||surchargeReason.trim().length<3} onClick={()=>void saveSurcharge(Number(surcharge),surchargeReason)}>Ghi nhận phụ thu</button></details>
+     <footer className="gu-v52-settlement-actions gu-settlement-bottom"><div className="gu-settlement-result"><Wallet size={18}/><span>{completed?'Đơn đã quyết toán đủ các bước.':'Còn việc cần xử lý; bạn có thể đóng để tiếp tục sau.'}</span></div><button type="button" className={'btn '+(completed?'btn-dark':'btn-white')} disabled={busy} onClick={onClose}>{completed?'Hoàn tất · Đóng':'Để sau · Đóng'}</button></footer>
+    </>;
+   })()}
   </section>}
  </section></div>;
 }

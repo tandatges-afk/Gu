@@ -9,6 +9,7 @@ import {matchesProductSearch} from '@/lib/product-search';
 import {isCameraCategory,isCameraModel,chosenCameraPackageSnapshot} from '@/lib/camera-rental';
 import {orderGroup,productGroup} from '@/lib/order-group';
 import {formatVNDateTime} from '@/lib/vn-datetime';
+import {pickupForDisplay,wasHandedOverEarly} from '@/lib/order-pickup-presentation';
 import {GuVNDateTimeInput} from './GuVNDateTimeInput';
 import {paymentReview} from '@/lib/payment-review';
 import {GuOrderPaymentPanel} from './GuOrderPaymentPanel';
@@ -102,8 +103,8 @@ export function GuV5OrderDetail({order,items,api,onChanged,isAdmin,onCapture}:{o
   finally{setBusy(false);}
  };
  return <div className="modal-body detail-body"><h3>{order.code} · {order.customerName}</h3><p>Mã sản phẩm: {order.lines.map(l=>(l.hangerCode||l.sku)+(l.cameraSerial?' · Serial '+l.cameraSerial:'')).join(', ')}</p>
- <p>Giờ hẹn nhận: <b>{order.scheduledPickupAt||order.pickupAt?formatVNDateTime(order.scheduledPickupAt||order.pickupAt!):order.pickupDate}</b> · Giờ trả dự kiến: <b>{order.returnAt?formatVNDateTime(order.returnAt):order.returnDate}</b></p>
- {order.status!=='RESERVED'&&order.lines[0]?.startAt&&<p className="gu-compact-meta">Bắt đầu tính tiền thuê: <b>{formatVNDateTime(order.lines[0].startAt)}</b>{order.handoverProof?.at&&<> · Giao thực tế: {formatVNDateTime(order.handoverProof.at)}</>}</p>}
+ <div className="gu-pickup-summary" aria-label="Thời gian nhận và trả sản phẩm"><div><span>{order.handoverProof?.at?'Khách đã nhận lúc':'Giờ hẹn nhận'}</span><strong>{pickupForDisplay(order)?formatVNDateTime(pickupForDisplay(order)!):order.pickupDate}</strong>{wasHandedOverEarly(order)&&<small className="gu-early-pickup">Nhận sớm hơn lịch hẹn</small>}</div><div><span>Giờ trả dự kiến</span><strong>{order.returnAt?formatVNDateTime(order.returnAt):order.returnDate}</strong></div></div>
+ {order.status!=='RESERVED'&&<details className="gu-optional-details gu-pickup-audit"><summary>Xem giờ hẹn ban đầu và giờ tính tiền</summary><p>Giờ hẹn ban đầu: <b>{order.scheduledPickupAt||order.pickupAt?formatVNDateTime(order.scheduledPickupAt||order.pickupAt!):order.pickupDate}</b></p>{order.lines[0]?.startAt&&<p>Bắt đầu tính tiền thuê: <b>{formatVNDateTime(order.lines[0].startAt)}</b></p>}</details>}
  {cameraOrder&&<p className="gu-mini-note">Giá gói máy ảnh: {money(order.lines.reduce((s,l)=>s+(l.cameraPackageBasePrice??l.lineTotal??0),0))}{order.cameraOvertimeFeeTotal?` · Phí trễ đã chốt: ${money(order.cameraOvertimeFeeTotal)}`:''}. Phí trả trễ chưa chốt chỉ là tạm tính.</p>}
  {cameraAlert&&<div role="status" className="gu-camera-live-alert"><strong>Máy ảnh trả trễ {cameraAlert.lateMinutes} phút</strong><span>{liveCameraQuote?`Tổng thuê tạm tính ${money(displayedRent)} · Bao gồm phí trễ ${money(liveCameraQuote.lateFee)} · Còn dự kiến ${money(liveCameraQuote.unpaid)}.`:'Chưa tính được phí trễ tạm tính. Nhân viên cần nhận trả để chốt tiền.'} Phí chính thức được ghi nhận khi nhận trả.</span></div>}
  <div className="gu-quick-money"><span><small>{cameraAlert?'Tạm tính đến lúc này':'Tổng thuê'}</small><strong>{money(displayedRent)}</strong></span><span><small>Đã thu</small><strong>{money(order.paid)}</strong></span><span><small>{clothingPolicy?'Thu thêm sau cấn trừ':'Còn thiếu'}</small><strong>{cameraOrder&&order.status==='PICKED_UP'?'Chờ trả máy':money(extraCashNeeded)}</strong></span></div>

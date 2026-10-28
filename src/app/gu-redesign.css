@@ -116,3 +116,76 @@ td b{font-size:12.5px;color:#233d48}
 @media(max-width:620px){.content{padding:18px 12px calc(95px + env(safe-area-inset-bottom,0px))}.page-intro{align-items:flex-start;margin-bottom:15px}.page-intro h1{font-size:25px}.page-intro .action-row{display:flex;flex-wrap:wrap;gap:8px;width:100%}.page-intro .action-row .btn{flex:1 1 145px;min-width:0;padding:9px 11px;min-height:44px}.stats-grid{gap:9px}.metric{min-height:137px;padding:14px}.metric>strong{font-size:20px}.panel-heading{padding:15px 16px}.gu-inventory-tabs{display:flex;width:100%}.gu-inventory-tab{flex:1;min-width:0;white-space:normal;line-height:1.2;padding:9px}.filter-toolbar{padding:12px}.modal,.gu-capture-dialog{border-radius:18px 18px 0 0}.btn{min-height:44px}.topbar .today{display:none}}
 @media(prefers-reduced-motion:reduce){.btn,.quick-grid button,.nav-link{transition:none!important}}
 @media print{.sidebar,.topbar,.gu-inventory-tabs{display:none!important}.main{margin:0!important;width:100%!important}.content{padding:0!important}.panel,.metric{box-shadow:none}}
+
+/* GU Rev7.7 — Fix focused login and return-settlement layouts. Scoped additions;
+   pricing, server transactions and reserved time records remain untouched. */
+.login-page{min-height:100dvh}
+.login-pane{min-width:0;padding:clamp(22px,4vw,56px);display:flex;align-items:center;justify-content:center}
+.login-box{width:min(100%,440px);padding:clamp(22px,3.4vw,42px)!important;min-width:0}
+.login-small-logo{margin-bottom:clamp(30px,5vh,58px)}
+.login-box h2{line-height:1.2;margin-bottom:10px;overflow-wrap:break-word}
+.login-box>.muted{margin-bottom:26px;line-height:1.55}
+.login-box form{display:flex;flex-direction:column;gap:0;min-width:0}
+.login-box form .field-label{display:block;margin:10px 0 8px;font-size:12px;font-weight:730}
+.login-box form>.input{min-width:0;width:100%;margin:0 0 17px;padding:12px 14px;min-height:48px}
+.login-box .gu-password-field{display:flex;align-items:center;position:relative;width:100%;height:50px;min-width:0;margin:0 0 13px}
+.login-box .gu-password-field>.input{box-sizing:border-box;display:block;width:100%;min-width:0;height:50px;min-height:50px;margin:0!important;padding:10px 80px 10px 14px;border-radius:12px;line-height:1.4}
+.login-box .gu-password-toggle{position:absolute;right:6px;top:6px;bottom:6px;display:flex;align-items:center;justify-content:center;min-width:62px;max-height:38px;padding:0 12px;border:0;border-radius:8px;font-size:12px;z-index:1}
+.login-box .gu-password-field:focus-within>.input{border-color:#228794;box-shadow:0 0 0 3px #21818d21;outline:0}
+.login-box .gu-password-toggle:focus-visible{outline:2px solid #176f7d;outline-offset:1px}
+.login-box .login-btn{margin-top:14px;min-height:50px;display:flex;align-items:center;justify-content:center;gap:10px}
+.login-box .login-secure{justify-content:center;text-align:center;gap:8px;margin-top:22px}
+@media(max-width:850px){.login-page{display:flex;flex-direction:column;justify-content:center;min-height:100dvh}.login-art{display:none!important}.login-pane{width:100%;min-height:100dvh;padding:22px 16px max(28px,env(safe-area-inset-bottom,0px))}.login-box{width:min(100%,448px);margin:0 auto}}
+@media(max-width:385px){.login-box{padding:22px 19px!important}.login-small-logo{margin-bottom:27px}.login-box h2{font-size:25px}}
+
+.gu-pickup-summary{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:13px 0}
+.gu-pickup-summary>div{background:#f4f8f8;border:1px solid #dbe7e8;border-radius:13px;display:flex;flex-direction:column;align-items:flex-start;gap:6px;padding:14px;min-width:0}
+.gu-pickup-summary span{color:#66808a;font-size:11px;font-weight:750}
+.gu-pickup-summary strong{font-size:15px;font-weight:840;color:#1d3943;font-variant-numeric:tabular-nums;line-height:1.4;overflow-wrap:anywhere}
+.gu-early-pickup{font-size:10.5px;background:#deefe9;color:#206d52;border-radius:7px;padding:4px 7px;font-weight:750}
+.gu-pickup-audit{background:#fbfcfc}
+.gu-pickup-audit p{margin:6px 0;line-height:1.5}
+@media(max-width:600px){.gu-pickup-summary{grid-template-columns:1fr;gap:7px}.gu-pickup-summary>div{padding:11px 12px}.gu-pickup-summary strong{font-size:14px}}
+
+.gu-capture-dialog:has(.gu-settlement-v77){width:min(94vw,800px);background:#fff}
+.gu-capture-dialog:has(.gu-settlement-v77) .gu-capture-header{position:sticky;top:0;z-index:3;background:#fff}
+.gu-settlement-v77{padding:18px clamp(14px,2.6vw,24px) 0;gap:14px;background:#fff;min-width:0}
+.gu-settlement-success{display:flex;align-items:flex-start;gap:12px;padding:15px;background:#ecf7f2;border:1px solid #cfe9dd;border-radius:14px;color:#1b694b}
+.gu-settlement-success>svg{flex:none;margin-top:2px}
+.gu-settlement-success>div{display:grid;gap:4px;min-width:0}
+.gu-settlement-success strong{font-size:15px;line-height:1.4}
+.gu-settlement-success span{font-size:12px;color:#4e7563;line-height:1.5}
+.gu-settlement-money{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px}
+.gu-settlement-money>div{display:grid;align-content:center;gap:8px;min-width:0;border:1px solid #e0e8e9;border-radius:12px;background:#f8faf9;padding:14px}
+.gu-settlement-money span{font-size:11px;line-height:1.4;color:#607680;font-weight:720}
+.gu-settlement-money strong{font-size:clamp(15px,1.6vw,20px);color:#1e3640;font-weight:850;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.gu-settlement-money .gu-money-attention{border-color:#ebdbaf;background:#fff8e9}
+.gu-settlement-money .gu-money-attention strong{color:#94600d}
+.gu-settlement-money .gu-money-complete{background:#edf7f1;border-color:#cae5d5}
+.gu-settlement-money .gu-money-complete strong{color:#20764f}
+.gu-settlement-subnote{background:#f5f8f9;color:#59717d;padding:9px 12px;border-radius:9px;font-size:12px;line-height:1.55;margin:0}
+.gu-settlement-step{border:1px solid #dde7e8;border-radius:15px;padding:17px;background:#fff;display:grid;gap:12px;min-width:0}
+.gu-settlement-step-heading{display:flex;align-items:flex-start;gap:11px;min-width:0}
+.gu-settlement-step-heading>div{flex:1;min-width:0}
+.gu-settlement-step-heading h3{margin:0 0 4px;font-size:15px;color:#1c3a43;letter-spacing:-.02em}
+.gu-settlement-step-heading p{margin:0;color:#657b84;font-size:12px;line-height:1.5}
+.gu-step-number{display:grid;place-items:center;width:29px;height:29px;border-radius:9px;background:#22505b;color:white;font-size:13px;font-weight:850;flex:none}
+.gu-step-state{background:#fff4df;color:#845915;border:1px solid #f1dcb2;padding:5px 8px;border-radius:8px;white-space:nowrap;font-size:10px;font-weight:760;margin-left:auto}
+.gu-step-done{background:#ebf6ee;color:#29734b;border-color:#d5e9dc}
+.gu-step-ok{display:flex;align-items:center;gap:8px;margin:0;font-size:12px;line-height:1.5;color:#236b4b;background:#edf8f2;border-radius:9px;padding:11px 12px}
+.gu-settlement-v77 .gu-settlement-step [aria-label="Thu tiền đơn thuê"]{background:#f8faf9;border:1px solid #e0e9e7;border-radius:12px;padding:14px;gap:10px;box-shadow:none}
+.gu-settlement-v77 .gu-settlement-step .gu-optional-details{margin:0;background:white}
+.gu-settlement-v77 .gu-settlement-step .gu-v52-deposit-panel{margin:0}
+.gu-settlement-collateral{display:grid;gap:10px;padding:0}
+.gu-collateral-amount{display:flex;align-items:center;gap:9px;padding:12px;background:#f2f7f8;border:1px solid #e0e9e9;border-radius:10px;font-weight:780;color:#28515b;line-height:1.45}
+.gu-settlement-warning{border-radius:9px;border:1px solid #f1ddaf;background:#fffae9;color:#8b6314;padding:10px;margin:0;font-size:12px}
+.gu-collateral-confirm{justify-self:start;min-height:44px}
+.gu-settlement-surcharge{margin:0;background:#fafbfb;border-color:#e4eaeb}
+.gu-settlement-surcharge .form-grid{margin-top:12px}
+.gu-settlement-surcharge .btn{margin-top:10px}
+.gu-settlement-bottom{position:sticky;bottom:0;z-index:2;display:flex;gap:12px;align-items:center;justify-content:space-between;margin:0 -24px;border-top:1px solid #e2e9e9;background:#fff;padding:14px 24px calc(14px + env(safe-area-inset-bottom,0px));box-shadow:0 -8px 24px #18323e07}
+.gu-settlement-result{display:flex;align-items:center;gap:8px;color:#607580;font-size:12px;line-height:1.45}
+.gu-settlement-result>svg{flex:none}
+.gu-settlement-bottom .btn{flex:none;min-height:44px}
+@media(max-width:650px){.gu-capture-dialog:has(.gu-settlement-v77){width:100%;max-height:100dvh;border-radius:16px 16px 0 0}.gu-settlement-v77{padding:12px 12px 0;gap:11px}.gu-settlement-money{grid-template-columns:1fr;gap:6px}.gu-settlement-money>div{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 12px}.gu-settlement-money strong{font-size:16px;text-align:right}.gu-settlement-step{padding:12px;gap:10px}.gu-step-state{font-size:10px}.gu-settlement-bottom{margin:0 -12px;padding:12px;flex-direction:column;align-items:stretch}.gu-settlement-bottom .btn{width:100%}}
+@media(prefers-reduced-motion:reduce){.login-box .gu-password-toggle{transition:none!important}}

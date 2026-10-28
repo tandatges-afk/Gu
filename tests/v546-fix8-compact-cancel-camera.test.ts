@@ -26,8 +26,10 @@ test('laundry locks handover button and the API still enforces availability',()=
 test('capture settlement and order details are condensed without losing audit details',()=>{
  const cap=read('src/components/GuOrderCapture.tsx');
  const review=read('src/components/GuV5Review.tsx');
- assert.match(cap,/gu-quick-money/);
+ assert.match(cap,/gu-settlement-money/);
+ assert.match(cap,/gu-settlement-step/);
+ assert.match(cap,/Còn việc cần xử lý/);
  assert.match(review,/gu-quick-money/);
  assert.match(review,/Chi tiết thu \/ hoàn tiền/);
- assert.match(cap,/summary>Xem ảnh cọc \/ CCCD đã giữ/);
+ assert.match(cap,/summary>Kiểm tra ảnh cọc \/ CCCD đã giữ/);
 });
