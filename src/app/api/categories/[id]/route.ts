@@ -3,12 +3,14 @@ import {db} from '@/lib/firebase-admin';
 import {staffUser,handleError,jsonBody,ApiError} from '@/lib/http';
 import {assertText} from '@/lib/rental';
 import {auditInTransaction} from '@/lib/audit';
+import {categoryDocumentIdFromRouteParam} from '@/lib/product-policies';
 export const runtime='nodejs';
 async function categoryChange(req:NextRequest,ctx:{params:Promise<{id:string}>},deleting:boolean){
  try{
   const me=await staffUser(req);
   if(me.role!=='admin')throw new ApiError(403,'Chỉ Admin được sửa hoặc xóa danh mục.');
-  const {id}=await ctx.params;
+  const {id:routeId}=await ctx.params;
+  const id=categoryDocumentIdFromRouteParam(routeId);
   const ref=db().collection('categories').doc(id);
   const name=deleting?'':assertText((await jsonBody(req)).name,'Tên danh mục',50);
   const newId=deleting?'':encodeURIComponent(name.toLocaleLowerCase('vi-VN'));

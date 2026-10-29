@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "release": "5.4.6-fix20.0-rev7",
-  "source": "GU Rev7.9.2: consistent order detail information/action disclosures, UI-only",
+  "source": "GU Rev7.9.3: fix category URL IDs, stale alerts, and calendar category filter",
   "files": {
     ".env.example": "81df7902d420c6e511dab9449268fc4f096fc4dc74302f3c3893feb41fb4e785",
     ".env.vps.example": "f73165e145a3524858535fce2a0301e81628858f2372d2783e8da0e3736027e4",
@@ -69,7 +69,7 @@
     "src/app/api/bootstrap/route.ts": "b1a25d82ad0aa0f30d3c046b824caca43e76df5cadc7ff840648f6d44a32d5ec",
     "src/app/api/calendar/route.ts": "eb9d5280b0a51b2f9f5792ca94b02c78342b8c97bdc4859ffba33fe8d5fc5a78",
     "src/app/api/catalog/route.ts": "fd1245d7df79bd8a80305bffb24c1d3d3bdb6bebdb9ca7badbfd1a04c61dced0",
-    "src/app/api/categories/[id]/route.ts": "b3c19d346bb2efd18831be57f6cb757d4211c7d67a36fa5530b465cc709e4599",
+    "src/app/api/categories/[id]/route.ts": "10c8e82ce40463f9f04963bb289fcf706e3e41be24ecb31eee7d825ceb92f24a",
     "src/app/api/categories/route.ts": "ab5ceb66569b6c0cff14e4b5faade32b1a9dd8d08fe7433ec7efd90ee7dd5413",
     "src/app/api/customers/route.ts": "c08d324296cbacc3ac83a3bbc5908f5ba6318817d19cab46d4dd061fa259d254",
     "src/app/api/items/[id]/route.ts": "29ba4f7d8423223d2b820dec2b81f62ddbdbd7ea9f7b49727b509fa1a454ed91",
@@ -106,7 +106,7 @@
     "src/app/gu-redesign.css": "b8438d0ed4692deb9eb32820cf771e7663eacb9deed0d6427d633e594341078c",
     "src/app/layout.tsx": "e9dbee4dfd9a1a6b71394b8fe0f35cb922f3bd253a7ada6a7c786345deaa29b9",
     "src/app/manifest.ts": "9cea2b6c119bf1aa4725456e9467c974a62ab0fee5970b53048b69f5cc468f4d",
-    "src/app/page.tsx": "681a45856086584699a6e996c6c508d60d77508956b27e500b13d9964964a72a",
+    "src/app/page.tsx": "409472ef9e5f5f05bf5cee80afa075f2f309284f1f0fb83be9564cd9b2df08a6",
     "src/app/robots.ts": "a0bd40f8e287768be31f5980a40a98f61ee2d3d4536607f3f6b06770f8092c58",
     "src/components/GuBookingCamera.module.css": "044a4e9fbc2ed89c26380ea5faef9b09661caede5e1bac4fd8920163cacff513",
     "src/components/GuBulkInventory.module.css": "ef9fcfdfdb73ac705ed2599d7cfe0c4b4092c8b0f35303858f7cd81ae6094821",
@@ -178,7 +178,7 @@
     "src/lib/pg-firestore.ts": "7cc1d5fb26e100ed6d0115fb6811b9032f803552c47724ba5bf26f17ff63afaa",
     "src/lib/pg-query-compiler.ts": "795b927115870a1a8cb558a968542f92b2d918cc36e78a660bde48d65cc07acd",
     "src/lib/product-name.ts": "93780c61d20cc87f4f70a3b043691bcd53bd19cb6992026ed973f562a4ae83d3",
-    "src/lib/product-policies.ts": "51f3a817c32ce8214272cc522f9acda92253424966b578c5d8f98e4d0eee1b84",
+    "src/lib/product-policies.ts": "764aa9b93aef8532ca0609d8edb04fc70b7bd064322ae9ac8e6250580e885b93",
     "src/lib/product-search.ts": "12c9adb72f403e7dcbfb0c3893f08eefb376d32c9a34148e8cda7bfe7a5d4a88",
     "src/lib/rental-extension.ts": "9b15811729b0f67b3074ecc52419142dbc08e4ea2994fbe7327601eb0db9f72d",
     "src/lib/rental.ts": "2f867da4670fed5072134083d5d9ea9627ab2fafe5073a7f3bd05ab251c5ff14",
@@ -256,7 +256,7 @@
     "tests/v5-beta10-index-buttons.test.ts": "0ec201c7de449e7846d957e6bfaf37b73528d497c23fe10166b377e0a3162905",
     "tests/v5-beta11-unified-staff.test.ts": "2d9efe239b7a38fd3ae0292b420570bb820e9c75b18c932c6469f01d4865bba2",
     "tests/v5-beta3-audit.test.ts": "c030ffc6193dd5355ad82145e3fa2441e813c540b1181131c1835de167515875",
-    "tests/v5-beta5-inventory-ui.test.ts": "70b5fa479985c9e4753fa2060f168a30cdf1a0f5f198366487e1cbd5452eaae6",
+    "tests/v5-beta5-inventory-ui.test.ts": "ea20e7f6660ac890178b04b5f4feddcc98690474312510cbaa8f47e9a6bba788",
     "tests/v5-beta5-photo-template-snapshot.test.ts": "51876971f89dd156f12f84bbf23e4b489ba671c6d2fd1b2e15c8482297cf6393",
     "tests/v5-beta6-mobile-reset.test.ts": "9a0f47d6f8bd7a4541d14c7819b57a3131c023b78699632ab2410b7c413e09aa",
     "tests/v5-beta7-css-monitoring.test.ts": "e101bbba2ba7c31fcd979445de79ee5c0991c33a06862461659337a9d538913e",
@@ -297,6 +297,6 @@
     "vps-main/prepare-v5-vps.sh": "29f036194cce2383b9f800459165d3a82e4dd332d87486df04b81725a1c9d7a3",
     "windows/01-replace-main-safely.ps1": "926496253b2cef8a881235971454b0eade20cd056028fec1a4b739c9c12c1ca3",
     "windows/apply-full-source.ps1": "cc3ac34c02e5e460475a3cfd200a571b682ade51497eeb1fa777b302a4b5286b",
-    "SOURCE-SHA256SUMS.txt": "14444134f5ab9c0947f6785a31fb5c691052c91fd0bf65b916aeeaa689e6244c"
+    "SOURCE-SHA256SUMS.txt": "77e1592e6491148ed97fa2a8060770648b14417dc83ee06af95260d4d35ad3be"
   }
 }
