@@ -1314,3 +1314,91 @@ html,body{background:var(--paper);color:var(--ink)}
  .gu-vn-picker{min-width:38px;width:38px;flex-basis:38px}
  .gu-vn-clock{min-width:70px;flex-basis:70px!important}
 }
+
+/* GU Rev7.9.7 — calendar date navigation + issue evidence design refresh.
+   Keep the 4-digit year in one button; never split 20/26 across flex children. */
+.gu-vn-date-parts{display:flex;align-items:center;justify-content:center;gap:0!important;width:100%;max-width:100%;height:42px;min-height:42px;white-space:nowrap;overflow:hidden;padding:0 8px!important;border:1px solid #dce5e7;border-radius:11px;background:#fff}
+.gu-vn-date-parts>button{flex:0 0 auto!important;width:32px;min-width:32px!important;height:36px;min-height:36px;padding:0!important;border-radius:7px;font-size:14px!important;font-weight:750;letter-spacing:-.02em;color:#1d3645;white-space:nowrap}
+.gu-vn-date-parts>button.gu-vn-year-button{width:51px;min-width:51px!important;letter-spacing:-.035em;font-variant-numeric:tabular-nums}
+.gu-vn-date-parts>span{flex:0 0 auto!important;padding:0 1px;color:#81969d;font-size:13px;font-weight:450}
+.gu-vn-date-parts>button[aria-expanded="true"]{background:#eaf5ef!important;color:#146549}
+.gu-vn-date-parts.is-readonly>button{cursor:default}
+.gu-vn-date-field-wrap{min-width:0}
+.gu-vn-clock{border-color:#dce5e7;border-radius:10px;height:42px}
+.gu-vn-picker{border-color:#dce5e7;background:#f6faf9;color:#315f58;border-radius:10px;height:42px;min-height:42px}
+.gu-vn-picker:focus-within{outline:2px solid #24795d;outline-offset:2px}
+.gu-calendar-toolbar-v532 .gu-calendar-date-group{max-width:590px;width:100%;gap:7px}
+.gu-calendar-toolbar-v532 .gu-calendar-date-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:24px}
+.gu-calendar-toolbar-v532 .gu-calendar-date-label{font-size:12px;font-weight:750;color:#425f61}
+.gu-calendar-toolbar-v532 .gu-calendar-date-heading>.gu-calendar-today{appearance:none;display:inline-flex;align-items:center;justify-content:center;min-height:29px;padding:4px 12px;border:1px solid #c9dfd2;border-radius:20px;background:#eaf5ee;color:#176447;font-weight:750;font-size:12px;cursor:pointer;white-space:nowrap}
+.gu-calendar-toolbar-v532 .gu-calendar-date-heading>.gu-calendar-today:hover{background:#dff0e5}
+.gu-calendar-toolbar-v532 .gu-calendar-date-heading>.gu-calendar-today:focus-visible{outline:2px solid #206b52;outline-offset:2px}
+.gu-calendar-toolbar-v532 .gu-calendar-date-actions{display:grid!important;grid-template-columns:42px minmax(0,1fr) 42px;align-items:center;gap:8px!important;flex-wrap:nowrap!important}
+.gu-calendar-toolbar-v532 .gu-calendar-date-actions>.boxed{width:42px!important;min-width:42px!important;max-width:42px!important;height:42px!important;min-height:42px!important;flex:none!important;border-radius:11px!important;background:#f7fafb!important;border:1px solid #dbe5e8!important;color:#294957}
+.gu-calendar-toolbar-v532 .gu-calendar-date-actions>.boxed:hover{background:#eef4f4!important}
+.gu-calendar-toolbar-v532 .gu-calendar-date-actions>.gu-vn-date-only{order:unset!important;display:flex!important;flex:1 1 auto!important;min-width:0!important;max-width:none!important;width:100%!important;min-height:42px!important;height:42px!important;gap:6px!important;padding:0!important;border:0!important;background:transparent!important}
+.gu-calendar-toolbar-v532 .gu-calendar-date-actions>.gu-vn-date-only>.gu-vn-date-field-wrap{flex:1 1 0!important;min-width:0!important;max-width:none!important;height:42px!important}
+.gu-calendar-toolbar-v532 .gu-calendar-date-actions>.gu-vn-date-only .gu-vn-date-parts{height:42px!important;min-height:42px!important;width:100%!important;border:1px solid #dce5e7!important;box-shadow:0 1px 2px #102c3010!important;max-width:none!important}
+.gu-calendar-toolbar-v532 .gu-calendar-date-actions>.gu-vn-date-only>.gu-vn-picker{flex:0 0 42px!important;width:42px!important;min-width:42px!important;min-height:42px!important;height:42px!important;border:1px solid #dce5e7!important;border-radius:11px!important}
+/* Booking pickup & expected return use the same compact, joined date segments. */
+.gu-vn-datetime>.gu-vn-date-field-wrap .gu-vn-date-parts{height:40px;min-height:40px;padding:0 1px!important}
+.gu-vn-datetime>.gu-vn-clock{height:40px}
+.gu-vn-datetime>.gu-vn-picker{height:40px;min-height:40px}
+/* Inspection choices: neutral when untouched; selected colors communicate state. */
+.gu-capture-conditions{display:grid;gap:10px;padding:13px 0 9px}
+.gu-capture-condition-actions{display:flex;align-items:center;flex-wrap:wrap;gap:7px}
+.gu-capture-conditions .gu-capture-condition-actions>.gu-condition-choice{display:inline-flex;align-items:center;justify-content:center;gap:7px;min-height:40px;padding:8px 14px;border:1px solid #dce5e8;border-radius:10px;background:#fff;color:#405968;font-size:12px;font-weight:700;line-height:1.2;transition:background .16s,border-color .16s,color .16s;white-space:nowrap}
+.gu-capture-conditions .gu-capture-condition-actions>.gu-condition-choice svg{opacity:.78;flex:0 0 auto}
+.gu-capture-conditions .gu-capture-condition-actions>.gu-condition-choice:hover{border-color:#9bbbb4;background:#f6faf8}
+.gu-capture-conditions .gu-capture-condition-actions>.gu-condition-choice:focus-visible{outline:2px solid #2a8067;outline-offset:2px}
+.gu-capture-conditions .gu-capture-condition-actions>.gu-condition-choice.gu-condition-ok{background:#e9f6ee;color:#196348;border-color:#9ad1af}
+.gu-capture-conditions .gu-capture-condition-actions>.gu-condition-choice.gu-condition-issue{background:#fff5dd;color:#865700;border-color:#e5c477}
+.gu-capture-conditions .gu-capture-condition-actions>.gu-condition-choice.gu-condition-missing{background:#ffebeb;color:#9b3434;border-color:#eab3b3}
+.gu-capture-issue{gap:11px;padding:15px;border:1px solid #e7d7b8;border-radius:14px;background:#fffcf6;box-shadow:0 1px 4px #6c4b1208;min-width:0}
+.gu-capture-issue.is-missing{background:#fff9f9;border-color:#eccaca}
+.gu-capture-issue-heading{display:flex;align-items:flex-start;gap:10px}
+.gu-capture-issue-icon{display:grid;place-items:center;width:31px;height:31px;min-width:31px;border-radius:10px;background:#fff0cb;color:#9a690a}
+.gu-capture-issue.is-missing .gu-capture-issue-icon{background:#fde7e7;color:#b13636}
+.gu-capture-issue-heading>div{display:grid;gap:3px;min-width:0}
+.gu-capture-issue-heading strong{font-size:13px;line-height:1.4;color:#283e4d;font-weight:800}
+.gu-capture-issue-heading p{margin:0;font-size:12px;line-height:1.5;color:#73818c}
+.gu-capture-issue-evidence{display:flex;align-items:stretch;gap:10px;min-width:0}
+.gu-capture-issue-photo{display:block;width:94px;height:88px;min-width:94px;max-width:94px;max-height:88px;object-fit:cover;border-radius:10px;border:1px solid #e9dec5;background:#fff}
+.gu-capture-issue-upload{position:relative;display:flex;flex:1 1 auto;align-items:center;justify-content:center;gap:12px;min-width:0;min-height:86px;padding:13px;border:1px dashed #d7bd88;border-radius:11px;background:#fffefb;color:#6e521c;cursor:pointer;transition:border-color .16s,background .16s}
+.gu-capture-issue-upload:hover{background:#fff8e9;border-color:#ae842e}
+.gu-capture-issue-upload:focus-within{outline:2px solid #24795d;outline-offset:2px}
+.gu-capture-issue-upload.is-busy{opacity:.6;cursor:wait}
+.gu-capture-issue-upload.has-photo{background:#f7fcf9;border-color:#a3c9b1;color:#196348}
+.gu-capture-issue-upload-icon{display:grid;place-items:center;width:35px;height:35px;min-width:35px;border-radius:11px;background:#fff2d8;color:#92630f}
+.gu-capture-issue-upload.has-photo .gu-capture-issue-upload-icon{background:#e6f4eb;color:#23734b}
+.gu-capture-issue-upload-text{display:grid;gap:3px;min-width:0}
+.gu-capture-issue-upload-text strong{font-size:12px;font-weight:800;line-height:1.3}
+.gu-capture-issue-upload-text small{font-size:11px;color:#8b8578;line-height:1.35;font-weight:500}
+.gu-capture-issue-upload input[type="file"]{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;font-size:16px;z-index:1}
+.gu-capture-issue-note{display:grid;gap:6px;min-width:0}
+.gu-capture-issue-note>span{color:#3c5260;font-size:12px;font-weight:750}
+.gu-capture-issue-note>span small{color:#81909b;font-size:11px;font-weight:500}
+.gu-capture-issue-note textarea.input{width:100%;min-height:62px;resize:vertical;padding:10px 12px;border:1px solid #dde5e8;border-radius:10px;background:#fff;color:#294252;font-size:13px;line-height:1.45;box-shadow:none}
+.gu-capture-issue-note textarea.input:focus{border-color:#78aa95;box-shadow:0 0 0 3px #24795d18}
+@media(max-width:600px){
+ .gu-calendar-toolbar-v532 .gu-calendar-date-actions{grid-template-columns:40px minmax(0,1fr) 40px;gap:6px!important}
+ .gu-calendar-toolbar-v532 .gu-calendar-date-actions>.boxed{width:40px!important;min-width:40px!important;height:42px!important}
+ .gu-calendar-toolbar-v532 .gu-calendar-date-actions>.gu-vn-date-only{order:unset!important;flex-basis:auto!important;min-width:0!important;max-width:none!important;gap:4px!important}
+ .gu-calendar-toolbar-v532 .gu-calendar-date-actions>.gu-vn-date-only>.gu-vn-picker{flex-basis:40px!important;width:40px!important;min-width:40px!important}
+ .gu-vn-date-parts>button{width:29px;min-width:29px!important;font-size:13px!important}
+ .gu-vn-date-parts>button.gu-vn-year-button{width:47px;min-width:47px!important}
+ .gu-capture-conditions{padding-top:10px}
+ .gu-capture-condition-actions{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px}
+ .gu-capture-condition-actions>.gu-condition-choice{min-width:0;padding:9px 5px!important;font-size:11px!important;gap:5px!important}
+ .gu-capture-condition-actions>.gu-condition-choice svg{width:14px;height:14px}
+ .gu-capture-issue{padding:12px;gap:10px}
+ .gu-capture-issue-upload{min-height:77px;padding:10px;gap:9px}
+ .gu-capture-issue-upload-icon{width:32px;height:32px;min-width:32px}
+}
+@media(max-width:365px){
+ .gu-capture-condition-actions>.gu-condition-choice{font-size:10px!important}
+ .gu-vn-date-parts>button{width:27px;min-width:27px!important}
+ .gu-vn-date-parts>button.gu-vn-year-button{width:45px;min-width:45px!important}
+ .gu-calendar-toolbar-v532 .gu-calendar-date-actions>.gu-vn-date-only>.gu-vn-picker{min-width:36px!important;width:36px!important;flex-basis:36px!important}
+}
+@media(prefers-reduced-motion:reduce){.gu-capture-issue-upload,.gu-capture-conditions .gu-capture-condition-actions>.gu-condition-choice{transition:none}}

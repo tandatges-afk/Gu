@@ -118,9 +118,8 @@ function VNDateFields({value,onChange,ariaLabel,readOnly=false}:{value:string;on
    <button type="button" disabled={readOnly} aria-label={`${ariaLabel}: tháng ${draft.month}`} aria-haspopup="dialog"
     aria-expanded={active?.part==='month'} onClick={e=>open('month',e.currentTarget)}>{vnWheelPad(draft.month)}</button>
    <span aria-hidden="true">/</span>
-   <span className="gu-vn-year-prefix" aria-hidden="true">{String(draft.year).slice(0,2)}</span>
-   <button type="button" disabled={readOnly} aria-label={`${ariaLabel}: năm ${draft.year}, chỉnh hai số cuối`} aria-haspopup="dialog"
-    aria-expanded={active?.part==='year'} onClick={e=>open('year',e.currentTarget)}>{vnWheelPad(draft.year%100)}</button>
+   <button type="button" className="gu-vn-year-button" disabled={readOnly} aria-label={`${ariaLabel}: năm ${draft.year}, chỉnh hai số cuối`} aria-haspopup="dialog"
+    aria-expanded={active?.part==='year'} onClick={e=>open('year',e.currentTarget)}>{draft.year}</button>
   </div>
   {error&&<p className="gu-vn-date-error" role="alert">{error}</p>}
   {active&&<WheelPicker part={active.part} selected={draft[active.part as keyof VNWheelDate]}

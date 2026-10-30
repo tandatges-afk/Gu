@@ -178,6 +178,7 @@
     "tests/rev794-mobile-dates.test.ts",
     "tests/rev795-global-calendar-inspection.test.ts",
     "tests/rev796-date-wheel.test.ts",
+    "tests/rev797-calendar-inspection-ui.test.ts",
     "tests/search-calendar-patch-v501.test.ts",
     "tests/shift-schedule-v53.test.ts",
     "tests/smart-calendar-v41.test.ts",

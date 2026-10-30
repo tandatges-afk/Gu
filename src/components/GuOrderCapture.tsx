@@ -1,7 +1,7 @@
 'use client';
 import {uploadImageToApi} from '@/lib/upload-client';
 import {useEffect,useMemo,useState} from 'react';
-import {Camera,CheckCircle2,X,Wallet,ShieldCheck,PackageCheck} from 'lucide-react';
+import {Camera,CheckCircle2,X,Wallet,ShieldCheck,PackageCheck,AlertTriangle,Search,ImagePlus} from 'lucide-react';
 import {clientAuth} from '@/lib/firebase-client';
 import {preparePhonePhoto} from '@/lib/mobile-images';
 import {ProductImage,type ApiCall} from './GuExtras';
@@ -87,12 +87,24 @@ export function GuOrderCapture({orderId,api,onClose,onDone}:{orderId:string;api:
   {waitingLaundry&&<p className="inline-alert danger-alert">{waitingReason||'Sản phẩm chưa sẵn sàng'}. Chỉ giao khi kho xác nhận còn trống.</p>}{order&&!phase&&!settling&&<div className="inline-alert">Đơn đã hoàn thành hoặc không còn ảnh cần chụp.</div>}
   {order&&phase&&<><div className="gu-capture-progress"><span>{completed}/{count} ảnh</span><progress max={Math.max(1,count)} value={completed}/></div>
    {lines.map(line=><article className="gu-capture-item" key={line.itemId}><div className="gu-capture-item-title"><ProductImage paths={items.find(i=>i.id===line.itemId)?.imagePaths}/><div><h3>{line.name}</h3><span>{line.hangerCode||line.sku}</span></div></div>
-    <div className="gu-capture-conditions" aria-label={'Tình trạng '+line.name}>
-      {(phase==='RETURN'?(['OK','ISSUE','MISSING'] as Condition[]):(['OK','ISSUE'] as Condition[])).map(c=><button type="button" key={c} className={'gu-condition-choice '+(conditions[line.itemId]===c?'chosen gu-condition-'+c.toLowerCase():'')} aria-pressed={conditions[line.itemId]===c} onClick={()=>setConditions(old=>({...old,[line.itemId]:c}))}>{c==='OK'?'Bình thường':c==='ISSUE'?'Có vấn đề':'Thất lạc'}</button>)}
-      {conditions[line.itemId]&&conditions[line.itemId]!=='OK'&&<div className="gu-capture-issue"><strong>Ghi nhận hiện trạng {conditions[line.itemId]==='MISSING'?'thất lạc':'có vấn đề'}</strong><p>Chụp ảnh chỗ bị lỗi (không cần gõ mô tả), hoặc ghi chú nếu không thể chụp.</p>
-       {pictures[line.itemId+'|issue']&&<img src={pictures[line.itemId+'|issue']} alt={'Ảnh vấn đề '+line.name} className="gu-capture-issue-photo"/>}
-       <label className="btn btn-white gu-capture-select">{sending===line.itemId+'|issue'?'Đang tải ảnh…':pictures[line.itemId+'|issue']?'Chụp lại vấn đề':'Chụp ảnh vấn đề'}<input type="file" accept="image/*" capture="environment" hidden disabled={Boolean(sending)||busy} onChange={e=>{void upload(e.target.files?.[0]||null,line.itemId,'issue');e.target.value='';}}/></label>
-       <textarea className="input" aria-label="Ghi chú tình trạng nếu không chụp ảnh" value={notes[line.itemId]||''} onChange={e=>setNotes(old=>({...old,[line.itemId]:e.target.value}))} placeholder="Ghi chú nếu không chụp ảnh (không bắt buộc khi đã chụp)"/>
+    <div className="gu-capture-conditions" role="group" aria-label={'Tình trạng '+line.name}>
+      <div className="gu-capture-condition-actions">
+       {(phase==='RETURN'?(['OK','ISSUE','MISSING'] as Condition[]):(['OK','ISSUE'] as Condition[])).map(c=><button type="button" key={c} className={'gu-condition-choice '+(conditions[line.itemId]===c?'chosen gu-condition-'+c.toLowerCase():'')} aria-pressed={conditions[line.itemId]===c} onClick={()=>setConditions(old=>({...old,[line.itemId]:c}))}>
+        {c==='OK'?<CheckCircle2 size={16} aria-hidden="true"/>:c==='ISSUE'?<AlertTriangle size={16} aria-hidden="true"/>:<Search size={16} aria-hidden="true"/>}
+        <span>{c==='OK'?'Bình thường':c==='ISSUE'?'Có vấn đề':'Thất lạc'}</span>
+       </button>)}
+      </div>
+      {conditions[line.itemId]&&conditions[line.itemId]!=='OK'&&<div className={'gu-capture-issue'+(conditions[line.itemId]==='MISSING'?' is-missing':'')}>
+       <div className="gu-capture-issue-heading"><span className="gu-capture-issue-icon"><AlertTriangle size={17} aria-hidden="true"/></span><div><strong>{conditions[line.itemId]==='MISSING'?'Ghi nhận tài sản thất lạc':'Ghi nhận tình trạng có vấn đề'}</strong><p>{conditions[line.itemId]==='MISSING'?'Chụp ảnh chứng từ liên quan hoặc ghi chú chi tiết tình trạng thất lạc.':'Chụp rõ vị trí bị lỗi; không cần gõ mô tả nếu đã có ảnh.'}</p></div></div>
+       <div className="gu-capture-issue-evidence">
+        {pictures[line.itemId+'|issue']&&<img src={pictures[line.itemId+'|issue']} alt={'Ảnh vấn đề '+line.name} className="gu-capture-issue-photo"/>}
+        <label className={'gu-capture-issue-upload'+(pictures[line.itemId+'|issue']?' has-photo':'')+(sending===line.itemId+'|issue'||busy?' is-busy':'')}>
+         <span className="gu-capture-issue-upload-icon"><ImagePlus size={19} aria-hidden="true"/></span>
+         <span className="gu-capture-issue-upload-text"><strong>{sending===line.itemId+'|issue'?'Đang tải ảnh…':pictures[line.itemId+'|issue']?'Chụp lại ảnh':'Chụp ảnh vấn đề'}</strong><small>{pictures[line.itemId+'|issue']?'Đã có ảnh · nhấn để thay thế':'Mở camera hoặc chọn ảnh có sẵn'}</small></span>
+         <input type="file" accept="image/*" capture="environment" disabled={Boolean(sending)||busy} aria-label={'Chụp ảnh vấn đề cho '+line.name} onChange={e=>{void upload(e.target.files?.[0]||null,line.itemId,'issue');e.target.value='';}}/>
+        </label>
+       </div>
+       <label className="gu-capture-issue-note"><span>Ghi chú <small>{pictures[line.itemId+'|issue']?'(không bắt buộc)':'(nếu không thể chụp ảnh)'}</small></span><textarea className="input" rows={2} aria-label="Ghi chú tình trạng nếu không chụp ảnh" value={notes[line.itemId]||''} onChange={e=>setNotes(old=>({...old,[line.itemId]:e.target.value}))} placeholder="Vị trí, hiện trạng hoặc thông tin bổ sung…"/></label>
       </div>}</div>
     {!(phase==='RETURN'&&conditions[line.itemId]==='MISSING')&&(order.photoTemplates?.[line.itemId]||[]).map(angle=><div className="gu-capture-angle" key={angle}><b>{angle}</b><div className="gu-capture-photo-grid"><div><small>{phase==='RETURN'?'Ảnh khi giao':'Ảnh mẫu'}</small>{(()=>{const url=phase==='RETURN'?order.handoverProof?.items.find(p=>p.itemId===line.itemId)?.shots[angle]?.url:order.referencePhotos?.[line.itemId]?.[angle];return url?<img alt={'Đối chiếu '+angle} src={url}/>:<div className="gu-capture-placeholder"/>;})()}</div><div><small>{phase==='RETURN'?'Ảnh khi nhận':'Ảnh khi giao'}</small>{pictures[line.itemId+'|'+angle]?<img src={pictures[line.itemId+'|'+angle]} alt={'Ảnh mới '+angle}/>:<div className="gu-capture-placeholder"><Camera/></div>}
      <label className="btn btn-white gu-capture-select">{sending===line.itemId+'|'+angle?'Đang tải…':pictures[line.itemId+'|'+angle]?'Chụp lại':'Chụp / Chọn ảnh'}<input type="file" accept="image/*" capture="environment" hidden disabled={Boolean(sending)||busy} onChange={e=>{void upload(e.target.files?.[0]||null,line.itemId,angle);e.target.value='';}}/></label></div></div></div>)}
