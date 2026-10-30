@@ -4,7 +4,7 @@ import {readFileSync} from 'node:fs';
 const src=(f:string)=>readFileSync(f,'utf8');
 test('Fix20 release and lockfile versions agree',()=>{
  const pkg=JSON.parse(src('package.json'));const lock=JSON.parse(src('package-lock.json'));
- assert.equal(pkg.version,'5.4.6-fix20.0');assert.equal(lock.version,pkg.version);
+ assert.equal(pkg.version,'1.0.0');assert.equal(lock.version,pkg.version);
  assert.equal(lock.packages[''].version,pkg.version);
 });
 test('Fix17: creates a durable idempotency marker in the same transaction as rental/stock/cash',()=>{

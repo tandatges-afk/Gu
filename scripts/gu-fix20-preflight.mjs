@@ -33,7 +33,7 @@ try{
  if(dup.rows.length)errors.push(`Duplicate order codes in ${dup.rows.length} groups; investigate before adding unique index`);
  const account=await pool.query("SELECT to_regclass('public.gu_accounts') AS relation");
  if(!account.rows[0]?.relation)errors.push('Missing gu_accounts');
- console.log(JSON.stringify({database,version:'5.4.6-fix20.0',checkedAt:new Date().toISOString(),errors},null,2));
+ console.log(JSON.stringify({database,version:'1.0.0',checkedAt:new Date().toISOString(),errors},null,2));
  if(errors.length)process.exitCode=1;
 }catch(error){console.error('GU FIX20 PREFLIGHT FAIL:',error.message);process.exitCode=1;}
 finally{await pool.end();}

@@ -1,6 +1,6 @@
 {
   "name": "gu-thue-do-xinh-vps",
-  "version": "5.4.6-fix20.0",
+  "version": "1.0.0",
   "private": true,
   "type": "module",
   "scripts": {

@@ -10,7 +10,7 @@ for(const [name,url] of [['staging',stage],...(stageOnly?[]:[['production',prod]
   const res=await fetch(url,{signal:AbortSignal.timeout(8000),headers:{'Cache-Control':'no-cache'}});
   if(!res.ok)throw Error('HTTP '+res.status);
   const info=await res.json();
-  const valid=info.version==='5.4.6-fix20.0'&&info.commit===expected;
+  const valid=info.version==='1.0.0'&&info.commit===expected;
   console.log(JSON.stringify({target:name,version:info.version,commit:info.commit,valid}));
   if(!valid)errors.push(name+' is not on the approved Fix20 commit');
  }catch(e){errors.push(name+': '+e.message);}

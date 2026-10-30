@@ -1,0 +1,24 @@
+[Unit]
+Description=GU v1 Local Fashion Vision CLIP Worker
+After=network-online.target postgresql.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=guapp
+Group=guapp
+WorkingDirectory=/var/www/gu-v546-prod-deploy/current
+EnvironmentFile=/etc/gu-v546/prod.env
+Environment=HF_HOME=/opt/gu-visual-ai/cache
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/opt/gu-visual-ai/.venv/bin/python /var/www/gu-v546-prod-deploy/current/visual-ai/worker.py
+Restart=on-failure
+RestartSec=15
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=false
+CPUQuota=100%
+TimeoutStartSec=300
+
+[Install]
+WantedBy=multi-user.target

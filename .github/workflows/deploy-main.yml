@@ -1,4 +1,4 @@
-name: GU Fix20 — CI and Auto Production on main
+name: GU v1 — CI and Auto Production on main
 on:
   push:
     branches: [main, 'gu-fix20-integrated-*']
@@ -19,7 +19,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   validate:
-    name: Validate GU 5.4.6 Fix20 source
+    name: Validate GU v1 source
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -35,7 +35,7 @@ jobs:
           test -f src/lib/pg-firestore.ts
           test -f src/app/api/version/route.ts
           test -f scripts/check-staging-env.mjs
-          node -e 'const p=require("./package.json"); if (p.version !== "5.4.6-fix20.0") process.exit(1)'
+          node -e 'const p=require("./package.json"); if (p.version !== "1.0.0") process.exit(1)'
       - name: CI tests and build
         run: |
           npm ci --no-audit --no-fund

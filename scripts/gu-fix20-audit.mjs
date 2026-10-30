@@ -53,7 +53,7 @@ try{
   flag('P2','PRODUCT_SEARCH_INDEX_INCOMPLETE',missingName.length,missingName.map(x=>x.id));
   await client.query('COMMIT');
  }catch(e){await client.query('ROLLBACK').catch(()=>{});throw e;}finally{client.release();}
- const report={version:'5.4.6-fix20.0',database,checkedAt:new Date().toISOString(),counts,findings,limitations:'Read-only sample (first 20 IDs per rule); not a financial sign-off or live concurrency test.'};
+ const report={version:'1.0.0',database,checkedAt:new Date().toISOString(),counts,findings,limitations:'Read-only sample (first 20 IDs per rule); not a financial sign-off or live concurrency test.'};
  console.log(JSON.stringify(report,null,2));
  if(findings.some(f=>['P0','P1'].includes(f.severity)))process.exitCode=2;
 }catch(e){console.error('GU FIX20 AUDIT ERROR:',e.message);process.exitCode=1;}finally{await pool.end();}

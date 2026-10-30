@@ -2,6 +2,7 @@
 import {useEffect,useRef,useState} from 'react';
 import {RefreshCcw,Search,AlertCircle} from 'lucide-react';
 import {imageSignature} from '@/lib/visual-image';
+import {preparePhonePhoto} from '@/lib/mobile-images';
 import {rankVisualCandidates,type VisualIndexEntry} from '@/lib/visual-index';
 import {ProductImage,type ApiCall} from './GuExtras';
 import type {InventoryItem} from '@/lib/types';
@@ -62,6 +63,27 @@ export function GuVisualFinder({api,onChoose,active=true,isAdmin=false,available
  const scan=async()=>{
   if(!file)return;const seq=++token.current;setLoading(true);setAvailability({});setAvailabilityError('');setResults([]);setChosen(null);setNote('');
   try{
+   // Genuine image-model inference on the VPS is opt-in, with a graceful
+   // fallback to the existing browser descriptor when the worker is offline.
+   // No UI switches, chatbot, or extra employee actions are introduced.
+   let aiRanked:{id:string;score:number}[]|null=null;
+   try{
+    const optimized=await preparePhonePhoto(file);
+    const ai=await api<{ready:boolean;hits:{id:string;score:number}[]}>(
+     'v5/visual-ai-search?category='+encodeURIComponent(category),
+     {method:'POST',body:optimized,headers:{'Content-Type':optimized.type}}
+    );
+    if(ai.ready&&ai.hits.length)aiRanked=ai.hits;
+   }catch{/* AI service disabled, unindexed or unavailable: use the proven finder. */}
+   if(seq!==token.current)return;
+   if(aiRanked){
+    const response=await api<{results:InventoryItem[]}>('catalog?kind=items&ids='+encodeURIComponent(aiRanked.map(x=>x.id).join(',')));
+    const byId=new Map(response.results.map(item=>[item.id,item]));
+    const hits=aiRanked.filter(x=>byId.has(x.id)&&(category==='ALL'||byId.get(x.id)?.category===category))
+     .map(x=>({item:byId.get(x.id)!,distance:Math.max(0,1-x.score),referenceCount:1}));
+    if(seq!==token.current)return;
+    if(hits.length){setResults(hits);await loadAvailability(hits.map(hit=>hit.item),seq);return;}
+   }
    const [needle,rows]=await Promise.all([imageSignature(file),loadIndex()]);
    const candidates=rows.map(row=>({id:row.id,category:row.category,signatures:(row.signatures||[]).map(x=>x.signature)}))
     .filter(row=>row.signatures.length);

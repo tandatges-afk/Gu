@@ -1,1 +1,1 @@
-GU_FIX20_REV7_6_UI_UX_REDESIGN
+GU v1 — Production candidate with optional background visual AI

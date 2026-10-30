@@ -1,0 +1,5 @@
+# Python 3.11+, CPU-only local AI. Install torch CPU wheel separately (README).
+transformers>=4.48,<5
+pillow>=11,<13
+numpy>=1.26,<3
+psycopg[binary]>=3.2,<4

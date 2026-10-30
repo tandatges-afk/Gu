@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "release": "5.4.6-fix20.0",
+  "release": "1.0.0",
   "files": [
     "src/app/api/audit/route.ts",
     "src/app/api/availability/route.ts",
@@ -37,6 +37,7 @@
     "src/app/api/v5/secure-photo/route.ts",
     "src/app/api/v5/session/route.ts",
     "src/app/api/v5/storage-health/route.ts",
+    "src/app/api/v5/visual-ai-search/route.ts",
     "src/app/api/v5/visual-availability/route.ts",
     "src/app/api/v5/visual-catalog/route.ts",
     "src/app/api/version/route.ts",
@@ -151,6 +152,7 @@
     "tests/fix20-rev74-backup-guard.test.ts",
     "tests/fix20-safety.test.ts",
     "tests/fix20-source-manifest-extended.test.ts",
+    "tests/gu-v1-visual-ai.test.ts",
     "tests/gu-v535-beta3-build-regression.test.ts",
     "tests/gu-v535-upgrade.test.ts",
     "tests/gu-v537-cameras-deposits.test.ts",
