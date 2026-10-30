@@ -79,3 +79,9 @@
  .summary:global(.booking-total)>strong{font-size:16px}
 }
 @media(prefers-reduced-motion:reduce){.productRow,.field :global(.input){transition:none}}
+/* Rev7.9.4: keep the 3-part masked date field and real native picker operable. */
+.field :global(.gu-vn-datetime) > :global(.gu-vn-date-parts){flex:1.6 1 0;min-width:0;border:0;border-radius:0;box-shadow:none;height:44px}
+.field :global(.gu-vn-datetime) > :global(.gu-vn-date-parts) input{min-width:0;width:0;font-size:16px;padding:0;box-shadow:none}
+.field :global(.gu-vn-datetime) > :global(.gu-vn-date-parts) input:last-of-type{flex-grow:1.8}
+.field :global(.gu-vn-datetime) > :global(.gu-vn-picker){flex:0 0 44px;min-width:44px;height:44px;border:0;border-left:1px solid #e7ecf1;border-radius:0}
+.field :global(.gu-vn-datetime) > :global(.gu-vn-picker) input[type="date"]{position:absolute!important;inset:0!important;width:100%!important;height:100%!important;opacity:.015!important;pointer-events:auto!important;max-width:none!important;max-height:none!important}

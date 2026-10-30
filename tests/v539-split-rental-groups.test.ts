@@ -32,7 +32,7 @@ test('camera 3/6/24/48h không thay đổi giá hợp đồng; trang phục thu�
  const booking=code('src/components/GuV5Booking.tsx');
  assert.match(booking,/initialTimes\(/);
  assert.match(booking,/next\.setUTCDate\(next\.getUTCDate\(\)\+1\)/);
- assert.match(booking,/setReturnAt\(addPackageHours\(pickupAt,hours\)\)/);
+ assert.match(booking,/returnAt=useMemo\(\(\)=>rentalHours\?addPackageHours\(pickupAt,rentalHours\)/);
  assert.match(booking,/productGroup\(i\.category\)===rentalGroup/);
 });
 test('API bảo vệ phân nhóm ngay cả khi client gửi dữ liệu khác loại',()=>{

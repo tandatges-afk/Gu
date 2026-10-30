@@ -1226,3 +1226,23 @@ html,body{background:var(--paper);color:var(--ink)}
  .gu-order-compact .gu-quick-money strong{font-size:clamp(12px,3.3vw,15px);overflow-wrap:anywhere}
  .gu-order-more-body{padding:10px}
 }
+
+/* Rev7.9.4 — touch-first calendar/date controls; immutable DD/MM/YYYY separators. */
+.gu-vn-date-only,.gu-vn-datetime{display:flex;align-items:stretch;gap:6px;min-width:0;width:100%}
+.gu-vn-date-parts{display:flex;align-items:center;justify-content:center;min-width:0;flex:1 1 auto;gap:1px;border:1px solid #d9e1e8;border-radius:10px;background:#fff;padding:0 5px;height:46px}
+.gu-vn-date-parts:focus-within{border-color:#347b96;box-shadow:0 0 0 2px #347b9622}
+.gu-vn-date-parts>input{box-sizing:border-box;min-width:0;width:0;flex:1 1 0;border:0!important;box-shadow:none!important;background:transparent!important;color:#263a53;text-align:center;font-size:16px!important;font-weight:650;font-variant-numeric:tabular-nums;outline:none!important;padding:0!important;height:42px;line-height:42px;appearance:none;border-radius:0}
+.gu-vn-date-parts>input:last-child{flex:1.8 1 0}
+.gu-vn-date-parts>input::placeholder{color:#92a3b3}
+.gu-vn-date-parts>span{flex:0 0 auto;color:#60738a;font-size:16px;pointer-events:none;font-variant-numeric:tabular-nums}
+.gu-vn-datetime>.gu-vn-date-parts{flex:1.65 1 0;max-width:none}
+.gu-vn-datetime>input[type="text"]{flex:1 1 0;min-width:64px!important;font-size:16px!important;text-align:center;padding:0 4px!important}
+.gu-vn-picker{position:relative;display:grid;place-items:center;flex:0 0 44px;min-width:44px;height:46px;min-height:44px;border:1px solid #d9e1e8;border-radius:10px;background:#edf4f8;color:#345c76;overflow:hidden;cursor:pointer;touch-action:manipulation}
+.gu-vn-picker>svg{pointer-events:none}
+.gu-vn-picker>.gu-vn-native-date{position:absolute!important;inset:0!important;width:100%!important;height:100%!important;min-width:44px!important;max-width:none!important;max-height:none!important;border:0!important;margin:0!important;padding:0!important;opacity:.015!important;pointer-events:auto!important;cursor:pointer;z-index:1;font-size:16px;appearance:auto}
+.gu-vn-picker:focus-within{outline:2px solid #347b96;outline-offset:2px}
+.gu-calendar-toolbar-v532 .gu-calendar-date-actions>.gu-vn-date-only{display:flex!important;align-items:center!important;flex:1 1 210px!important;min-width:0!important;width:auto!important;max-width:none!important;height:46px!important;border:0!important;background:transparent!important;padding:0!important;gap:7px!important}
+.gu-calendar-toolbar-v532 .gu-calendar-date-actions>.gu-vn-date-only>.gu-vn-date-parts{flex:1 1 auto!important;min-width:0!important;max-width:none!important;width:auto!important;height:46px!important}
+.gu-calendar-toolbar-v532 .gu-calendar-date-actions>.gu-vn-date-only>.gu-vn-picker{flex:0 0 44px!important;width:44px!important;min-width:44px!important;height:46px!important;min-height:46px!important}
+.gu-calendar-toolbar-v532 .gu-calendar-date-actions button{touch-action:manipulation;position:relative;z-index:1}
+@media(max-width:520px){.gu-calendar-toolbar-v532 .gu-calendar-date-actions>.gu-vn-date-only{order:1!important;flex-basis:calc(100% - 104px)!important}.gu-calendar-toolbar-v532 .gu-calendar-date-actions>.gu-calendar-today{order:3!important;flex:1 1 100%!important}.gu-vn-datetime{flex-wrap:nowrap!important;gap:4px!important}.gu-vn-date-parts{padding-inline:2px;gap:0}.gu-vn-date-parts>input{font-size:16px!important}.gu-vn-picker{flex-basis:44px}}

@@ -22,7 +22,7 @@ test('Nhân viên chọn gói 3h/6h/24h/48h độc lập với suy luận thời
 test('Tạo đơn máy ảnh có lựa chọn gói ở form và xác thực ngay tại server',()=>{
  const form=read('src/components/GuV5Booking.tsx');const route=read('src/app/api/v5/orders/route.ts');
  assert.match(form,/Chọn gói thuê máy ảnh/);
- assert.match(form,/setReturnAt\(addPackageHours\(pickupAt,hours\)\)/);
+ assert.match(form,/returnAt=useMemo\(\(\)=>rentalHours\?addPackageHours\(pickupAt,rentalHours\)/);
  assert.match(form,/cameraPackageHours:cameraItems\.length\?cameraPackageHours/);
  assert.match(route,/chosenCameraPackageSnapshot\(i\.cameraModel,pickupAt,returnAt,b\.cameraPackageHours\)/);
  assert.match(route,/rentalCharge\(\{\.\.\.i,\.\.\.cameraSnapshot\}/);

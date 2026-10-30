@@ -21,7 +21,7 @@ test('Booking UI refactor preserves submit validation, phone lookup, secure phot
  assert.match(form,/phoneIndex|quickCustomer:\{name:name\.trim\(\),phone:digits\(phone\)\}/);
  assert.match(form,/gu-customer-search-anchor/);
  assert.match(form,/setShowPhoneSuggestions\(false\)/);
- assert.match(form,/setReturnAt\(addPackageHours\(pickupAt,hours\)\)/);
+ assert.match(form,/returnAt=useMemo\(\(\)=>rentalHours\?addPackageHours\(pickupAt,rentalHours\)/);
  assert.match(form,/GuSecureUpload purpose="reservation"/);
  assert.match(form,/aria-pressed=\{selected\.includes\(i\.id\)\}/);
  assert.match(form,/GuVNDateTimeInput required value=\{pickupAt\}/);

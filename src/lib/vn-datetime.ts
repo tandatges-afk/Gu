@@ -12,9 +12,9 @@ export function formatVNDateTime(iso:string|undefined|null):string{
  return `${parts.hour}:${parts.minute} ${parts.day}/${parts.month}/${parts.year}`;
 }
 export function isoDayFromVN(value:string):string|null{
- const m=/^(\d{2})\/(\d{2})\/(\d{4})$/.exec(value.trim());
+ const m=/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(value.trim());
  if(!m)return null;
- const key=`${m[3]}-${m[2]}-${m[1]}`;
+ const key=`${m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`;
  const d=new Date(key+'T00:00:00Z');
  return !Number.isNaN(d.getTime())&&d.toISOString().slice(0,10)===key?key:null;
 }

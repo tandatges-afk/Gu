@@ -20,7 +20,7 @@ function initialTimes(day?:string,endDay?:string,startHour?:string,endHour?:stri
  next.setUTCDate(next.getUTCDate()+1);
  return {pickup,returnAt:next.toISOString().slice(0,10)+'T'+(endHour||pickup.slice(11))};
 }
-const readableReturn=(value:string)=>{try{return formatVNDateTime(localDateTimeToISO(value));}catch{return 'Chọn giờ nhận hợp lệ';}};
+const readableReturn=(value:string)=>{if(!value)return 'Chọn gói thuê máy ảnh';try{return formatVNDateTime(localDateTimeToISO(value));}catch{return 'Chọn giờ nhận hợp lệ';}};
 const digits=(s:string)=>s.replace(/\D/g,'').replace(/^84(?=\d{9}$)/,'0');
 function addPackageHours(pickup:string,hours:number):string{
  const date=new Date(pickup+':00Z');
@@ -31,7 +31,6 @@ export function GuV5Booking({items,customers,api,initial,onClose,onSuccess,onCus
  const [customerId,setCustomerId]=useState(initial.customerId);
  const [selected,setSelected]=useState<string[]>(initial.itemIds.filter(id=>{const item=items.find(i=>i.id===id);return !item||productGroup(item.category)===rentalGroup;}));
  const [pickupAt,setPickupAt]=useState(()=>initialTimes(initial.pickupDate,initial.returnDate,initial.pickupHour,initial.returnHour).pickup);
- const [returnAt,setReturnAt]=useState(()=>initialTimes(initial.pickupDate,initial.returnDate,initial.pickupHour,initial.returnHour).returnAt);
  const [query,setQuery]=useState('');const [searched,setSearched]=useState<InventoryItem[]>([]);const [selectedRecords,setSelectedRecords]=useState<InventoryItem[]>([]);const [people,setPeople]=useState<Customer[]>([]);const [name,setName]=useState('');const [phone,setPhone]=useState('');const [note,setNote]=useState(initial.note);
  const [error,setError]=useState('');const [busy,setBusy]=useState(false);
  const [quickCustomer,setQuickCustomer]=useState(false);
@@ -53,9 +52,10 @@ export function GuV5Booking({items,customers,api,initial,onClose,onSuccess,onCus
  useEffect(()=>{let cancelled=false;void api<{results:InventoryItem[]}>('catalog?kind=items&rentalGroup='+rentalGroup+'&size=50')
   .then(r=>{if(!cancelled)setSearched(old=>[...new Map([...old,...r.results].map(i=>[i.id,i])).values()]);}).catch(()=>{});
  return()=>{cancelled=true;};},[api,rentalGroup]);
- useEffect(()=>{const hours=rentalGroup==='CAMERA'?cameraPackageHours:rentalDaysSelected*24;
-  if(hours)setReturnAt(previous=>{const next=addPackageHours(pickupAt,hours);return next===previous?previous:next;});
- },[pickupAt,rentalDaysSelected,cameraPackageHours,rentalGroup]);
+ // Derive the deadline synchronously from the current pickup and rental package.
+ // This prevents a stale returnAt from being displayed/submitted on mobile after date changes.
+ const rentalHours=rentalGroup==='CAMERA'?Number(cameraPackageHours||0):rentalDaysSelected*24;
+ const returnAt=useMemo(()=>rentalHours?addPackageHours(pickupAt,rentalHours):'', [pickupAt,rentalHours]);
  const visible=available.filter(i=>!i.archivedAt&&productGroup(i.category)===rentalGroup&&(!query||matchesProductSearch([i.name,i.hangerCode||'',i.category].join(' '),query)));
  useEffect(()=>{if(!query.trim())return;
  let cancelled=false;const timer=setTimeout(()=>{void api<{results:InventoryItem[]}>('catalog?kind=items&q='+encodeURIComponent(query.trim())+'&size=50&rentalGroup='+rentalGroup).then(res=>{if(!cancelled)setSearched(res.results);}).catch(()=>{if(!cancelled)setSearched([]);});},350);
@@ -75,7 +75,7 @@ export function GuV5Booking({items,customers,api,initial,onClose,onSuccess,onCus
  const incomplete=(!customerId&&!quickCustomer)?'Chưa chọn khách hàng.':quickCustomer&&(!name.trim()||digits(phone).length<9)?'Cần nhập tên và số điện thoại hợp lệ cho khách mới.':!selected.length?'Chưa chọn sản phẩm.':selected.some(id=>!available.some(item=>item.id===id))?'Đang tải thông tin sản phẩm đã chọn.':selected.some(id=>available.some(item=>item.id===id&&productGroup(item.category)!==rentalGroup))?'Đơn đang chứa sản phẩm khác loại. Hãy tạo đơn riêng.':!blocks?'Ngày giờ thuê chưa hợp lệ.':cameraItems.length&&!cameraPackageHours?'Chưa chọn gói thuê máy ảnh 3h/6h/24h/48h.':quoteError?'Không thể tính giá của ít nhất một sản phẩm.':needsPrepay&&!reservationProofId?'Chưa tải ảnh chứng từ thanh toán thành công.':'';
  const submit=async(e:FormEvent)=>{e.preventDefault();if(busy)return;setError('');
   const fields=Array.from((e.currentTarget as HTMLFormElement).querySelectorAll('.gu-vn-datetime'));
-  if(fields.some(group=>{const inputs=group.querySelectorAll<HTMLInputElement>('input[type="text"]');return inputs.length!==2||!isoDayFromVN(inputs[0].value)||!isValidHHMM(inputs[1].value);})){setError('Ngày và giờ chưa hợp lệ. Nhập theo DD/MM/YYYY và giờ 24h HH:MM (00:00–23:59).');return;}
+  if(fields.some(group=>{const parts=group.querySelectorAll<HTMLInputElement>('.gu-vn-date-parts input');const clock=group.querySelector<HTMLInputElement>('input[aria-label*="giờ (24h)"]');const typed=parts.length===3?isoDayFromVN(`${parts[0].value}/${parts[1].value}/${parts[2].value}`):null;return !typed||typed!==pickupAt.slice(0,10)||!clock||!isValidHHMM(clock.value)||clock.value!==pickupAt.slice(11,16); })){setError('Ngày và giờ chưa hợp lệ. Nhập đủ ngày/tháng/năm và giờ 24h HH:MM (00:00–23:59).');return;}
   if(incomplete){setError(incomplete);return;}setBusy(true);try{let cid=customerId;
    if(quickCustomer)cid='QUICK_CUSTOMER';
    if(!cid||!selected.length||!blocks)throw Error('Chọn khách, sản phẩm và ngày giờ hợp lệ.');
@@ -127,7 +127,7 @@ export function GuV5Booking({items,customers,api,initial,onClose,onSuccess,onCus
     {visible.length===0&&<p className={ui.empty}>Không tìm thấy sản phẩm phù hợp.</p>}
    </div>
   </section>
-  {cameraItems.length>0&&<section className={`gu-camera-package-panel ${ui.packagePanel}`}><label className="form-field"><span>Chọn gói thuê máy ảnh (bắt buộc)</span><select className="input" value={cameraPackageHours} onChange={e=>{const hours=Number(e.target.value) as CameraPackageHours;if(!CAMERA_TIERS.includes(hours))return;setCameraPackageHours(hours);setReturnAt(addPackageHours(pickupAt,hours));}}><option value="">Chọn gói máy ảnh</option>{CAMERA_TIERS.map(hours=><option value={hours} key={hours}>Gói {hours} giờ</option>)}</select></label>
+  {cameraItems.length>0&&<section className={`gu-camera-package-panel ${ui.packagePanel}`}><label className="form-field"><span>Chọn gói thuê máy ảnh (bắt buộc)</span><select className="input" value={cameraPackageHours} onChange={e=>{const hours=Number(e.target.value) as CameraPackageHours;if(!CAMERA_TIERS.includes(hours))return;setCameraPackageHours(hours);}}><option value="">Chọn gói máy ảnh</option>{CAMERA_TIERS.map(hours=><option value={hours} key={hours}>Gói {hours} giờ</option>)}</select></label>
   {cameraPackageHours!==''&&cameraItems.map(item=>isCameraModel(item.cameraModel)?<p key={item.id} className="gu-camera-package-preview">{item.name} · {item.hangerCode||item.cameraSerial} · Gói {cameraPackageHours}h: {money(cameraBasePrice(item.cameraModel,cameraPackageHours))}. Quá hạn thực tế: +10.000đ mỗi giờ trễ bắt đầu.</p>:<p key={item.id} className="field-error">{item.name} chưa có mẫu máy hợp lệ.</p>)}</section>}
   {quoteError&&<div className="inline-alert danger-alert">Có sản phẩm không đủ thông tin để tính giá. Kiểm tra mẫu máy ảnh hoặc khoảng giờ thuê.</div>}
   <div className={`booking-total ${ui.summary}`}><div><b>{selected.length} sản phẩm · {rentalGroup==='CAMERA'?(cameraPackageHours?`Gói máy ảnh ${cameraPackageHours} giờ`:'Chưa chọn gói máy ảnh'):`${blocks||'—'} chu kỳ 24 giờ`}</b></div><strong>{money(total)}</strong></div>
