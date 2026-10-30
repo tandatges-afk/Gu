@@ -1264,3 +1264,53 @@ html,body{background:var(--paper);color:var(--ink)}
 .gu-review-choice:disabled{cursor:default;opacity:.8}
 .gu-review-issue-photo{display:grid;gap:8px;margin:12px 0;padding:10px;border-radius:12px;background:#fff8e9;border:1px solid #ead4a8}
 .gu-review-issue-photo img{max-width:270px;width:100%;max-height:290px;object-fit:contain;border-radius:9px}
+
+/* Rev7.9.6 — compact, touch-friendly numeric wheels for date + time. */
+.gu-vn-date-only,.gu-vn-datetime{gap:5px;align-items:center}
+.gu-vn-date-field-wrap{min-width:0;flex:1 1 0}
+.gu-vn-date-parts{width:100%;height:40px;min-height:40px;padding:0 2px;gap:0;flex:1;justify-content:center;border-radius:9px}
+.gu-vn-date-parts>button,.gu-vn-clock>button{appearance:none;border:0!important;outline:none;background:transparent!important;box-shadow:none!important;color:#253d53;font-size:14px!important;font-weight:750;font-variant-numeric:tabular-nums;padding:0 1px!important;height:38px;min-height:38px;min-width:0;line-height:1;flex:0 1 34px;display:grid;place-items:center;border-radius:6px}
+.gu-vn-date-parts>button:last-child{flex-basis:27px}
+.gu-vn-date-parts>button:focus-visible,.gu-vn-clock>button:focus-visible{outline:2px solid #347b96!important;outline-offset:-2px}
+.gu-vn-date-parts>button:not(:disabled):hover,.gu-vn-clock>button:not(:disabled):hover{background:#e8f2f9!important}
+.gu-vn-date-parts>span,.gu-vn-clock>span{flex:0 0 auto;color:#647a8c;font-weight:650;font-size:14px}
+.gu-vn-year-prefix{margin-left:2px;letter-spacing:0;font-variant-numeric:tabular-nums;color:#253d53!important}
+.gu-vn-date-parts.is-invalid{border-color:#c75148!important;box-shadow:0 0 0 2px #c7514812}
+.gu-vn-date-error{font-size:11px;line-height:1.45;color:#b53c30;margin:5px 0 0;font-weight:650}
+.gu-vn-date-field-wrap>.gu-vn-date-error{max-width:300px}
+.gu-vn-clock{display:flex;align-items:center;justify-content:center;flex:0 0 74px;min-width:74px;height:40px;gap:0;border:1px solid #d9e1e8;border-radius:9px;background:#fff;padding:0 2px}
+.gu-vn-clock>button{flex-basis:30px;font-size:14px!important}
+.gu-vn-datetime>.gu-vn-date-field-wrap{flex:1.4 1 0}
+.gu-vn-datetime>.gu-vn-clock{flex:0 0 74px}
+.gu-vn-picker{height:40px;min-height:40px;width:40px;min-width:40px;flex:0 0 40px;border-radius:9px}
+.gu-vn-picker>.gu-vn-native-date{min-width:40px!important}
+.gu-vn-datetime.is-readonly .gu-vn-date-parts,.gu-vn-datetime.is-readonly .gu-vn-clock{background:#f4f7f9}
+.gu-vn-date-parts.is-readonly>button,.gu-vn-clock.is-readonly>button{opacity:1!important;cursor:default;color:#526b7e}
+.gu-vn-readonly-placeholder{border:1px solid #d9e1e8;border-radius:9px;padding:11px;background:#f4f7f9;color:#627b8f;font-size:12px}
+.gu-vn-wheel-backdrop{position:fixed;inset:0;z-index:10990;background:transparent}
+.gu-vn-wheel-panel{position:fixed;z-index:10991;width:188px;max-width:calc(100vw - 16px);background:white;border:1px solid #d2dde6;border-radius:13px;box-shadow:0 17px 48px #1831463b;max-height:calc(100dvh - 16px);overflow-y:auto;padding:7px;touch-action:pan-x}
+.gu-vn-wheel-heading{height:32px;display:flex;justify-content:space-between;align-items:center;gap:5px;padding:0 4px 4px 8px;color:#27425a;font-size:11px}
+.gu-vn-wheel-heading button{border:0;background:transparent;color:#657c8a;display:grid;place-items:center;min-width:30px;height:30px}
+.gu-vn-wheel-items{display:flex;flex-direction:column;align-items:stretch;touch-action:none;overscroll-behavior:contain;user-select:none;-webkit-user-select:none;max-height:306px;overflow:hidden;position:relative;border-radius:8px;background:linear-gradient(180deg,#f6f9fc,white 22%,white 78%,#f6f9fc)}
+.gu-vn-wheel-option{height:34px;min-height:34px;flex:0 0 34px;border:0;border-bottom:1px solid #edf1f5;background:transparent;color:#8596a4;font-variant-numeric:tabular-nums;font-size:16px;font-weight:600;letter-spacing:.04em;display:grid;place-items:center}
+.gu-vn-wheel-option.is-current{background:#e7f2fb;color:#1e5e86;font-size:21px;font-weight:850;border-radius:8px;border:1px solid #bad5e7}
+.gu-vn-wheel-option:focus-visible{outline:2px solid #277ba6;outline-offset:-2px}
+.gu-vn-wheel-hint{font-size:10px;color:#8192a0;text-align:center;padding:7px 0 4px;line-height:1.5}
+.gu-vn-wheel-done{display:block;width:100%;padding:8px 10px;border:0;border-radius:8px;background:#224965;color:#fff;font-size:12px;font-weight:750;min-height:34px}
+.gu-vn-date-only>.gu-vn-date-field-wrap{flex:1 1 auto}
+.gu-calendar-toolbar-v532 .gu-calendar-date-actions>.gu-vn-date-only{height:40px!important;max-width:100%!important}
+.gu-calendar-toolbar-v532 .gu-calendar-date-actions>.gu-vn-date-only>.gu-vn-date-field-wrap{flex:1 1 auto;min-width:0}
+.gu-calendar-toolbar-v532 .gu-calendar-date-actions>.gu-vn-date-only>.gu-vn-picker{height:40px!important;min-height:40px!important;min-width:40px!important;width:40px!important;flex-basis:40px!important}
+@media(max-width:600px){
+ .gu-vn-wheel-backdrop{background:#162c3e5b}
+ .gu-vn-wheel-panel{left:0!important;right:0!important;bottom:0!important;top:auto!important;width:100%!important;max-width:none;border-radius:17px 17px 0 0;padding:12px 15px calc(12px + env(safe-area-inset-bottom))}
+ .gu-vn-wheel-heading{font-size:13px;height:36px}
+ .gu-vn-wheel-items{max-width:320px;width:100%;margin:0 auto}
+ .gu-vn-wheel-option{height:36px;min-height:36px;flex-basis:36px}
+ .gu-vn-date-parts{height:40px!important;padding:0 1px!important}
+ .gu-vn-date-parts>button,.gu-vn-clock>button{font-size:14px!important}
+ .gu-vn-datetime{flex-wrap:nowrap!important;gap:4px!important}
+ .gu-vn-datetime>.gu-vn-date-field-wrap{min-width:0;flex:1 1 0}
+ .gu-vn-picker{min-width:38px;width:38px;flex-basis:38px}
+ .gu-vn-clock{min-width:70px;flex-basis:70px!important}
+}

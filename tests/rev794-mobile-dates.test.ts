@@ -17,7 +17,7 @@ test('calendar and booking share non-editable separators and native touch date t
  const fields=readFileSync('src/components/GuVNDateTimeInput.tsx','utf8');
  assert.match(fields,/gu-vn-date-parts/);
  assert.match(fields,/aria-hidden="true">\/<\/span>/);
- assert.match(fields,/inputMode="numeric"/);
+ assert.match(fields,/vnWheelRange/);
  assert.match(fields,/gu-vn-picker/);
  assert.match(fields,/type="date" className="gu-vn-native-date"/);
  assert.doesNotMatch(fields,/showPicker\(/);
@@ -30,5 +30,5 @@ test('booked return time is derived from pickup and selected package in the same
  const booking=readFileSync('src/components/GuV5Booking.tsx','utf8');
  assert.match(booking,/const returnAt=useMemo\(\(\)=>rentalHours\?addPackageHours\(pickupAt,rentalHours\)/);
  assert.doesNotMatch(booking,/setReturnAt/);
- assert.match(booking,/typed!==pickupAt\.slice\(0,10\)/);
+ assert.match(booking,/parts\.dataset\.vnIso!==expected\.slice\(0,10\)/);
 });

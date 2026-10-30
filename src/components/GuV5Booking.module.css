@@ -85,3 +85,12 @@
 .field :global(.gu-vn-datetime) > :global(.gu-vn-date-parts) input:last-of-type{flex-grow:1.8}
 .field :global(.gu-vn-datetime) > :global(.gu-vn-picker){flex:0 0 44px;min-width:44px;height:44px;border:0;border-left:1px solid #e7ecf1;border-radius:0}
 .field :global(.gu-vn-datetime) > :global(.gu-vn-picker) input[type="date"]{position:absolute!important;inset:0!important;width:100%!important;height:100%!important;opacity:.015!important;pointer-events:auto!important;max-width:none!important;max-height:none!important}
+/* Rev7.9.6: wheels portal to body. Do not clip their triggers in booking fields. */
+.field :global(.gu-vn-datetime){overflow:visible;min-height:42px;height:auto;align-items:center;padding:0 3px;gap:3px}
+.field :global(.gu-vn-datetime) > :global(.gu-vn-date-field-wrap){flex:1 1 0;min-width:0}
+.field :global(.gu-vn-datetime) > :global(.gu-vn-clock){flex:0 0 74px;min-width:74px;height:38px;border-top:0;border-bottom:0;border-right:0;border-radius:0}
+.field :global(.gu-vn-datetime) > :global(.gu-vn-picker){flex:0 0 36px;min-width:36px;width:36px;height:40px;border:0;border-left:1px solid #e4ebef;border-radius:0;background:#f1f5f8}
+.field :global(.gu-vn-datetime) > :global(.gu-vn-date-field-wrap) :global(.gu-vn-date-parts){height:38px;border:0!important;box-shadow:none!important}
+.resetReturn{border:0;background:transparent;color:#245f87;font-size:11px;font-weight:750;text-align:left;justify-self:start;padding:3px 0;cursor:pointer}
+.resetReturn:hover{text-decoration:underline}
+@media(max-width:680px){.field :global(.gu-vn-datetime){min-height:42px;height:auto}.field :global(.gu-vn-datetime) > :global(.gu-vn-clock){min-width:70px;flex-basis:70px}}

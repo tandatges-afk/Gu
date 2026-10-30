@@ -29,9 +29,9 @@ test('Booking UI refactor preserves submit validation, phone lookup, secure phot
 });
 test('24h date picker uses accessible calendar icon instead of glyph',()=>{
  const date=read('src/components/GuVNDateTimeInput.tsx');
- assert.match(date,/import \{CalendarDays\} from 'lucide-react'/);
+ assert.match(date,/import \{CalendarDays,X\} from 'lucide-react'/);
  assert.match(date,/<CalendarDays size=\{17\}/);
  assert.doesNotMatch(date,/▦/);
- assert.match(date,/isoDayFromVN/);
+ assert.match(date,/vnWheelISO/);
  assert.match(date,/isValidHHMM/);
 });
