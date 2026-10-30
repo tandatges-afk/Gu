@@ -57,7 +57,7 @@ export function GuOrderCapture({orderId,api,onClose,onDone}:{orderId:string;api:
  const count=lines.reduce((sum,l)=>sum+(phase==='RETURN'&&conditions[l.itemId]==='MISSING'?0:(order?.photoTemplates?.[l.itemId]||[]).length),0);
  const completed=lines.reduce((sum,l)=>sum+(phase==='RETURN'&&conditions[l.itemId]==='MISSING'?0:(order?.photoTemplates?.[l.itemId]||[]).filter(angle=>Boolean(pictures[l.itemId+'|'+angle])).length),0);
  const missingSetup=lines.some(l=>!order?.photoTemplates?.[l.itemId]?.length);
- const missingReason=phase==='RETURN'&&lines.some(l=>conditions[l.itemId]&&conditions[l.itemId]!=='OK'&&!notes[l.itemId]?.trim());
+ const missingReason=lines.some(l=>conditions[l.itemId]&&conditions[l.itemId]!=='OK'&&!notes[l.itemId]?.trim()&&!pictures[l.itemId+'|issue']);
  const canSend=Boolean(phase&&lines.length>0&&!missingSetup&&!missingReason&&count===completed&&!sending&&!busy&&(phase!=='HANDOVER'||Boolean(depositProofId))&& !waitingLaundry&&(!extraSecurity||Boolean(depositProofId)));
  const upload=async(file:File|null,itemId:string,angle:string)=>{
   if(!file||!order||!phase)return;
@@ -73,7 +73,7 @@ export function GuOrderCapture({orderId,api,onClose,onDone}:{orderId:string;api:
  const submit=async()=>{
   if(!order||!phase||!canSend)return;setBusy(true);setError('');
   try{
-   const proofs=lines.map(l=>({itemId:l.itemId,shots:Object.fromEntries((order.photoTemplates?.[l.itemId]||[]).map(angle=>[angle,pictures[l.itemId+'|'+angle]||''])),condition:conditions[l.itemId]||'OK',note:notes[l.itemId]||''}));
+   const proofs=lines.map(l=>({itemId:l.itemId,shots:Object.fromEntries((order.photoTemplates?.[l.itemId]||[]).map(angle=>[angle,pictures[l.itemId+'|'+angle]||''])),condition:conditions[l.itemId]||'OK',note:notes[l.itemId]||'',issuePhotoUrl:pictures[l.itemId+'|issue']||''}));
    await api('v5/orders/'+orderId,{method:'PATCH',body:JSON.stringify({action:phase==='HANDOVER'?'HANDOVER':phase==='HANDOVER_EXTRA'?'HANDOVER_EXTRA':'RECEIVE',items:proofs,...((phase==='HANDOVER'||phase==='HANDOVER_EXTRA')&&depositProofId?{depositProofId,depositDraftId,depositKind,collateralAmount:cashAmount}:{})})});
    const updated=await api<{order:RentalOrder}>('v5/orders/'+orderId);setOrder(updated.order);setPictures({});
    await onDone();if(phase==='RETURN'){setSettling(true);}else onClose();
@@ -87,8 +87,13 @@ export function GuOrderCapture({orderId,api,onClose,onDone}:{orderId:string;api:
   {waitingLaundry&&<p className="inline-alert danger-alert">{waitingReason||'Sản phẩm chưa sẵn sàng'}. Chỉ giao khi kho xác nhận còn trống.</p>}{order&&!phase&&!settling&&<div className="inline-alert">Đơn đã hoàn thành hoặc không còn ảnh cần chụp.</div>}
   {order&&phase&&<><div className="gu-capture-progress"><span>{completed}/{count} ảnh</span><progress max={Math.max(1,count)} value={completed}/></div>
    {lines.map(line=><article className="gu-capture-item" key={line.itemId}><div className="gu-capture-item-title"><ProductImage paths={items.find(i=>i.id===line.itemId)?.imagePaths}/><div><h3>{line.name}</h3><span>{line.hangerCode||line.sku}</span></div></div>
-    {phase==='RETURN'&&<div className="gu-capture-conditions" aria-label={'Tình trạng '+line.name}>{(['OK','ISSUE','MISSING'] as Condition[]).map(c=><button type="button" key={c} className={conditions[line.itemId]===c?'chosen':''} onClick={()=>setConditions(old=>({...old,[line.itemId]:c}))}>{c==='OK'?'Bình thường':c==='ISSUE'?'Có vấn đề':'Thiếu món'}</button>)}
-      {conditions[line.itemId]&&conditions[line.itemId]!=='OK'&&<textarea className="input" aria-label="Ghi chú tình trạng" value={notes[line.itemId]||''} onChange={e=>setNotes(old=>({...old,[line.itemId]:e.target.value}))} placeholder="Mô tả tình trạng"/>}</div>}
+    <div className="gu-capture-conditions" aria-label={'Tình trạng '+line.name}>
+      {(phase==='RETURN'?(['OK','ISSUE','MISSING'] as Condition[]):(['OK','ISSUE'] as Condition[])).map(c=><button type="button" key={c} className={'gu-condition-choice '+(conditions[line.itemId]===c?'chosen gu-condition-'+c.toLowerCase():'')} aria-pressed={conditions[line.itemId]===c} onClick={()=>setConditions(old=>({...old,[line.itemId]:c}))}>{c==='OK'?'Bình thường':c==='ISSUE'?'Có vấn đề':'Thất lạc'}</button>)}
+      {conditions[line.itemId]&&conditions[line.itemId]!=='OK'&&<div className="gu-capture-issue"><strong>Ghi nhận hiện trạng {conditions[line.itemId]==='MISSING'?'thất lạc':'có vấn đề'}</strong><p>Chụp ảnh chỗ bị lỗi (không cần gõ mô tả), hoặc ghi chú nếu không thể chụp.</p>
+       {pictures[line.itemId+'|issue']&&<img src={pictures[line.itemId+'|issue']} alt={'Ảnh vấn đề '+line.name} className="gu-capture-issue-photo"/>}
+       <label className="btn btn-white gu-capture-select">{sending===line.itemId+'|issue'?'Đang tải ảnh…':pictures[line.itemId+'|issue']?'Chụp lại vấn đề':'Chụp ảnh vấn đề'}<input type="file" accept="image/*" capture="environment" hidden disabled={Boolean(sending)||busy} onChange={e=>{void upload(e.target.files?.[0]||null,line.itemId,'issue');e.target.value='';}}/></label>
+       <textarea className="input" aria-label="Ghi chú tình trạng nếu không chụp ảnh" value={notes[line.itemId]||''} onChange={e=>setNotes(old=>({...old,[line.itemId]:e.target.value}))} placeholder="Ghi chú nếu không chụp ảnh (không bắt buộc khi đã chụp)"/>
+      </div>}</div>
     {!(phase==='RETURN'&&conditions[line.itemId]==='MISSING')&&(order.photoTemplates?.[line.itemId]||[]).map(angle=><div className="gu-capture-angle" key={angle}><b>{angle}</b><div className="gu-capture-photo-grid"><div><small>{phase==='RETURN'?'Ảnh khi giao':'Ảnh mẫu'}</small>{(()=>{const url=phase==='RETURN'?order.handoverProof?.items.find(p=>p.itemId===line.itemId)?.shots[angle]?.url:order.referencePhotos?.[line.itemId]?.[angle];return url?<img alt={'Đối chiếu '+angle} src={url}/>:<div className="gu-capture-placeholder"/>;})()}</div><div><small>{phase==='RETURN'?'Ảnh khi nhận':'Ảnh khi giao'}</small>{pictures[line.itemId+'|'+angle]?<img src={pictures[line.itemId+'|'+angle]} alt={'Ảnh mới '+angle}/>:<div className="gu-capture-placeholder"><Camera/></div>}
      <label className="btn btn-white gu-capture-select">{sending===line.itemId+'|'+angle?'Đang tải…':pictures[line.itemId+'|'+angle]?'Chụp lại':'Chụp / Chọn ảnh'}<input type="file" accept="image/*" capture="environment" hidden disabled={Boolean(sending)||busy} onChange={e=>{void upload(e.target.files?.[0]||null,line.itemId,angle);e.target.value='';}}/></label></div></div></div>)}
    </article>)}

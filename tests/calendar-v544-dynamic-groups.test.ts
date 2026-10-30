@@ -43,7 +43,8 @@ test('No labels Hôm nay/Mai/Mốt inside the date headers; available cells only
  assert.match(page,/<strong>\{prettyDay\(d\)\}<\/strong><\/div>/);
  assert.match(page,/visual\.className==='stateFree'\?<span className=\{calendarUi\.freeAction\} aria-hidden="true">\+<\/span>/);
  assert.doesNotMatch(page,/\+ Đặt thuê/);
- assert.match(page,/sortCalendarProductsForDay\(calendarFilteredItems,calendarStart,calendarActive,today,riskIds\)/);
+ assert.match(page,/calendar\/page\?/);
+ assert.match(page,/calendarItems=calendarBaseItems/);
  assert.match(css,/\.grid :global\(\.calendar-row\)>\.dayTrack/);
  assert.doesNotMatch(css,/\.toneToday\{[^\n]*box-shadow:/);
 });

@@ -51,7 +51,7 @@ test('đơn chung, lịch trang phục/phụ kiện và lịch máy ảnh tách 
  assert.doesNotMatch(page,/id:'camera-orders'/);
  assert.match(page,/kind==='orders'\?'&rentalGroup=ALL'/);
  assert.match(page,/const calendarFilteredItems=calendarSearchPool\.filter\(i=>productGroup\(i\.category\)/);
- assert.match(page,/rentalGroup='\+\(page==='camera-calendar'\?'CAMERA':'CLOTHING'\)/);
+ assert.match(page,/group:page==='camera-calendar'\?'CAMERA':'CLOTHING'/);
  assert.match(catalog,/kind==='orders'&&requestedRentalGroup!=='ALL'/);
  assert.match(catalog,/collection=collection\.startAfter\(scan\.docs\[scan\.docs\.length-1\]\)/);
 });

@@ -1246,3 +1246,21 @@ html,body{background:var(--paper);color:var(--ink)}
 .gu-calendar-toolbar-v532 .gu-calendar-date-actions>.gu-vn-date-only>.gu-vn-picker{flex:0 0 44px!important;width:44px!important;min-width:44px!important;height:46px!important;min-height:46px!important}
 .gu-calendar-toolbar-v532 .gu-calendar-date-actions button{touch-action:manipulation;position:relative;z-index:1}
 @media(max-width:520px){.gu-calendar-toolbar-v532 .gu-calendar-date-actions>.gu-vn-date-only{order:1!important;flex-basis:calc(100% - 104px)!important}.gu-calendar-toolbar-v532 .gu-calendar-date-actions>.gu-calendar-today{order:3!important;flex:1 1 100%!important}.gu-vn-datetime{flex-wrap:nowrap!important;gap:4px!important}.gu-vn-date-parts{padding-inline:2px;gap:0}.gu-vn-date-parts>input{font-size:16px!important}.gu-vn-picker{flex-basis:44px}}
+/* Rev7.9.5: calendar page controls are compact and stay usable on mobile. */
+.gu-calendar-pager{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.gu-calendar-pager .gu-search-wrap{flex:1 1 300px;min-width:180px}
+.gu-pager-actions{display:flex;align-items:center;justify-content:flex-end;gap:7px;flex-wrap:wrap}
+.gu-page-indicator{white-space:nowrap;font-weight:700;color:#244256;font-size:13px;padding:0 9px;font-variant-numeric:tabular-nums}
+@media(max-width:760px){.gu-calendar-pager{display:grid;grid-template-columns:1fr}.gu-pager-actions{justify-content:space-between}.gu-pager-actions .btn{flex:1 1 auto;width:auto;min-width:0}.gu-page-indicator{order:-1;flex-basis:100%;text-align:center;padding:5px 0}}
+/* Rev7.9.5: optional defect photography and color-coded administrator review. */
+.gu-capture-conditions .gu-condition-choice.gu-condition-ok,.gu-review-choice--ok{background:#e4f6eb;border-color:#8acbaa;color:#145d38;font-weight:800}
+.gu-capture-conditions .gu-condition-choice.gu-condition-issue,.gu-review-choice--issue{background:#fff3cf;border-color:#e3bb52;color:#835400;font-weight:800}
+.gu-capture-conditions .gu-condition-choice.gu-condition-missing,.gu-review-choice--missing{background:#ffe2e2;border-color:#e88b8b;color:#9c2026;font-weight:800}
+.gu-capture-issue{flex-basis:100%;display:flex;flex-direction:column;gap:8px;padding:12px;border:1px solid #e4cb8b;background:#fffdf3;border-radius:12px}
+.gu-capture-issue p{margin:0;color:#6e5a30;font-size:13px}
+.gu-capture-issue-photo{max-height:210px;max-width:220px;object-fit:contain;border-radius:10px}
+.gu-review-choice-row{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0}
+.gu-review-choice{cursor:pointer;min-height:44px;padding:10px 14px;border-radius:10px;background:#fff;border:1px solid #cdd8de;color:#334d5c;font-weight:700}
+.gu-review-choice:disabled{cursor:default;opacity:.8}
+.gu-review-issue-photo{display:grid;gap:8px;margin:12px 0;padding:10px;border-radius:12px;background:#fff8e9;border:1px solid #ead4a8}
+.gu-review-issue-photo img{max-width:270px;width:100%;max-height:290px;object-fit:contain;border-radius:9px}

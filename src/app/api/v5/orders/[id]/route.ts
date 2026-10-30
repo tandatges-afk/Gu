@@ -33,8 +33,13 @@ function readProof(raw:unknown,order:RentalOrder,uid:string,name:string,phase:'H
   if(!targetIds.includes(id))throw new ApiError(400,'Sản phẩm không thuộc đợt chụp.');
   const slots=templates[id];if(!slots)throw new ApiError(400,'Chưa có cấu hình góc chụp.');
   const condition=p.condition==='MISSING'?'MISSING':p.condition==='ISSUE'?'ISSUE':'OK';
+  if(phase==='HANDOVER'&&condition==='MISSING')throw new ApiError(400,'Không ghi nhận thất lạc khi bàn giao.');
   const missing=phase==='RETURN'&&condition==='MISSING';
-  if(phase==='RETURN'&&(missing||condition==='ISSUE')&&(!p.note||typeof p.note!=='string'||!p.note.trim()))throw new ApiError(400,'Đồ thiếu hoặc có vấn đề phải ghi chú hiện trạng để Admin đối chiếu.');
+  const issuePhotoRaw=condition==='OK'?null:p.issuePhotoUrl;
+  const issuePhotoUpload=issuePhotoRaw?parseInspectionPhotoUrl(issuePhotoRaw,process.env.APP_URL):null;
+  if(issuePhotoRaw&&(!issuePhotoUpload||issuePhotoUpload.uid!==uid))throw new ApiError(400,'Ảnh ghi nhận vấn đề không hợp lệ hoặc không thuộc người chụp.');
+  if((missing||condition==='ISSUE')&&!String(p.note||'').trim()&&!issuePhotoUpload)
+   throw new ApiError(400,'Món có vấn đề hoặc thất lạc cần chụp ảnh hiện trạng hoặc ghi chú ngắn.');
   const shots=Object.fromEntries(slots.map(angle=>{
    const url=(p.shots as Record<string,unknown>|undefined)?.[angle];
    // URL belongs to the authenticated uploader and this order. Public URLs alone cannot be trusted.
@@ -43,13 +48,13 @@ function readProof(raw:unknown,order:RentalOrder,uid:string,name:string,phase:'H
    if(!uploaded||uploaded.uid!==uid)throw new ApiError(400,`Ảnh ${angle} không khớp tài khoản đang bàn giao. Hãy chụp lại góc ${angle} bằng tài khoản hiện tại.`);
    return [angle,{url:uploaded.url,at:now,by:uid,byName:name} satisfies Capture];
   }).filter((entry):entry is [string,Capture]=>entry!==null));
-  return {itemId:id,shots,condition,note:typeof p.note==='string'?p.note.slice(0,500):''};
+  return {itemId:id,shots,condition,note:typeof p.note==='string'?p.note.slice(0,500):'',...(issuePhotoUpload?{issuePhoto:{url:issuePhotoUpload.url,at:now,by:uid,byName:name}}:{})};
  });
  if(result.length!==targetIds.length||new Set(result.map(p=>p.itemId)).size!==result.length||result.some(p=>p.condition!=='MISSING'&&!templates[p.itemId]?.every(a=>!!p.shots[a]?.url)))throw new ApiError(400,'Thiếu ảnh của sản phẩm hoặc góc chụp.');
  return result;
 }
 async function verifyProofUploads(tx:Transaction,proofs:PhotoProof[],phase:'handover'|'return',uid:string,orderId:string){
- const paths=proofs.flatMap(p=>Object.values(p.shots).filter(Boolean).map(c=>c.url));
+ const paths=proofs.flatMap(p=>[...Object.values(p.shots).filter(Boolean).map(c=>c.url),...(p.issuePhoto?[p.issuePhoto.url]:[])]);
  if(new Set(paths).size!==paths.length)throw new ApiError(400,'Không dùng một ảnh cho nhiều góc chụp.');
  const parsed=paths.map(path=>parseInspectionPhotoUrl(path,process.env.APP_URL));
  if(parsed.some(p=>!p))throw new ApiError(400,'Đường dẫn ảnh kiểm nhận không hợp lệ.');
@@ -208,8 +213,15 @@ export async function PATCH(req:NextRequest,ctx:{params:Promise<{id:string}>}){
    }else if(action==='REVIEW_PHOTOS'){
     if(order.status!=='RETURNED'||order.photoReviewStatus!=='PENDING'||!order.returnProof)throw new ApiError(409,'Không có ảnh trả hàng chờ kiểm tra.');
     if((order.settlementPolicyVersion===CLOTHING_SETTLEMENT_VERSION||order.settlementPolicyVersion===CAMERA_SETTLEMENT_VERSION)&&!order.collateralReturnedAt)throw new ApiError(409,'Phải hoàn cọc/CCCD và xác nhận xong mới được duyệt hậu kiểm.');
+    const selection=b.assessments;
+    if(selection!==undefined&&(!selection||typeof selection!=='object'||Array.isArray(selection)||
+       Object.keys(selection).length>order.lines.length||Object.entries(selection).some(([itemId,value])=>
+         !order.lines.some(line=>line.itemId===itemId)||!['OK','ISSUE','MISSING'].includes(String(value)))))
+      throw new ApiError(400,'Trạng thái hậu kiểm không hợp lệ.');
+    const assessments=(selection||{}) as Record<string,'OK'|'ISSUE'|'MISSING'>;
+    // These are audit-only color labels, not a change to stock or settled compensation.
     // Seven-round evidence retention is triggered when RECEIVE succeeds, not on later Admin approval.
-    tx.update(ref,{photoReviewStatus:'REVIEWED',photoReviewedBy:me.uid,photoReviewedAt:now,updatedAt:now,history:[...order.history,{action:'PHOTO_REVIEWED',by:me.uid,at:now,detail:'Admin duyệt ảnh; chứng từ nhạy cảm được tự động xóa sau 5 ngày kể từ khi hoàn tất đơn và trả vật cọc'}]});
+    tx.update(ref,{photoReviewAssessments:assessments,photoReviewStatus:'REVIEWED',photoReviewedBy:me.uid,photoReviewedAt:now,updatedAt:now,history:[...order.history,{action:'PHOTO_REVIEWED',by:me.uid,at:now,detail:'Admin duyệt ảnh; chứng từ nhạy cảm được tự động xóa sau 5 ngày kể từ khi hoàn tất đơn và trả vật cọc'}]});
     queueSensitiveEvidenceCleanup(tx,id,now);
     tx.set(job,{stage:'DONE',updatedAt:now},{merge:true});
    }else if(action==='RETURN_COLLATERAL'){

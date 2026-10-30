@@ -4,7 +4,7 @@ import type {RentalOrder} from './types';
 import type {PhotoProof,ProofSet} from './inspection-proof';
 import {deleteByURL} from './local-media';
 function photoUrls(proofs:PhotoProof[]|undefined,itemId:string):string[]{
- return Object.values(proofs?.find(p=>p.itemId===itemId)?.shots||{}).map(s=>s.url).filter(Boolean);
+ const proof=proofs?.find(p=>p.itemId===itemId);return [...Object.values(proof?.shots||{}).map(s=>s.url),...(proof?.issuePhoto?[proof.issuePhoto.url]:[])].filter(Boolean);
 }
 export function urlsForRound(order:RentalOrder,itemId:string){return [...new Set([...photoUrls(order.handoverProof?.items,itemId),...photoUrls(order.returnProof?.items,itemId)])];}
 async function deleteLocalEvidence(urls:string[]):Promise<void>{
@@ -12,7 +12,7 @@ async function deleteLocalEvidence(urls:string[]):Promise<void>{
 }
 function withoutPhotos(set:ProofSet|undefined,itemId:string):ProofSet|undefined{
  if(!set)return set;
- return {...set,items:set.items.map(p=>p.itemId===itemId?{...p,shots:{}}:p)};
+ return {...set,items:set.items.map(p=>p.itemId===itemId?{...p,shots:{},issuePhoto:undefined}:p)};
 }
 /** Retriable cleanup: successful Cloudinary deletion precedes removal of database photo links. */
 export async function cleanupOne(jobId:string):Promise<'deleted'|'skipped'>{

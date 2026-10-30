@@ -83,8 +83,8 @@ test('Visual search result click opens a usable selected product preview',()=>{
  assert.match(finder,/gu-v5-found-detail/);
 });
 
-test('Any returned garment/device with ISSUE requires a note and is quarantined',()=>{
- assert.match(route,/condition==='ISSUE'\)&&\(!p\.note/);
+test('Any returned garment/device with ISSUE requires an evidence photo or a note and is quarantined',()=>{
+ assert.match(route,/!String\(p\.note\|\|''\)\.trim\(\)\&\&!issuePhotoUpload/);
  assert.match(route,/const state=missing\?'MISSING':issue\?'MAINTENANCE'/);
 });
 

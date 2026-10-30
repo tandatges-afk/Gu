@@ -151,8 +151,9 @@ export default function Home() {
   const [calendarCreator,setCalendarCreator]=useState('ALL');
   const [calendarRemote,setCalendarRemote]=useState<InventoryItem[]>([]);
   const [calendarLoaded,setCalendarLoaded]=useState(false);
-  const [calendarNext,setCalendarNext]=useState<string|null>(null);
-  const [calendarPageCursor,setCalendarPageCursor]=useState<string|null>(null);
+  const [calendarPage,setCalendarPage]=useState(1);
+  const [calendarTotalPages,setCalendarTotalPages]=useState(1);
+  const [calendarTotal,setCalendarTotal]=useState(0);
   const [calendarQuery,setCalendarQuery]=useState('');
   const [calendarReload,setCalendarReload]=useState(0);
   const [calendarOrderRows,setCalendarOrderRows]=useState<RentalOrder[]|null>(null);
@@ -302,28 +303,32 @@ export default function Home() {
       .catch(e=>{if(!cancelled)setReportNote(e instanceof Error?e.message:'Chưa có báo cáo.');});
     return()=>{cancelled=true;};
   },[user,data?.me.role,page,api,minuteTick]);
-  // The two calendars have separate catalog pages and visible stock classes.
-  // Clear stale rows when switching between clothing/accessories and cameras.
+  // Changing the calendar group resets to the globally sorted first page.
   useEffect(()=>{
     setCalendarRemote([]);setCalendarOrderRows(null);setCalendarLoaded(false);
-    setCalendarNext(null);setCalendarPageCursor(null);setCalendarCategory('ALL');
-    setCalendarCreator('ALL');setNearestResult(null);
+    setCalendarPage(1);setCalendarTotalPages(1);setCalendarTotal(0);
+    setCalendarCategory('ALL');setCalendarCreator('ALL');setNearestResult(null);
   },[page]);
+  useEffect(()=>{setCalendarPage(1);},[calendarStart,calendarQuery,calendarCategory,calendarStatus,calendarCreator]);
   useEffect(()=>{
     if(!user||!['calendar','camera-calendar'].includes(page))return;
-    const key=['cal-items',user.uid,page,calendarQuery.trim(),calendarPageCursor||'first',catalogReload].join(':');
-    type CalPage={results:InventoryItem[];cursor:string|null};
+    const key=['cal-global',user.uid,page,calendarStart,calendarQuery.trim(),calendarCategory,calendarStatus,calendarCreator,calendarPage,catalogReload,calendarReload].join(':');
+    type CalPage={results:InventoryItem[];page:number;totalPages:number;total:number;hasMore:boolean};
     const previous=cached<CalPage>(key);
-    if(previous){setCalendarRemote(previous.value.results.filter(i=>!i.archivedAt));setCalendarLoaded(true);setCalendarNext(previous.value.cursor);if(previous.fresh)return;}
+    const usePage=(r:CalPage)=>{
+      setCalendarRemote(r.results);setCalendarLoaded(true);
+      setCalendarTotalPages(r.totalPages);setCalendarTotal(r.total);
+      if(r.page!==calendarPage)setCalendarPage(r.page);
+    };
+    if(previous){usePage(previous.value);if(previous.fresh)return;}
     let cancelled=false;
     const timer=setTimeout(()=>{
-      const url='catalog?kind=items&size=25&rentalGroup='+(page==='camera-calendar'?'CAMERA':'CLOTHING')+(calendarQuery.trim()?'&q='+encodeURIComponent(calendarQuery.trim()):'')+(calendarPageCursor?'&cursor='+encodeURIComponent(calendarPageCursor):'');
-      api<CalPage>(url).then(r=>{saveCache(key,r);if(!cancelled){setCalendarRemote(r.results.filter(i=>!i.archivedAt));setCalendarLoaded(true);setCalendarNext(r.cursor);}})
-        .catch(e=>{if(!cancelled)setErr(e instanceof Error?e.message:'Không tải được sản phẩm lịch.');});
+      const params=new URLSearchParams({start:calendarStart,group:page==='camera-calendar'?'CAMERA':'CLOTHING',page:String(calendarPage),q:calendarQuery.trim(),category:calendarCategory,status:calendarStatus,creator:calendarCreator});
+      api<CalPage>('calendar/page?'+params).then(r=>{saveCache(key,r);if(!cancelled)usePage(r);})
+       .catch(e=>{if(!cancelled){setCalendarRemote([]);setCalendarLoaded(true);setErr(e instanceof Error?e.message:'Không tải được thứ tự lịch toàn kho.');}});
     },previous?0:200);
     return()=>{cancelled=true;clearTimeout(timer);};
-  },[user,page,calendarQuery,calendarPageCursor,catalogReload,api,minuteTick]);
-  useEffect(()=>{setCalendarPageCursor(null);},[calendarQuery]);
+  },[user,page,calendarStart,calendarQuery,calendarCategory,calendarStatus,calendarCreator,calendarPage,catalogReload,calendarReload,api,minuteTick]);
   useEffect(()=>{
     if(!user||!['calendar','camera-calendar'].includes(page)||!calendarRemote.length)return;
     let cancelled=false;
@@ -434,15 +439,15 @@ export default function Home() {
   const cameraOverdueOrders=calendarActive.filter(o=>cameraLateAlert(o,Date.now()));
   const calendarCreators=Array.from(new Map(calendarActive.filter(o=>Boolean(o.createdBy)).map(o=>[o.createdBy,orderCreatorName(o,data?.staffNames)] as const)).entries()).sort((a,b)=>a[1].localeCompare(b[1],'vi'));
   const creatorName=(o:RentalOrder)=>orderCreatorName(o,data?.staffNames);
-  const calendarBaseItems=calendarLoaded?calendarRemote:items.slice(0,25);
-  const calendarSearchPool=calendarQuery.trim()?[...new Map([...calendarBaseItems,...items].map(item=>[item.id,item] as const)).values()]:calendarBaseItems;
+  const calendarBaseItems=calendarLoaded?calendarRemote:[];
+  const calendarSearchPool=calendarBaseItems;
   const calendarFilteredItems=calendarSearchPool.filter(i=>productGroup(i.category)===(page==='camera-calendar'?'CAMERA':'CLOTHING')&&(calendarCategory==='ALL'||i.category===calendarCategory)&&
     (calendarCreator==='ALL'||calendarActive.some(o=>o.createdBy===calendarCreator&&o.lines.some(l=>l.itemId===i.id)&&o.pickupDate<=calendarDays[6]&&o.returnDate>=calendarStart))&&
     (calendarStatus==='ALL'||calendarItemState(i,calendarActive,calendarStart,7,today,Date.now())===calendarStatus)&&
     matchesCalendarSearch(i,calendarActive,calendarQuery));
   // Reorder ALL visible products using the first date on screen, not the next day's state.
   // Desktop and mobile receive the same order. Switching dates recalculates the groups.
-  const calendarItems=sortCalendarProductsForDay(calendarFilteredItems,calendarStart,calendarActive,today,riskIds);
+  const calendarItems=calendarBaseItems; // API filtered and sorted the entire inventory BEFORE pagination.
   const findNearest=async(itemId:string)=>{
     setNearestLoading(itemId);setNearestResult(null);
     try {
@@ -554,7 +559,7 @@ export default function Home() {
         </>}
         {['calendar','camera-calendar'].includes(page)&&<>
           <div className="page-intro"><div><div className="eyebrow">LỊCH THEO NGÀY / THÁNG / NĂM</div><h1>{page==='camera-calendar'?'Lịch máy ảnh':'Lịch cho thuê'}</h1></div><div className="action-row"><button className="btn btn-white" onClick={()=>openBooking('RESERVE')}><CalendarDays size={17}/> Đặt lịch trước</button><button className="btn btn-dark" onClick={()=>openBooking('PICKUP')}><Plus size={18}/> Giao ngay</button></div></div>
-          <div className="gu-catalog-pager"><div className="gu-search-wrap"><Search size={15}/><input className="input" value={calendarQuery} onChange={e=>setCalendarQuery(e.target.value)} placeholder="Tìm tên sản phẩm, mã GU-00234 / 234, khách đang thuê hoặc SĐT…"/></div><button type="button" className="btn btn-white" disabled={!calendarNext} onClick={()=>setCalendarPageCursor(calendarNext)}>25 món tiếp theo <ChevronRight size={14}/></button><button type="button" className="btn btn-white" disabled={!calendarPageCursor} onClick={()=>setCalendarPageCursor(null)}>Đầu danh sách</button></div>
+          <div className="gu-catalog-pager gu-calendar-pager"><div className="gu-search-wrap"><Search size={15}/><input className="input" value={calendarQuery} onChange={e=>setCalendarQuery(e.target.value)} placeholder="Tìm tên sản phẩm, mã GU-00234 / 234, khách đang thuê hoặc SĐT…"/></div><nav className="gu-pager-actions" aria-label="Phân trang lịch thuê"><button type="button" className="btn btn-white" disabled={calendarPage<=1} onClick={()=>setCalendarPage(1)}>Trang đầu</button><button type="button" className="btn btn-white" disabled={calendarPage<=1} onClick={()=>setCalendarPage(p=>Math.max(1,p-1))}><ChevronLeft size={14}/> Trang trước</button><span className="gu-page-indicator" aria-live="polite">Trang {calendarPage} / {calendarTotalPages} · {calendarTotal} món</span><button type="button" className="btn btn-white" disabled={calendarPage>=calendarTotalPages} onClick={()=>setCalendarPage(p=>Math.min(calendarTotalPages,p+1))}>Trang sau <ChevronRight size={14}/></button></nav></div>
 
           {page==='camera-calendar'&&cameraOverdueOrders.length>0&&<div role="status" className="gu-camera-overdue-summary"><BellRing size={19}/><div><strong>{cameraOverdueOrders.length} đơn máy ảnh quá giờ trả</strong><span>{cameraOverdueOrders.slice(0,3).map(o=>`${o.customerName} · trễ ${cameraLateAlert(o,Date.now())?.lateMinutes||0} phút`).join(' · ')}. Mở đơn để xem tiền tạm tính và nhận trả để chốt phí.</span></div></div>}
           <section className="panel calendar-panel"><div className="calendar-toolbar gu-calendar-toolbar-v532">

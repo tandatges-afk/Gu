@@ -22,14 +22,14 @@ import {CAMERA_SETTLEMENT_VERSION,cameraCollateralQuote,cameraCollateralForLines
 export function GuV5Review({api,onChanged,active=true}:{api:ApiCall;onChanged:()=>Promise<void>;active?:boolean}){
  const [jobs,setJobs]=useState<Array<{orderId:string;code:string;customerName:string}>>([]);
  const [order,setOrder]=useState<RentalOrder|null>(null);const [items,setItems]=useState<InventoryItem[]>([]);
- const [busy,setBusy]=useState(false);const [error,setError]=useState('');const [note,setNote]=useState('');const lastLoaded=useRef(0);
+ const [busy,setBusy]=useState(false);const [error,setError]=useState('');const [note,setNote]=useState('');const [reviewSelections,setReviewSelections]=useState<Record<string,'OK'|'ISSUE'|'MISSING'>>({});const lastLoaded=useRef(0);
  const reload=async()=>{try{const r=await api<{jobs:typeof jobs}>('v5/jobs?stage=REVIEW');setJobs(r.jobs);lastLoaded.current=Date.now();}catch(e){setError(e instanceof Error?e.message:'Không tải được ảnh chờ xem.');}};
  useEffect(()=>{if(active&&Date.now()-lastLoaded.current>60_000)void reload();},[active]);
- const open=async(id:string)=>{try{const r=await api<{order:RentalOrder;items:InventoryItem[]}>('v5/orders/'+id);setOrder(r.order);setItems(r.items);}catch(e){setError(e instanceof Error?e.message:'Không mở được đơn.');}};
+ const open=async(id:string)=>{try{const r=await api<{order:RentalOrder;items:InventoryItem[]}>('v5/orders/'+id);setOrder(r.order);setItems(r.items);setReviewSelections(r.order.photoReviewAssessments||{});}catch(e){setError(e instanceof Error?e.message:'Không mở được đơn.');}};
  const done=async()=>{
   if(!order||!confirm('Duyệt ảnh giao/nhận và lên lịch xóa vĩnh viễn ảnh CCCD, vật cọc, chứng từ sau 5 ngày kể từ lúc hoàn tất đơn? Chỉ giữ 7 lượt ảnh góc chụp đã duyệt của mỗi món.'))return;
   setBusy(true);setError('');try{
-   await api('v5/orders/'+order.id,{method:'PATCH',body:JSON.stringify({action:'REVIEW_PHOTOS'})});
+   await api('v5/orders/'+order.id,{method:'PATCH',body:JSON.stringify({action:'REVIEW_PHOTOS',assessments:reviewSelections})});
    setOrder(null);await reload();await onChanged();setNote('Đã duyệt ảnh. Chứng từ nhạy cảm sẽ được xóa sau 5 ngày từ khi hoàn tất đơn và đã hoàn cọc/CCCD.');
   }catch(e){setError(e instanceof Error?e.message:'Không cập nhật được.');}finally{setBusy(false);}
  };
@@ -40,7 +40,16 @@ export function GuV5Review({api,onChanged,active=true}:{api:ApiCall;onChanged:()
   {order&&<article className="panel gu-v5-review-detail"><h2>{order.code} · {order.customerName}</h2><p><b>Nhân viên tạo:</b> {order.createdByName||'—'} · <b>Giao:</b> {order.handoverProof?.byName||'—'} · <b>Nhận:</b> {order.returnProof?.byName||'—'}</p><p><b>Trạng thái:</b> {order.status==='RETURNED'?'Đã nhận trả, kho không bị khóa':'Đơn cũ đang chờ hoàn tất thủ tục'}</p>
    {order.reservationPaymentProofId&&<section className="gu-v52-deposit-panel"><strong>Ảnh thu đủ tiền đặt lịch</strong><GuSecurePhoto id={order.reservationPaymentProofId} alt="Chứng từ thanh toán đặt trước"/></section>}
    {order.handoverDepositProofId&&<section className="gu-v52-deposit-panel"><strong>Ảnh vật cọc khi giao ({order.handoverDepositKind||'Không rõ'})</strong><GuSecurePhoto id={order.handoverDepositProofId} alt="Vật cọc khi bàn giao"/></section>}
-   {order.lines.map(line=><section className="gu-v5-inspection-item" key={line.itemId}><h3>{line.name} · {line.hangerCode||line.sku}{line.cameraSerial?' · Serial '+line.cameraSerial:''}</h3><p>Tình trạng trả: <b>{order.returnProof?.items.find(p=>p.itemId===line.itemId)?.condition||'OK'}</b> {order.returnProof?.items.find(p=>p.itemId===line.itemId)?.note||''}</p><ProductImage paths={items.find(i=>i.id===line.itemId)?.imagePaths}/>
+   {order.lines.map(line=><section className="gu-v5-inspection-item" key={line.itemId}><h3>{line.name} · {line.hangerCode||line.sku}{line.cameraSerial?' · Serial '+line.cameraSerial:''}</h3><p>Tình trạng khi trả: <b>{order.returnProof?.items.find(p=>p.itemId===line.itemId)?.condition||'OK'}</b> {order.returnProof?.items.find(p=>p.itemId===line.itemId)?.note||''}</p>
+    <div className="gu-review-choice-row" aria-label={'Đánh giá hậu kiểm '+line.name}>
+     {(['OK','ISSUE','MISSING'] as const).map(value=><button type="button" key={value} disabled={order.photoReviewStatus!=='PENDING'} aria-pressed={reviewSelections[line.itemId]===value}
+      className={'gu-review-choice '+(reviewSelections[line.itemId]===value?'gu-review-choice--'+value.toLowerCase():'')}
+      onClick={()=>setReviewSelections(old=>old[line.itemId]===value?Object.fromEntries(Object.entries(old).filter(([key])=>key!==line.itemId)):{...old,[line.itemId]:value})}>
+      {value==='OK'?'Bình thường':value==='ISSUE'?'Có vấn đề':'Thất lạc'}</button>)}
+    </div>
+    <small>Chưa chọn: nền trắng. Xanh: bình thường · Vàng: có vấn đề · Đỏ: thất lạc. Đánh dấu hậu kiểm không tự đổi tình trạng kho hoặc tiền.</small>
+    {order.handoverProof?.items.find(p=>p.itemId===line.itemId)?.issuePhoto?.url&&<div className="gu-review-issue-photo"><b>Ảnh vấn đề khi giao</b><img src={order.handoverProof.items.find(p=>p.itemId===line.itemId)!.issuePhoto!.url} alt="Vấn đề khi giao"/></div>}
+    {order.returnProof?.items.find(p=>p.itemId===line.itemId)?.issuePhoto?.url&&<div className="gu-review-issue-photo"><b>Ảnh vấn đề khi nhận</b><img src={order.returnProof.items.find(p=>p.itemId===line.itemId)!.issuePhoto!.url} alt="Vấn đề khi nhận"/></div>}<ProductImage paths={items.find(i=>i.id===line.itemId)?.imagePaths}/>
     {(order.photoTemplates?.[line.itemId]||[]).map(angle=><div className="gu-v5-angle" key={angle}><strong>{angle}</strong><div className="gu-v5-compare"><div><small>Khi giao</small>{order.handoverProof?.items.find(p=>p.itemId===line.itemId)?.shots[angle]?.url?<img src={order.handoverProof.items.find(p=>p.itemId===line.itemId)?.shots[angle].url} alt={'Giao '+angle}/>:<p>Không có ảnh</p>}</div><div><small>Khi trả</small>{order.returnProof?.items.find(p=>p.itemId===line.itemId)?.shots[angle]?.url?<img src={order.returnProof.items.find(p=>p.itemId===line.itemId)?.shots[angle].url} alt={'Trả '+angle}/>:<p>Không có ảnh</p>}</div></div></div>)}
    </section>)}
    <div className="gu-v5-payment-review"><p>{paymentReview(order).extra>0?<><strong>Tổng thuê:</strong> {money(paymentReview(order).rent)} · <strong>Phụ thu/đền bù:</strong> {money(paymentReview(order).extra)} · </>:null}<strong>Đã thu:</strong> {money(order.paid)}</p>
