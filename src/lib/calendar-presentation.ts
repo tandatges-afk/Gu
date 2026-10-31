@@ -58,16 +58,35 @@ export function calendarSlotState(
  // fixtures. Only today's precisely overdue returns get the new red state.
  const sameDayReturnLate=!!lateOrder&&liveClock&&lateOrder.returnDate===today&&
   overdueReturnNotice(lateOrder,instant)!==null;
- const late=!!lateOrder&&(cameraLate?day>=today:
-  day>lateOrder.returnDate||(sameDayReturnLate&&day>=today));
+ // A live overdue order is an operational alert, not a booking occupying all
+ // future calendar dates. Future columns must show their own dated bookings.
+ // Keep the original time-simulated fixture behavior when 'today' is synthetic.
+ const wouldBeLate=!!lateOrder&&(cameraLate?day>=today:
+  day>lateOrder.returnDate||(sameDayReturnLate&&day>=today))&&
+  (!liveClock||day<=today);
  const latePickupOrder=liveClock?orders.find(o=>o.status==='RESERVED'&&isForItem(o)&&
   overduePickupNotice(o,instant)!==null):undefined;
- const fallbackPickup=day>=today?latePickupOrder:undefined;
- const shown=late&&lateOrder?lateOrder:matching[0]||fallbackPickup||
-  (lateOrder&&day>=lateOrder.pickupDate?lateOrder:undefined);
+ // Uncollected reservations appear as an alert only on the CURRENT day;
+ // they must not appear as fake bookings on every later day.
+ const fallbackPickup=day===today?latePickupOrder:undefined;
+ // Prefer an actual upcoming RESERVED order over a previously overdue order
+ // for the same item, even when that next booking is for TODAY. The unresolved
+ // order remains available in the click chooser and as a visible risk marker.
+ const nextReservation=liveClock&&day>=today&&(lateOrder||latePickupOrder)
+  ?matching.find(o=>o.status==='RESERVED'&&(lateOrder?o.id!==lateOrder.id:o.id!==latePickupOrder?.id))
+  :undefined;
+ const showingNextToday=day===today&&Boolean(nextReservation);
+ const late=wouldBeLate&&!showingNextToday;
+ const shown=nextReservation||(late&&lateOrder?lateOrder:matching[0]||fallbackPickup||
+  (lateOrder&&day>=lateOrder.pickupDate&&(!liveClock||day<=today)?lateOrder:undefined));
+ // Risk marker does not replace the dated booking, customer or pickup time.
+ const followupRisk=liveClock&&(day>today||showingNextToday)&&Boolean(lateOrder||latePickupOrder);
  let matchingForClick=late&&lateOrder&&!matching.some(o=>o.id===lateOrder.id)?[lateOrder,...matching]:matching;
+ if(showingNextToday&&lateOrder&&!matchingForClick.some(o=>o.id===lateOrder.id)){
+  matchingForClick=[lateOrder,...matchingForClick];
+ }
  if(fallbackPickup&&!matchingForClick.some(o=>o.id===fallbackPickup.id)&&!late){matchingForClick=[fallbackPickup,...matchingForClick];}
- const pickupLate=day>=today&&shown?.status==='RESERVED'&&shown.id===latePickupOrder?.id;
+ const pickupLate=day===today&&liveClock&&shown?.status==='RESERVED'&&overduePickupNotice(shown,instant)!==null;
  const warning=riskItemIds.has(item.id)&&day===today&&Boolean(shown)&&!late&&!pickupLate;
  const blocked=!shown&&(['LAUNDRY','MAINTENANCE','MISSING'].includes(item.status)||!(item.replacementValue>0));
  const isPast=day<today;
@@ -75,7 +94,7 @@ export function calendarSlotState(
    blockedLabel:blocked&&['LAUNDRY','MAINTENANCE','MISSING'].includes(item.status)?{
      LAUNDRY:'Đang giặt',MAINTENANCE:'Bảo trì',MISSING:'Thất lạc'
    }[item.status as 'LAUNDRY'|'MAINTENANCE'|'MISSING']:'Chưa duyệt giá'});
- return {matching:matchingForClick,shown,late,pickupLate,warning,blocked,isPast,visual};
+ return {matching:matchingForClick,shown,late,pickupLate,warning,followupRisk,blocked,isPast,visual};
 }
 
 /**
@@ -128,7 +147,12 @@ export function sortCalendarProductsForDay(
  for(const item of items){
   const itemOrders=byItem.get(item.id)||[];
   const firstSlot=calendarSlotState(item,day,itemOrders,today,riskItemIds);
-  const rank=priority[firstSlot.visual.className];
+  // A product with a currently overdue prior rental must remain near the top
+  // even if the TODAY cell already shows the next reservation with a risk icon.
+  const riskRank=firstSlot.followupRisk&&day===today&&firstSlot.shown?.status==='RESERVED'
+   ?(firstSlot.matching.some(o=>o.status==='PICKED_UP')?priority.stateOverdue:priority.stateWarning)
+   :undefined;
+  const rank=riskRank??priority[firstSlot.visual.className];
   const bookedDays=new Set<string>();
   const bookingIds=new Set<string>();
   let nextBooking:{order:RentalOrder;day:string}|undefined;
