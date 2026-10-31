@@ -149,7 +149,8 @@ function NativeDatePicker({value,onChange,ariaLabel,readOnly=false}:{value:strin
  return <label className="gu-vn-picker" title="Chọn ngày bằng lịch">
   <CalendarDays size={17} aria-hidden="true"/>
   <input type="date" className="gu-vn-native-date" tabIndex={0} aria-label={ariaLabel}
-   value={value} onChange={e=>{if(e.target.value)onChange(e.target.value);}}/>
+   value={value} onClick={e=>{try{e.currentTarget.showPicker?.();}catch{/* Native input click remains as a fallback. */}}}
+    onChange={e=>{if(e.target.value)onChange(e.target.value);}}/>
  </label>;
 }
 /** ISO local HH:MM DD/MM/YYYY segments; all selections go through the same validation. */

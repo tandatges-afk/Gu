@@ -1402,3 +1402,10 @@ html,body{background:var(--paper);color:var(--ink)}
  .gu-calendar-toolbar-v532 .gu-calendar-date-actions>.gu-vn-date-only>.gu-vn-picker{min-width:36px!important;width:36px!important;flex-basis:36px!important}
 }
 @media(prefers-reduced-motion:reduce){.gu-capture-issue-upload,.gu-capture-conditions .gu-capture-condition-actions>.gu-condition-choice{transition:none}}
+
+/* GU 2026-10-31 main date picker hit target */
+/* The date input occupies the full icon target and remains natively interactive. */
+.gu-vn-picker{min-width:44px!important;width:44px!important;min-height:44px!important;height:44px!important;flex-basis:44px!important}
+.gu-vn-picker>.gu-vn-native-date{width:100%!important;height:100%!important;min-width:0!important}
+.gu-vn-picker>.gu-vn-native-date::-webkit-calendar-picker-indicator{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer}
+.gu-calendar-toolbar-v532 .gu-calendar-date-actions>.gu-vn-date-only>.gu-vn-picker{min-width:44px!important;width:44px!important;min-height:44px!important;height:44px!important;flex-basis:44px!important}

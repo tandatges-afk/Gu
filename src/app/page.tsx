@@ -437,7 +437,11 @@ export default function Home() {
   const calendarActive=calendarOrderRows??active;
   const calendarOverdue=calendarActive.filter(o=>o.status==='PICKED_UP'&&(o.returnDate<today||cameraLateAlert(o,Date.now())));
   const cameraOverdueOrders=calendarActive.filter(o=>cameraLateAlert(o,Date.now()));
-  const calendarCreators=Array.from(new Map(calendarActive.filter(o=>Boolean(o.createdBy)).map(o=>[o.createdBy,orderCreatorName(o,data?.staffNames)] as const)).entries()).sort((a,b)=>a[1].localeCompare(b[1],'vi'));
+  // Calendar creator options are independent of the filtered calendar response.
+  const calendarCreators=Array.from(new Map<string,string>([
+    ...Object.entries(data?.staffNames||{}),
+    ...orders.filter(o=>Boolean(o.createdBy)).map(o=>[o.createdBy,orderCreatorName(o,data?.staffNames)] as [string,string]),
+  ])).filter(([id,name])=>Boolean(id)&&Boolean(name.trim())).sort((a,b)=>a[1].localeCompare(b[1],'vi'));
   const creatorName=(o:RentalOrder)=>orderCreatorName(o,data?.staffNames);
   const calendarBaseItems=calendarLoaded?calendarRemote:[];
   const calendarSearchPool=calendarBaseItems;

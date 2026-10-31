@@ -20,7 +20,11 @@ export async function GET(req: NextRequest) {
       me,
       counts,
       // Names only, never staff emails or passwords. Legacy orders stored the creator UID.
-      staffNames: Object.fromEntries(staff.docs.filter(d=>orders.docs.some(o=>o.data().createdBy===d.id)).map(d=>[d.id,String(d.data().name||'').trim()])),
+      // Keep the list stable for admin, independent of the filtered calendar.
+       staffNames: Object.fromEntries(staff.docs
+         .filter(d=>me.role==='admin'||orders.docs.some(o=>o.data().createdBy===d.id))
+         .map(d=>[d.id,String(d.data().name||'').trim()] as const)
+         .filter(([,name])=>Boolean(name))),
       categories:categories.docs.map(d=>({id:d.id,...d.data()})),
       items: items.docs.map(d => ({id:d.id,...d.data()})) as InventoryItem[],
       customers: customers.docs.map(d => ({id:d.id,...d.data()})) as Customer[],
