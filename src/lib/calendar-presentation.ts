@@ -10,8 +10,9 @@ export function calendarDayTone(day:string,today:string):CalendarDayTone{
 }
 
 export type CalendarVisualClass='stateWarning'|'stateOverdue'|'statePicked'|'stateReserved'|'stateBlocked'|'statePast'|'stateFree';
-export function calendarVisualState(input:{late:boolean;warning:boolean;orderStatus?:string;blocked:boolean;isPast:boolean;blockedLabel?:string}):{className:CalendarVisualClass;label:string}{
+export function calendarVisualState(input:{late:boolean;pickupLate?:boolean;warning:boolean;orderStatus?:string;blocked:boolean;isPast:boolean;blockedLabel?:string}):{className:CalendarVisualClass;label:string}{
  if(input.late)return {className:'stateOverdue',label:'Trả trễ'};
+ if(input.pickupLate)return {className:'stateWarning',label:'Quá giờ nhận'};
  if(input.warning)return {className:'stateWarning',label:'Cảnh báo'};
  if(input.orderStatus==='PICKED_UP')return {className:'statePicked',label:'Đã lấy'};
  if(input.orderStatus==='RESERVED')return {className:'stateReserved',label:'Đã giữ'};
@@ -22,6 +23,7 @@ export function calendarVisualState(input:{late:boolean;warning:boolean;orderSta
 
 import type {InventoryItem,RentalOrder} from './types.ts';
 import {cameraLateAlert} from './camera-live-status.ts';
+import {overduePickupNotice,overdueReturnNotice,vnClock} from './return-risk.ts';
 
 /**
  * One source of truth for the desktop and mobile calendar cells AND for sorting.
@@ -44,20 +46,36 @@ export function calendarSlotState(
   day>=(o.lines.find(l=>l.itemId===item.id)?.startDate||o.pickupDate)
  ).sort((a,b)=>(a.status==='PICKED_UP'?0:1)-(b.status==='PICKED_UP'?0:1)||
   String(a.pickupAt||'').localeCompare(String(b.pickupAt||''))||a.id.localeCompare(b.id));
+ const instant=new Date(nowMs);
+ // The caller may render a historical or simulated calendar. Do not apply
+ // real-time pickup/return deadlines to a different "today" reference.
+ const liveClock=Number.isFinite(nowMs)&&vnClock(instant).today===today;
  const lateOrder=orders.find(o=>o.status==='PICKED_UP'&&isForItem(o)&&
-  (cameraLateAlert(o,nowMs)!==null||o.returnDate<today));
- const late=!!lateOrder&&(cameraLateAlert(lateOrder,nowMs)?day>=today:day>lateOrder.returnDate);
- // An overdue camera already on loan takes priority over a later reservation.
- const shown=late&&lateOrder?lateOrder:matching[0]||(lateOrder&&day>=lateOrder.pickupDate?lateOrder:undefined);
- const matchingForClick=late&&lateOrder&&!matching.some(o=>o.id===lateOrder.id)?[lateOrder,...matching]:matching;
- const warning=riskItemIds.has(item.id)&&day===today&&Boolean(shown)&&!late;
+  (cameraLateAlert(o,nowMs)!==null||o.returnDate<today||
+   (liveClock&&overdueReturnNotice(o,instant)!==null)));
+ const cameraLate=!!lateOrder&&cameraLateAlert(lateOrder,nowMs)!==null;
+ // Keep the original expired-date rule, including simulated/past calendar
+ // fixtures. Only today's precisely overdue returns get the new red state.
+ const sameDayReturnLate=!!lateOrder&&liveClock&&lateOrder.returnDate===today&&
+  overdueReturnNotice(lateOrder,instant)!==null;
+ const late=!!lateOrder&&(cameraLate?day>=today:
+  day>lateOrder.returnDate||(sameDayReturnLate&&day>=today));
+ const latePickupOrder=liveClock?orders.find(o=>o.status==='RESERVED'&&isForItem(o)&&
+  overduePickupNotice(o,instant)!==null):undefined;
+ const fallbackPickup=day>=today?latePickupOrder:undefined;
+ const shown=late&&lateOrder?lateOrder:matching[0]||fallbackPickup||
+  (lateOrder&&day>=lateOrder.pickupDate?lateOrder:undefined);
+ let matchingForClick=late&&lateOrder&&!matching.some(o=>o.id===lateOrder.id)?[lateOrder,...matching]:matching;
+ if(fallbackPickup&&!matchingForClick.some(o=>o.id===fallbackPickup.id)&&!late){matchingForClick=[fallbackPickup,...matchingForClick];}
+ const pickupLate=day>=today&&shown?.status==='RESERVED'&&shown.id===latePickupOrder?.id;
+ const warning=riskItemIds.has(item.id)&&day===today&&Boolean(shown)&&!late&&!pickupLate;
  const blocked=!shown&&(['LAUNDRY','MAINTENANCE','MISSING'].includes(item.status)||!(item.replacementValue>0));
  const isPast=day<today;
- const visual=calendarVisualState({late,warning,orderStatus:shown?.status,blocked,isPast,
+ const visual=calendarVisualState({late,pickupLate,warning,orderStatus:shown?.status,blocked,isPast,
    blockedLabel:blocked&&['LAUNDRY','MAINTENANCE','MISSING'].includes(item.status)?{
      LAUNDRY:'Đang giặt',MAINTENANCE:'Bảo trì',MISSING:'Thất lạc'
    }[item.status as 'LAUNDRY'|'MAINTENANCE'|'MISSING']:'Chưa duyệt giá'});
- return {matching:matchingForClick,shown,late,warning,blocked,isPast,visual};
+ return {matching:matchingForClick,shown,late,pickupLate,warning,blocked,isPast,visual};
 }
 
 /**

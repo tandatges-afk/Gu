@@ -24,7 +24,7 @@ export async function GET(req:NextRequest){
   if(group!=='CLOTHING'&&group!=='CAMERA')throw new ApiError(400,'Nhóm lịch không hợp lệ.');
   const category=(params.get('category')||'ALL').slice(0,80);
   const status=params.get('status')||'ALL';
-  if(!['ALL','FREE','RESERVED','PICKED_UP','OVERDUE','LAUNDRY','MAINTENANCE','MISSING','UNPRICED'].includes(status))throw new ApiError(400,'Trạng thái lọc không hợp lệ.');
+  if(!['ALL','FREE','RESERVED','PICKED_UP','OVERDUE','PICKUP_LATE','LAUNDRY','MAINTENANCE','MISSING','UNPRICED'].includes(status))throw new ApiError(400,'Trạng thái lọc không hợp lệ.');
   const creator=(params.get('creator')||'ALL').slice(0,128);
   const query=(params.get('q')||'').slice(0,80);
   const result=await Promise.all([
@@ -33,9 +33,10 @@ export async function GET(req:NextRequest){
     ORDER BY id LIMIT $1`,[MAX_ITEMS+1]),
    pgPool().query<{id:string;data:Omit<RentalOrder,'id'>}>(`SELECT id,data FROM gu_documents WHERE collection='orders'
     AND data->>'status' IN ('RESERVED','PICKED_UP')
-    AND (coalesce(data->>'returnDate','') >= $1 OR data->>'status'='PICKED_UP')
+    AND (coalesce(data->>'returnDate','') >= $1 OR data->>'status'='PICKED_UP'
+      OR (data->>'status'='RESERVED' AND coalesce(data->>'pickupDate','')<$4))
     AND coalesce(data->>'pickupDate','') <= $2
-    ORDER BY id LIMIT $3`,[start,addDays(start,6),MAX_ORDERS+1]),
+    ORDER BY id LIMIT $3`,[start,addDays(start,6),MAX_ORDERS+1,vietnamToday()]),
   ]);
   if(result[0].rows.length>MAX_ITEMS||result[1].rows.length>MAX_ORDERS)
    throw new ApiError(503,'Dữ liệu lịch vượt giới hạn an toàn. Hãy liên hệ quản trị để tối ưu phân trang, không hiển thị thứ tự thiếu.');

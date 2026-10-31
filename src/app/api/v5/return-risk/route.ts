@@ -1,7 +1,7 @@
 import {NextRequest,NextResponse} from 'next/server';
 import {staffUser,handleError,ApiError} from '@/lib/http';
 import {db} from '@/lib/firebase-admin';
-import {NEXT_DAY_RISK_START_HOUR_VN,nextDay,tomorrowReturnRisk,vnClock,overduePickupNotices} from '@/lib/return-risk';
+import {NEXT_DAY_RISK_START_HOUR_VN,nextDay,tomorrowReturnRisk,vnClock,overduePickupNotices,overdueReturnNotices} from '@/lib/return-risk';
 import type {RentalOrder} from '@/lib/types';
 export const runtime='nodejs';
 export async function GET(req:NextRequest){try{
@@ -22,11 +22,12 @@ export async function GET(req:NextRequest){try{
  // Overdue pickups are independent of the 20:00 next-day stock risk threshold.
  const [reservations,held]=await Promise.all([
   loadAll('status','RESERVED'),
-  warnNextDay?loadAll('status','PICKED_UP'):Promise.resolve([] as RentalOrder[])
+  loadAll('status','PICKED_UP') // All still-held orders, independent of the 20h stock risk window.
  ]);
  const booked=warnNextDay?reservations.filter(o=>o.pickupDate===tomorrow):[];
  const latePickups=overduePickupNotices(reservations,now);
+ const lateReturns=overdueReturnNotices(held,now);
  const orders=[...new Map([...held,...booked].map(o=>[o.id,o])).values()];
  const risks=warnNextDay?tomorrowReturnRisk(orders,now):[];
- return NextResponse.json({risks,latePickups,checkedAt:now.toISOString(),truncated:false},{headers:{'Cache-Control':'private,no-store'}});
+ return NextResponse.json({risks,latePickups,lateReturns,checkedAt:now.toISOString(),truncated:false},{headers:{'Cache-Control':'private,no-store'}});
  }catch(e){return handleError(e,'GET /api/v5/return-risk');}}

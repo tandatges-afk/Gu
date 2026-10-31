@@ -36,6 +36,29 @@ export function overduePickupNotice(order:RentalOrder,now:Date):LatePickupAlert|
  }
  return null;
 }
+/** Visual-only return alert. Never changes billing, status or the scheduled return.
+ * Clothing/accessory deadlines use the persisted handover-adjusted returnAt.
+ * Camera uses the existing specialized cameraLateAlert in calendar/dashboard.
+ * Legacy date-only records are not treated as late until the next Vietnam day.
+ */
+export type LateReturnAlert={orderId:string;code:string;customerName:string;scheduledAt:string|null;returnDate:string};
+export function overdueReturnNotice(order:RentalOrder,now:Date):LateReturnAlert|null{
+ if(order.status!=='PICKED_UP')return null;
+ if(order.rentalGroup==='CAMERA'||order.lines.some(l=>Boolean(l.cameraModel||l.cameraPackageHours)))return null;
+ const planned=order.returnAt;
+ if(planned && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(planned) && /(?:Z|[+-]\d{2}:?\d{2})$/i.test(planned)){
+  const at=Date.parse(planned);
+  if(Number.isFinite(at))return now.getTime()>at?{orderId:order.id,code:order.code,customerName:order.customerName,scheduledAt:planned,returnDate:order.returnDate}:null;
+ }
+ if(/^\d{4}-\d{2}-\d{2}$/.test(order.returnDate||'') && order.returnDate<vnClock(now).today){
+  return {orderId:order.id,code:order.code,customerName:order.customerName,scheduledAt:null,returnDate:order.returnDate};
+ }
+ return null;
+}
+export function overdueReturnNotices(orders:RentalOrder[],now:Date):LateReturnAlert[]{
+ return orders.map(o=>overdueReturnNotice(o,now)).filter((row):row is LateReturnAlert=>row!==null)
+  .sort((a,b)=>(a.scheduledAt||a.returnDate).localeCompare(b.scheduledAt||b.returnDate)||a.orderId.localeCompare(b.orderId));
+}
 export function overduePickupNotices(orders:RentalOrder[],now:Date):LatePickupAlert[]{
  return orders.map(o=>overduePickupNotice(o,now)).filter((row):row is LatePickupAlert=>row!==null)
   .sort((a,b)=>(a.scheduledAt||a.pickupDate).localeCompare(b.scheduledAt||b.pickupDate)||a.orderId.localeCompare(b.orderId));

@@ -21,7 +21,7 @@ import {GuV5Booking} from '@/components/GuV5Booking';
 import {GuOrderCapture} from '@/components/GuOrderCapture';
 import {matchesProductSearch} from '@/lib/product-search';
 import {matchesInventoryCode} from '@/lib/catalog-code-search';
-import {NEXT_DAY_RISK_START_HOUR_VN,tomorrowReturnRisk,vnClock as vnCurrentTime,type LatePickupAlert} from '@/lib/return-risk';
+import {NEXT_DAY_RISK_START_HOUR_VN,tomorrowReturnRisk,vnClock as vnCurrentTime,overdueReturnNotice,type LatePickupAlert,type LateReturnAlert} from '@/lib/return-risk';
 import {vnClock as vnDisplayHour} from '@/lib/gu-v52-workflow';
 import {GuVisualFinder} from '@/components/GuVisualFinder';
 import {GuV5Review,GuV5OrderDetail} from '@/components/GuV5Review';
@@ -131,6 +131,8 @@ export default function Home() {
   const [remoteRisks,setRemoteRisks]=useState<Array<{itemId:string;heldOrderId:string;nextOrderId:string}>>([]);
   const [dismissedRiskSignature,setDismissedRiskSignature]=useState('');
   const [remoteLatePickups,setRemoteLatePickups]=useState<LatePickupAlert[]>([]);
+  const [remoteLateReturns,setRemoteLateReturns]=useState<LateReturnAlert[]>([]);
+  const [riskFetchError,setRiskFetchError]=useState(false);
   const [dismissedPickupSignature,setDismissedPickupSignature]=useState('');
   const [pickupAlertsExpanded,setPickupAlertsExpanded]=useState(false);
   const [evidenceItem,setEvidenceItem]=useState<InventoryItem|null>(null);
@@ -312,7 +314,8 @@ export default function Home() {
   useEffect(()=>{setCalendarPage(1);},[calendarStart,calendarQuery,calendarCategory,calendarStatus,calendarCreator]);
   useEffect(()=>{
     if(!user||!['calendar','camera-calendar'].includes(page))return;
-    const key=['cal-global',user.uid,page,calendarStart,calendarQuery.trim(),calendarCategory,calendarStatus,calendarCreator,calendarPage,catalogReload,calendarReload].join(':');
+    const key=['cal-global',user.uid,page,calendarStart,calendarQuery.trim(),calendarCategory,calendarStatus,calendarCreator,calendarPage,catalogReload,calendarReload,
+      calendarStatus==='OVERDUE'||calendarStatus==='PICKUP_LATE'?minuteTick:''].join(':');
     type CalPage={results:InventoryItem[];page:number;totalPages:number;total:number;hasMore:boolean};
     const previous=cached<CalPage>(key);
     const usePage=(r:CalPage)=>{
@@ -341,11 +344,11 @@ export default function Home() {
       .catch(e=>{if(!cancelled)setErr(e instanceof Error?e.message:'Không lấy được khóa lịch.');});
     return()=>{cancelled=true;};
   },[user,page,calendarStart,calendarRemote,calendarReload,api,minuteTick]);
-  useEffect(()=>{if(!user){setRemoteLatePickups([]);return;}let live=true;
+  useEffect(()=>{if(!user){setRemoteLatePickups([]);setRemoteLateReturns([]);setRiskFetchError(false);return;}let live=true;
     const pull=async()=>{try{
-      const r=await api<{risks:Array<{itemId:string;heldOrderId:string;nextOrderId:string}>;latePickups:LatePickupAlert[]}>('v5/return-risk');
-      if(live){setRemoteRisks(r.risks);setRemoteLatePickups(r.latePickups||[]);}
-    }catch{/* A failed notification request must not block rentals; next refresh will retry. */}};
+      const r=await api<{risks:Array<{itemId:string;heldOrderId:string;nextOrderId:string}>;latePickups:LatePickupAlert[];lateReturns:LateReturnAlert[]}>('v5/return-risk');
+      if(live){setRemoteRisks(r.risks||[]);setRemoteLatePickups(r.latePickups||[]);setRemoteLateReturns(r.lateReturns||[]);setRiskFetchError(false);}
+    }catch{if(live)setRiskFetchError(true);/* Never block creating or returning rentals. */}};
     void pull();return()=>{live=false;};
   },[user,api,minuteTick,catalogReload]);
   const items=(data?.items||[]).filter(i=>!i.archivedAt);
@@ -368,13 +371,20 @@ export default function Home() {
   const active=liveOrders.filter(o=>o.status==='RESERVED'||o.status==='PICKED_UP');
   const picked=orders.filter(o=>o.status==='PICKED_UP');
   const dueToday=orders.filter(o=>o.returnDate===today&&o.status==='PICKED_UP');
-  const overdueOrders=orders.filter(o=>o.status==='PICKED_UP'&&(o.returnDate<today||cameraLateAlert(o,Date.now())));
-  const isOverdue=(o:RentalOrder)=>o.status==='PICKED_UP'&&(orderGroup(o)==='CAMERA'?Boolean(cameraLateAlert(o,Date.now())):o.returnDate<today);
+  const isOverdue=(o:RentalOrder)=>o.status==='PICKED_UP'&&(
+    orderGroup(o)==='CAMERA'?Boolean(cameraLateAlert(o,Date.now())):Boolean(overdueReturnNotice(o,new Date())));
+  const overdueOrders=orders.filter(isOverdue);
+  // The server checks all active orders, not just the dashboard's recent 80.
+  const overdueSummaries=Array.from(new Map<string,LateReturnAlert>([
+    ...remoteLateReturns.map(a=>[a.orderId,a] as [string,LateReturnAlert]),
+    ...overdueOrders.map(o=>[o.id,{orderId:o.id,code:o.code,customerName:o.customerName,
+      scheduledAt:o.returnAt||null,returnDate:o.returnDate}] as [string,LateReturnAlert]),
+  ])).map(([,alert])=>alert);
   const dueAmount=(o:RentalOrder)=>o.total+(o.compensationTotal||0)+(o.lateFeeTotal||0)+(o.otherFeeTotal||0);
   const collected=reportDaily?.reduce((s,o)=>s+o.amount,0);
   const search=(str:string)=>matchesProductSearch(str,query);
   const filteredOrders=(taskView!=='ALL'?taskOrders:page==='orders'&&catalogData?.kind==='orders'?catalogData.results as RentalOrder[]:orders).filter(o=>(data?.me.role==='admin'||!['RETURNED','CANCELLED','VOIDED'].includes(o.status))&&(orderStatus==='ALL'||o.status===orderStatus)&&
-    (taskView==='ALL'||(taskView==='PICKUP_TODAY'&&o.status==='RESERVED'&&o.pickupDate===today)||(taskView==='RETURN_TODAY'&&o.status==='PICKED_UP'&&o.returnDate===today)||(taskView==='OVERDUE'&&o.status==='PICKED_UP'&&o.returnDate<today))&&
+    (taskView==='ALL'||(taskView==='PICKUP_TODAY'&&o.status==='RESERVED'&&o.pickupDate===today)||(taskView==='RETURN_TODAY'&&o.status==='PICKED_UP'&&o.returnDate===today)||(taskView==='OVERDUE'&&isOverdue(o)))&&
     (!query||search(o.code+' '+o.customerName+' '+o.customerPhone+' '+orderCreatorName(o,data?.staffNames)+' '+o.lines.map(l=>l.name).join(' '))));
   const customerPhoneHref=(phone:string)=>'tel:'+phone.replace(/[^+0-9]/g,'');
   const copyProductCode=async(code:string)=>{
@@ -435,14 +445,18 @@ export default function Home() {
   const chartMax=Math.max(1,...chartRows.map(r=>r.value));
   const calendarDays=Array.from({length:7},(_,i)=>addDays(calendarStart,i));
   const calendarActive=calendarOrderRows??active;
-  const calendarOverdue=calendarActive.filter(o=>o.status==='PICKED_UP'&&(o.returnDate<today||cameraLateAlert(o,Date.now())));
+  const calendarOverdue=calendarActive.filter(isOverdue);
   const cameraOverdueOrders=calendarActive.filter(o=>cameraLateAlert(o,Date.now()));
-  // Calendar creator options are independent of the filtered calendar response.
-  const calendarCreators=Array.from(new Map<string,string>([
-    ...Object.entries(data?.staffNames||{}),
-    ...orders.filter(o=>Boolean(o.createdBy)).map(o=>[o.createdBy,orderCreatorName(o,data?.staffNames)] as [string,string]),
-  ])).filter(([id,name])=>Boolean(id)&&Boolean(name.trim())).sort((a,b)=>a[1].localeCompare(b[1],'vi'));
-  const creatorName=(o:RentalOrder)=>orderCreatorName(o,data?.staffNames);
+  // Stable creator IDs; the current account/profile name overrides legacy order snapshots.
+  const creatorNames:Record<string,string>={...(data?.staffNames||{})};
+  if(data?.me.uid&&data.me.name?.trim())creatorNames[data.me.uid]=data.me.name.trim();
+  const creatorName=(o:RentalOrder)=>creatorNames[o.createdBy]?.trim()||orderCreatorName(o,creatorNames);
+  // This list is built on the server from distinct order creators, not staff
+  // accounts and not the currently filtered/paginated order results.
+  const calendarCreators=(data?.calendarCreatorOptions||[])
+    .map(o=>[o.uid,creatorNames[o.uid]||o.name] as [string,string])
+    .filter(([id,name])=>Boolean(id)&&Boolean(name.trim()))
+    .sort((a,b)=>a[1].localeCompare(b[1],'vi'));
   const calendarBaseItems=calendarLoaded?calendarRemote:[];
   const calendarSearchPool=calendarBaseItems;
   const calendarFilteredItems=calendarSearchPool.filter(i=>productGroup(i.category)===(page==='camera-calendar'?'CAMERA':'CLOTHING')&&(calendarCategory==='ALL'||i.category===calendarCategory)&&
@@ -465,13 +479,13 @@ export default function Home() {
   // Shared occupancy logic for desktop timeline and mobile product cards.
   // Keep both views on the exact same booking rules and click handlers.
   const renderCalendarCell=(item:InventoryItem,day:string,mobile=false)=>{
-    const {matching,shown,late,warning:nextDayRisk,blocked,isPast,visual}=calendarSlotState(item,day,calendarActive,today,riskIds,Date.now());
+    const {matching,shown,late,pickupLate,warning:nextDayRisk,blocked,isPast,visual}=calendarSlotState(item,day,calendarActive,today,riskIds,Date.now());
     const cameraAlert=shown&&page==='camera-calendar'?cameraLateAlert(shown,Date.now()):null;
     const liveQuote=shown&&cameraAlert?cameraLiveQuote(shown,Date.now()):null;
-    const title=shown?shown.customerName+' · '+shown.code+' · Tạo bởi: '+creatorName(shown)+(cameraAlert?` · TRẢ TRỄ ${cameraAlert.lateMinutes} phút`:(late?' · TRẢ TRỄ':''))+(liveQuote?` · Tiền tạm tính ${money(liveQuote.total)} (đã gồm trễ ${money(liveQuote.lateFee)})`:'')+(nextDayRisk?' · 20H: CHƯA TRẢ, MAI CÓ ĐƠN':''):blocked?statusLabels[item.status]||'Chưa được định giá':isPast?'Ngày đã qua':day===today?'Giao đồ ngay':'Đặt trước';
+    const title=shown?shown.customerName+' · '+shown.code+' · Tạo bởi: '+creatorName(shown)+(cameraAlert?` · TRẢ TRỄ ${cameraAlert.lateMinutes} phút`:(late?' · TRẢ TRỄ':''))+(liveQuote?` · Tiền tạm tính ${money(liveQuote.total)} (đã gồm trễ ${money(liveQuote.lateFee)})`:'')+(pickupLate?' · KHÁCH QUÁ GIỜ NHẬN':'')+(nextDayRisk?' · 20H: CHƯA TRẢ, MAI CÓ ĐƠN':''):blocked?statusLabels[item.status]||'Chưa được định giá':isPast?'Ngày đã qua':day===today?'Giao đồ ngay':'Đặt trước';
     const date=new Date(day+'T00:00:00Z');
     const week=['CN','T2','T3','T4','T5','T6','T7'][date.getUTCDay()];
-    return <button key={day} type="button" title={title} aria-label={`${prettyDay(day)}: ${visual.label}. ${title}`} className={'calendar-cell '+calendarUi.slot+' '+calendarUi[visual.className]+' '+(mobile?'gu-calendar-mobile-cell ':'')+(nextDayRisk?'gu-next-day-risk ':late?'gu-calendar-late ':shown?(shown.status==='PICKED_UP'?'occupied-picked':'occupied-reserved'):blocked?'cell-blocked':'cell-free')} disabled={!shown&&(blocked||isPast)} onClick={()=>matching.length>1?setCalendarMatches(matching):shown?openDetail(shown):openBooking(day===today?'PICKUP':'RESERVE',item.id,day)}>
+    return <button key={day} type="button" title={title} aria-label={`${prettyDay(day)}: ${visual.label}. ${title}`} className={'calendar-cell '+calendarUi.slot+' '+calendarUi[visual.className]+' '+(mobile?'gu-calendar-mobile-cell ':'')+(late?'gu-calendar-late ':pickupLate?'gu-calendar-pickup-late ':nextDayRisk?'gu-next-day-risk ':shown?(shown.status==='PICKED_UP'?'occupied-picked':'occupied-reserved'):blocked?'cell-blocked':'cell-free')} disabled={!shown&&(blocked||isPast)} onClick={()=>matching.length>1?setCalendarMatches(matching):shown?openDetail(shown):openBooking(day===today?'PICKUP':'RESERVE',item.id,day)}>
       {mobile&&<span className="gu-calendar-cell-date"><strong>{week}</strong><small>{day.slice(8,10)}/{day.slice(5,7)}</small></span>}
       {visual.className==='stateFree'?<span className={calendarUi.freeAction} aria-hidden="true">+</span>:<span className={'gu-calendar-cell-result '+calendarUi.stateLabel}>{visual.label}</span>}
       {shown&&<span className={calendarUi.customer} title={shown.customerName}>{matching.length>1?matching.length+' lượt':shown.customerName.split(' ').slice(-1)[0]}</span>}
@@ -538,12 +552,13 @@ export default function Home() {
       <button type="button" className="gu-late-pickup-dismiss" title="Tạm ẩn cảnh báo hiện tại" aria-label="Đóng cảnh báo khách chưa nhận đồ" onClick={()=>setDismissedPickupSignature(latePickupSignature)}><X size={19}/></button>
     </section>}
     {riskIds.size>0&&dismissedRiskSignature!==riskSignature&&<div role="status" className="gu-next-day-risk-banner"><BellRing size={20}/><div><strong>{riskIds.size} sản phẩm cần kiểm tra trước ca thuê ngày mai</strong><span>Từ 20:00: đồ chưa trả nhưng đã có lịch cho khách khác vào ngày mai. Liên hệ khách và chuẩn bị phương án thay thế.</span></div><button type="button" className="btn btn-white gu-risk-view" onClick={()=>{setPage('calendar');setCalendarStart(today);}}>Xem lịch</button><button type="button" className="gu-risk-dismiss" aria-label="Đóng cảnh báo 20 giờ" title="Đóng thông báo" onClick={()=>setDismissedRiskSignature(riskSignature)}><X size={19}/></button></div>}
-        {overdueOrders.length>0&&<div className="overdue-banner"><BellRing size={22}/><div><strong>KHẨN: {overdueOrders.length} đơn chưa trả đúng hạn</strong><p>{overdueOrders.slice(0,3).map(o=>o.code+' · '+o.customerName+' (hẹn '+prettyDay(o.returnDate)+')').join(' • ')}</p></div><button type="button" className="btn btn-white" onClick={()=>{setPage('orders');setOrderStatus('PICKED_UP');}}>Xem đơn trễ</button>{!notificationsEnabled&&<button type="button" className="btn btn-white" onClick={()=>void enableNotifications()}>Bật thông báo</button>}</div>}
+        {overdueSummaries.length>0&&<div className="overdue-banner"><BellRing size={22}/><div><strong>KHẨN: {overdueSummaries.length} đơn chưa trả đúng hạn</strong><p>{overdueSummaries.slice(0,3).map(o=>o.code+' · '+o.customerName+' (hẹn '+(o.scheduledAt?formatVNDateTime(o.scheduledAt):prettyDay(o.returnDate))+')').join(' • ')}</p></div><button type="button" className="btn btn-white" onClick={()=>{setPage('orders');setOrderStatus('PICKED_UP');}}>Xem đơn trễ</button>{!notificationsEnabled&&<button type="button" className="btn btn-white" onClick={()=>void enableNotifications()}>Bật thông báo</button>}</div>}
+        {riskFetchError&&<div className="inline-alert global-alert" role="status">Không tải được cảnh báo cập nhật. Kiểm tra kết nối rồi nhấn Tải lại dữ liệu.</div>}
         {err&&<div className="inline-alert danger-alert global-alert"><AlertCircle size={18}/><span>{err}</span><button className="icon-btn" onClick={()=>setErr('')} aria-label="Đóng thông báo"><X size={16}/></button></div>}
         {toast&&<div className="toast"><CheckCircle2 size={18}/>{toast}<button aria-label="Đóng" onClick={()=>setToast('')}><X size={15}/></button></div>}
         {!data?<div className="center-screen dashboard-empty">{loading?<><LoaderCircle className="spin" size={28}/><p>Đang tải dữ liệu cửa hàng…</p></>:<><AlertCircle size={30}/><h3>Chưa tải được dữ liệu</h3><p>Hãy kiểm tra tài khoản nhân viên và kết nối PostgreSQL trên VPS.</p><button className="btn btn-dark" onClick={()=>void refresh()}>Thử lại</button></>}</div>:<>
         {page==='overview'&&<><div className="page-intro"><div><div className="eyebrow">TỔNG QUAN CỬA HÀNG</div><h1>Xin chào, {data.me.name?.split(' ').slice(-1)[0]||'bạn'} <span className="wave">✳</span></h1></div><div className="action-row"><button className="btn btn-white" onClick={()=>openBooking('RESERVE')}><CalendarDays size={17}/> Đặt lịch trước</button><button className="btn btn-dark" onClick={()=>openBooking('PICKUP')}><Plus size={18}/> Tạo đơn thuê đồ</button><button className="btn btn-white" onClick={()=>openBooking('RESERVE',undefined,undefined,undefined,'','', 'CAMERA')}><Clock3 size={17}/> Đặt thuê máy ảnh</button></div></div>
-          <div className="gu-mobile-action-panel"><div className="gu-mobile-greeting"><strong>Hôm nay tại GU</strong><span>{prettyDay(today)}</span></div><div className="gu-mobile-task-grid"><button type="button" onClick={()=>openTaskOrders('PICKUP_TODAY')}><CalendarDays size={18}/><strong>{orders.filter(o=>o.status==='RESERVED'&&o.pickupDate===today).length}</strong><small>Chờ giao hôm nay</small></button><button type="button" onClick={()=>openTaskOrders('RETURN_TODAY')}><Clock3 size={18}/><strong>{dueToday.length}</strong><small>Đến hẹn trả</small></button><button type="button" className={overdueOrders.length?'gu-mobile-danger':''} onClick={()=>openTaskOrders('OVERDUE')}><BellRing size={18}/><strong>{overdueOrders.length}</strong><small>Quá hạn</small></button></div></div>
+          <div className="gu-mobile-action-panel"><div className="gu-mobile-greeting"><strong>Hôm nay tại GU</strong><span>{prettyDay(today)}</span></div><div className="gu-mobile-task-grid"><button type="button" onClick={()=>openTaskOrders('PICKUP_TODAY')}><CalendarDays size={18}/><strong>{orders.filter(o=>o.status==='RESERVED'&&o.pickupDate===today).length}</strong><small>Chờ giao hôm nay</small></button><button type="button" onClick={()=>openTaskOrders('RETURN_TODAY')}><Clock3 size={18}/><strong>{dueToday.length}</strong><small>Đến hẹn trả</small></button><button type="button" className={overdueOrders.length?'gu-mobile-danger':''} onClick={()=>openTaskOrders('OVERDUE')}><BellRing size={18}/><strong>{overdueSummaries.length}</strong><small>Quá hạn</small></button></div></div>
           <GuInstallApp/>
           <div className="stats-grid">{data.me.role==='admin'&&<Metric icon={Wallet} title="Thu ròng từ sổ quỹ" value={collected===undefined?'Đang tải…':money(collected)} detail="Dòng tiền ghi nhận, đã trừ hoàn tiền" tone="peach"/>}<Metric icon={ShoppingBag} title="Đơn đang hoạt động" value={String(data.counts?.activeOrders??active.length).padStart(2,'0')} detail={`${picked.length} đơn đã lấy hàng`} tone="purple"/><Metric icon={Shirt} title="Sản phẩm trong kho" value={String(data.counts?.items??items.length).padStart(2,'0')} detail={`${data.counts?.available??items.filter(i=>i.status==='AVAILABLE').length} bộ sẵn sàng`} tone="blue"/><Metric icon={ArrowDownLeft} title="Cần trả hôm nay" value={String(dueToday.length).padStart(2,'0')} detail="Đơn đến hạn trả hôm nay" tone="green"/><Metric icon={WashingMachine} title="Đang giặt" value={String(data.counts?.laundry??laundryRemote.length??0).padStart(2,'0')} detail="Trả xong sẽ tự chuyển vào đây" tone="blue"/></div>
           <section className="panel gu-today-tasks" aria-label="Việc hôm nay">
@@ -567,12 +582,12 @@ export default function Home() {
 
           {page==='camera-calendar'&&cameraOverdueOrders.length>0&&<div role="status" className="gu-camera-overdue-summary"><BellRing size={19}/><div><strong>{cameraOverdueOrders.length} đơn máy ảnh quá giờ trả</strong><span>{cameraOverdueOrders.slice(0,3).map(o=>`${o.customerName} · trễ ${cameraLateAlert(o,Date.now())?.lateMinutes||0} phút`).join(' · ')}. Mở đơn để xem tiền tạm tính và nhận trả để chốt phí.</span></div></div>}
           <section className="panel calendar-panel"><div className="calendar-toolbar gu-calendar-toolbar-v532">
-            <div className="gu-calendar-toolbar-title"><div><h3>{page==='camera-calendar'?'Lịch sử dụng máy ảnh':'Lịch trang phục, phụ kiện và các mục khác'}</h3></div><div className={'legend '+calendarUi.legend} aria-label="Chú giải các trạng thái thuê"><span className={calendarUi.legendOverdue}><i/>Trả trễ</span><span className={calendarUi.legendWarning}><i/>Cảnh báo 20h</span><span className={calendarUi.legendPicked}><i/>Đã lấy</span><span className={calendarUi.legendReserved}><i/>Đã giữ</span><span className={calendarUi.legendFree}><i/>Còn trống</span></div></div>
+            <div className="gu-calendar-toolbar-title"><div><h3>{page==='camera-calendar'?'Lịch sử dụng máy ảnh':'Lịch trang phục, phụ kiện và các mục khác'}</h3></div><div className={'legend '+calendarUi.legend} aria-label="Chú giải các trạng thái thuê"><span className={calendarUi.legendOverdue}><i/>Trả trễ</span><span className="gu-calendar-pickup-late-legend"><i/>Quá giờ nhận</span><span className={calendarUi.legendWarning}><i/>Cảnh báo 20h</span><span className={calendarUi.legendPicked}><i/>Đã lấy</span><span className={calendarUi.legendReserved}><i/>Đã giữ</span><span className={calendarUi.legendFree}><i/>Còn trống</span></div></div>
             <div className="calendar-controls gu-calendar-controls-v532">
               <div className="gu-calendar-filter-fields">
                 <label><span>Danh mục</span><select className="input gu-calendar-cat" aria-label="Lọc danh mục sản phẩm" value={calendarCategory} onChange={e=>setCalendarCategory(e.target.value)}><option value="ALL">Tất cả danh mục</option>{Array.from(new Set([...categories.map(c=>c.name),...items.map(i=>i.category)].filter(name=>productGroup(name)===(page==='camera-calendar'?'CAMERA':'CLOTHING')))).sort().map(c=><option value={c} key={c}>{c}</option>)}</select></label>
                 <label><span>Tình trạng</span><select className="input gu-calendar-status" aria-label="Lọc lịch theo tình trạng" value={calendarStatus} onChange={e=>setCalendarStatus(e.target.value as CalendarFilter)}>
-                  <option value="ALL">Mọi trạng thái</option><option value="FREE">Còn trống</option><option value="RESERVED">Đã giữ</option><option value="PICKED_UP">Đã giao</option><option value="OVERDUE">Trả trễ</option><option value="LAUNDRY">Đang giặt</option><option value="MAINTENANCE">Bảo trì</option><option value="MISSING">Thất lạc</option><option value="UNPRICED">Chưa duyệt giá</option>
+                  <option value="ALL">Mọi trạng thái</option><option value="FREE">Còn trống</option><option value="RESERVED">Đã giữ</option><option value="PICKED_UP">Đã giao</option><option value="OVERDUE">Trả trễ</option><option value="PICKUP_LATE">Quá giờ nhận</option><option value="LAUNDRY">Đang giặt</option><option value="MAINTENANCE">Bảo trì</option><option value="MISSING">Thất lạc</option><option value="UNPRICED">Chưa duyệt giá</option>
                 </select></label>
                 {data.me.role==='admin'&&<label><span>Nhân viên tạo đơn</span><select className="input gu-calendar-creator" aria-label="Lọc theo nhân viên tạo đơn" value={calendarCreator} onChange={e=>setCalendarCreator(e.target.value)}><option value="ALL">Mọi nhân viên tạo</option>{calendarCreators.map(([uid,name])=><option key={uid} value={uid}>{name}</option>)}</select></label>}
               </div>
