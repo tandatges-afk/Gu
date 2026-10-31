@@ -427,7 +427,11 @@ export default function Home() {
   const calendarActive=calendarOrderRows??active;
   const calendarOverdue=calendarActive.filter(o=>o.status==='PICKED_UP'&&(o.returnDate<today||cameraLateAlert(o,Date.now())));
   const cameraOverdueOrders=calendarActive.filter(o=>cameraLateAlert(o,Date.now()));
-  const calendarCreators=Array.from(new Map(calendarActive.filter(o=>Boolean(o.createdBy)).map(o=>[o.createdBy,orderCreatorName(o,data?.staffNames)] as const)).entries()).sort((a,b)=>a[1].localeCompare(b[1],'vi'));
+  // GU_FIX20_REV4_DATE_CREATOR_V3: menu choices must not depend on filtered calendarActive.
+  const calendarCreators=Array.from(new Map<string,string>([
+    ...Object.entries(data?.staffNames||{}),
+    ...orders.filter(o=>Boolean(o.createdBy)).map(o=>[o.createdBy,orderCreatorName(o,data?.staffNames)] as [string,string]),
+  ])).filter(([uid,name])=>Boolean(uid)&&Boolean(name.trim())).sort((a,b)=>a[1].localeCompare(b[1],'vi'));
   const creatorName=(o:RentalOrder)=>orderCreatorName(o,data?.staffNames);
   const calendarBaseItems=calendarLoaded?calendarRemote:items.slice(0,25);
   const calendarSearchPool=calendarQuery.trim()?[...new Map([...calendarBaseItems,...items].map(item=>[item.id,item] as const)).values()]:calendarBaseItems;

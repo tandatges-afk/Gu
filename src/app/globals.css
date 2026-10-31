@@ -1178,3 +1178,27 @@ html,body{background:var(--paper);color:var(--ink)}
 .gu-camera-live-alert strong{display:block;font-size:14px;margin-bottom:4px}
 .gu-camera-settlement-note{border:1px solid #d9e8e4;background:#f4f9f7;color:#264c48;border-radius:10px;padding:11px 13px;font-size:13px;line-height:1.55;margin:8px 0 14px}
 @media(max-width:620px){.gu-camera-overdue-summary,.gu-camera-live-alert{padding:10px 12px;margin:8px 0}.gu-camera-settlement-note{font-size:12px}}
+
+/* GU_FIX20_REV4_DATE_CREATOR_V3: make the real native date field clickable. */
+.gu-vn-datetime>.gu-vn-native-trigger,
+.gu-vn-date-only>.gu-vn-native-trigger{
+  position:relative;display:grid;place-items:center;
+  flex:0 0 44px;min-width:44px;min-height:44px;
+  border:1px solid #d9e1e8;border-radius:10px;
+  background:#f3f6f8;color:#253c52;cursor:pointer;
+  overflow:hidden;touch-action:manipulation;
+}
+.gu-vn-native-trigger>.gu-vn-native-date-overlay{
+  position:absolute!important;inset:0!important;
+  display:block!important;width:100%!important;height:100%!important;
+  max-width:none!important;max-height:none!important;
+  min-width:0!important;min-height:0!important;
+  margin:0!important;padding:0!important;
+  opacity:0.025!important;pointer-events:auto!important;
+  cursor:pointer!important;z-index:1!important;
+}
+.gu-vn-native-trigger:focus-within{outline:2px solid #24795d;outline-offset:2px}
+.gu-calendar-toolbar-v532 .gu-calendar-date-actions>.gu-vn-date-only>.gu-vn-native-trigger{
+  flex:0 0 44px!important;width:44px!important;height:46px!important;
+  min-width:44px!important;
+}
