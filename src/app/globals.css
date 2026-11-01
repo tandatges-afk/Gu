@@ -1443,3 +1443,26 @@ button.calendar-cell.gu-calendar-followup-risk.occupied-reserved{
 .gu-calendar-pending-action:hover{background:#ffe9ec}
 .gu-pending-handover{background:#eef3ff!important;color:#234a79!important}
 @media(max-width:850px){.gu-capture-issue-thumbs{grid-template-columns:repeat(3,minmax(0,1fr))}.gu-capture-issue-upload{flex-basis:100%}}
+
+/* GU 2026-11-02: a pending-operation button requires a taller shared grid row.
+   Grid .calendar-row uses display:contents, so the item's intrinsic size
+   sets the same row height for all seven day tracks. */
+@media (min-width:851px){
+ .calendar-grid .calendar-row.gu-calendar-has-pending>.calendar-item{
+  height:auto!important;min-height:120px!important;max-height:none!important;
+  overflow:hidden!important;align-items:center!important;padding-block:8px!important
+ }
+ .calendar-grid .calendar-row.gu-calendar-has-pending>.calendar-item [class*="productText"]{
+  justify-content:flex-start!important;min-height:0!important;gap:4px!important
+ }
+}
+/* All warning controls stay inside the name/code column, not atop next row. */
+.calendar-grid .calendar-item .gu-calendar-pending-action{
+ display:inline-flex;align-items:center;justify-content:flex-start;
+ position:static!important;width:100%;min-height:24px;max-width:100%;
+ white-space:normal;overflow-wrap:anywhere;line-height:1.2;padding:5px 7px;
+ flex:0 0 auto
+}
+.gu-mobile-calendar-product-info .gu-calendar-pending-action{
+ display:inline-flex;max-width:100%;min-height:32px;white-space:normal;overflow-wrap:anywhere
+}

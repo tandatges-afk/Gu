@@ -76,16 +76,24 @@ export function calendarSlotState(
   ?matching.find(o=>o.status==='RESERVED'&&(lateOrder?o.id!==lateOrder.id:o.id!==latePickupOrder?.id))
   :undefined;
  const showingNextToday=day===today&&Boolean(nextReservation);
- const late=wouldBeLate&&!showingNextToday&&(!liveClock||matching.some(o=>o.id===lateOrder?.id));
- const shown=liveClock?matching[0]:(nextReservation||(late&&lateOrder?lateOrder:matching[0]||
+ // Today may contain an unresolved earlier rental. Show it as a current
+ // OPERATIONAL alert only if no newer dated booking occupies today's cell.
+ // Other days must show real dated reservations, never a projected old order.
+ const late=wouldBeLate&&!showingNextToday&&(!liveClock||
+  matching.some(o=>o.id===lateOrder?.id)||(day===today&&matching.length===0));
+ const shown=liveClock?(matching[0]||(day===today?(lateOrder||latePickupOrder):undefined)):
+  (nextReservation||(late&&lateOrder?lateOrder:matching[0]||
   (lateOrder&&day>=lateOrder.pickupDate?lateOrder:undefined)));
  // Risk marker does not replace the dated booking, customer or pickup time.
  const followupRisk=liveClock&&day>=today&&Boolean(shown)&&Boolean(lateOrder||latePickupOrder)&&shown?.id!==lateOrder?.id&&shown?.id!==latePickupOrder?.id;
  let matchingForClick=late&&lateOrder&&!matching.some(o=>o.id===lateOrder.id)?[lateOrder,...matching]:matching;
- if(showingNextToday&&lateOrder&&!matchingForClick.some(o=>o.id===lateOrder.id)){
-  matchingForClick=[lateOrder,...matchingForClick];
+ if(liveClock&&day===today){
+  // Keep both the due booking and unresolved previous booking accessible.
+  for(const overdue of [lateOrder,latePickupOrder]){
+   if(overdue&&!matchingForClick.some(o=>o.id===overdue.id))matchingForClick=[...matchingForClick,overdue];
+  }
  }
- // Click targets are actual dated bookings only; unresolved old orders have a separate row action.
+ // Past and future dates keep only their real booking occupancy.
  const pickupLate=day===today&&liveClock&&shown?.status==='RESERVED'&&overduePickupNotice(shown,instant)!==null;
  const warning=riskItemIds.has(item.id)&&day===today&&Boolean(shown)&&!late&&!pickupLate;
  const physicallyOut=liveClock&&day>=today&&item.status==='RENTED'&&!shown;
