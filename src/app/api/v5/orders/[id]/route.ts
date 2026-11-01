@@ -38,6 +38,16 @@ function readProof(raw:unknown,order:RentalOrder,uid:string,name:string,phase:'H
   const issuePhotoRaw=condition==='OK'?null:p.issuePhotoUrl;
   const issuePhotoUpload=issuePhotoRaw?parseInspectionPhotoUrl(issuePhotoRaw,process.env.APP_URL):null;
   if(issuePhotoRaw&&(!issuePhotoUpload||issuePhotoUpload.uid!==uid))throw new ApiError(400,'Ảnh ghi nhận vấn đề không hợp lệ hoặc không thuộc người chụp.');
+  // The first photo retains the legacy issuePhoto field; extras use issuePhotos.
+  // Old clients with only issuePhotoUrl still work without migration.
+  const rawIssuePhotos=condition==='OK'?[]:Array.isArray(p.issuePhotoUrls)?p.issuePhotoUrls:(issuePhotoRaw?[issuePhotoRaw]:[]);
+  if(rawIssuePhotos.length>8||rawIssuePhotos.some(url=>typeof url!=='string'||url.length>2048)||
+     (rawIssuePhotos.length>0&&rawIssuePhotos[0]!==issuePhotoRaw)||
+     new Set(rawIssuePhotos).size!==rawIssuePhotos.length)
+    throw new ApiError(400,'Chỉ nhận tối đa 8 ảnh có vấn đề khác nhau trên mỗi sản phẩm.');
+  const additionalIssueUploads=rawIssuePhotos.slice(1).map(url=>parseInspectionPhotoUrl(url,process.env.APP_URL));
+  if(additionalIssueUploads.some(upload=>!upload||upload.uid!==uid))
+    throw new ApiError(400,'Ảnh vấn đề bổ sung không hợp lệ hoặc khác nhân viên chụp.');
   if((missing||condition==='ISSUE')&&!String(p.note||'').trim()&&!issuePhotoUpload)
    throw new ApiError(400,'Món có vấn đề hoặc thất lạc cần chụp ảnh hiện trạng hoặc ghi chú ngắn.');
   const shots=Object.fromEntries(slots.map(angle=>{
@@ -48,13 +58,14 @@ function readProof(raw:unknown,order:RentalOrder,uid:string,name:string,phase:'H
    if(!uploaded||uploaded.uid!==uid)throw new ApiError(400,`Ảnh ${angle} không khớp tài khoản đang bàn giao. Hãy chụp lại góc ${angle} bằng tài khoản hiện tại.`);
    return [angle,{url:uploaded.url,at:now,by:uid,byName:name} satisfies Capture];
   }).filter((entry):entry is [string,Capture]=>entry!==null));
-  return {itemId:id,shots,condition,note:typeof p.note==='string'?p.note.slice(0,500):'',...(issuePhotoUpload?{issuePhoto:{url:issuePhotoUpload.url,at:now,by:uid,byName:name}}:{})};
+  return {itemId:id,shots,condition,note:typeof p.note==='string'?p.note.slice(0,500):'',...(issuePhotoUpload?{issuePhoto:{url:issuePhotoUpload.url,at:now,by:uid,byName:name}}:{}),
+   ...(additionalIssueUploads.length?{issuePhotos:additionalIssueUploads.map(upload=>({url:upload!.url,at:now,by:uid,byName:name}))}:{})};
  });
  if(result.length!==targetIds.length||new Set(result.map(p=>p.itemId)).size!==result.length||result.some(p=>p.condition!=='MISSING'&&!templates[p.itemId]?.every(a=>!!p.shots[a]?.url)))throw new ApiError(400,'Thiếu ảnh của sản phẩm hoặc góc chụp.');
  return result;
 }
 async function verifyProofUploads(tx:Transaction,proofs:PhotoProof[],phase:'handover'|'return',uid:string,orderId:string){
- const paths=proofs.flatMap(p=>[...Object.values(p.shots).filter(Boolean).map(c=>c.url),...(p.issuePhoto?[p.issuePhoto.url]:[])]);
+ const paths=proofs.flatMap(p=>[...Object.values(p.shots).filter(Boolean).map(c=>c.url),...(p.issuePhoto?[p.issuePhoto.url]:[]),...(p.issuePhotos||[]).map(c=>c.url)]);
  if(new Set(paths).size!==paths.length)throw new ApiError(400,'Không dùng một ảnh cho nhiều góc chụp.');
  const parsed=paths.map(path=>parseInspectionPhotoUrl(path,process.env.APP_URL));
  if(parsed.some(p=>!p))throw new ApiError(400,'Đường dẫn ảnh kiểm nhận không hợp lệ.');

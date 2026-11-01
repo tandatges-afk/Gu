@@ -40,6 +40,10 @@ test('Defect photo is validated as a real inspection upload, kept for 7 rounds, 
  assert.match(api,/!String\(p.note\|\|''\).trim\(\)&&!issuePhotoUpload/);
  assert.match(api,/p.issuePhoto\.url/);
  assert.match(retention,/proof\?\.issuePhoto/);
+ assert.match(retention,/proof\?\.issuePhotos/);
+ assert.match(api,/additionalIssueUploads/);
+ assert.match(capture,/Chụp thêm ảnh vấn đề/);
+ assert.match(review,/gu-review-issue-gallery/);
  assert.match(capture,/Chụp ảnh vấn đề/);
  assert.match(review,/gu-review-choice--/);
  const approval=api.split("}else if(action==='REVIEW_PHOTOS'){")[1].split("}else if(action==='RETURN_COLLATERAL'){")[0];

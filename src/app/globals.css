@@ -1429,3 +1429,17 @@ button.calendar-cell.gu-calendar-followup-risk::after{
 button.calendar-cell.gu-calendar-followup-risk.occupied-reserved{
  box-shadow:inset 0 0 0 1px #b12f45!important
 }
+/* GU FIX workflow-issue-evidence 2026-11-02 */
+.gu-capture-issue-evidence{flex-wrap:wrap;align-items:flex-start}
+.gu-capture-issue-thumbs{display:grid;grid-template-columns:repeat(auto-fill,minmax(86px,1fr));gap:9px;width:100%;max-width:100%}
+.gu-capture-issue-thumb{position:relative;min-height:85px;aspect-ratio:1;border:1px solid #d4e1de;border-radius:10px;overflow:hidden;background:#f7faf9}
+.gu-capture-issue-thumb img{display:block;width:100%;height:100%;object-fit:cover}
+.gu-capture-issue-remove{position:absolute;right:4px;top:4px;display:grid;place-items:center;width:32px;height:32px;border:0;border-radius:9px;background:#ad243d;color:#fff;cursor:pointer;box-shadow:0 2px 6px #0004}
+.gu-capture-issue-remove:disabled{opacity:.55;cursor:not-allowed}
+.gu-capture-issue-upload{flex:1 1 210px}
+.gu-review-issue-gallery{display:grid;grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:8px;margin-top:8px}
+.gu-review-issue-gallery img{width:100%;aspect-ratio:1;object-fit:cover;border-radius:9px;border:1px solid #dde7e7}
+.gu-calendar-pending-action{border:1px solid #e5aeae;color:#a0273a;background:#fff4f4;border-radius:7px;font-size:10px;font-weight:750;line-height:1.25;padding:4px 6px;cursor:pointer;text-align:left;max-width:100%}
+.gu-calendar-pending-action:hover{background:#ffe9ec}
+.gu-pending-handover{background:#eef3ff!important;color:#234a79!important}
+@media(max-width:850px){.gu-capture-issue-thumbs{grid-template-columns:repeat(3,minmax(0,1fr))}.gu-capture-issue-upload{flex-basis:100%}}

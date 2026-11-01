@@ -68,7 +68,7 @@ export function calendarSlotState(
   overduePickupNotice(o,instant)!==null):undefined;
  // Uncollected reservations appear as an alert only on the CURRENT day;
  // they must not appear as fake bookings on every later day.
- const fallbackPickup=day===today?latePickupOrder:undefined;
+ // Historical overdue pickup is displayed in the operational queue, never as a fake dated booking.
  // Prefer an actual upcoming RESERVED order over a previously overdue order
  // for the same item, even when that next booking is for TODAY. The unresolved
  // order remains available in the click chooser and as a visible risk marker.
@@ -76,22 +76,23 @@ export function calendarSlotState(
   ?matching.find(o=>o.status==='RESERVED'&&(lateOrder?o.id!==lateOrder.id:o.id!==latePickupOrder?.id))
   :undefined;
  const showingNextToday=day===today&&Boolean(nextReservation);
- const late=wouldBeLate&&!showingNextToday;
- const shown=nextReservation||(late&&lateOrder?lateOrder:matching[0]||fallbackPickup||
-  (lateOrder&&day>=lateOrder.pickupDate&&(!liveClock||day<=today)?lateOrder:undefined));
+ const late=wouldBeLate&&!showingNextToday&&(!liveClock||matching.some(o=>o.id===lateOrder?.id));
+ const shown=liveClock?matching[0]:(nextReservation||(late&&lateOrder?lateOrder:matching[0]||
+  (lateOrder&&day>=lateOrder.pickupDate?lateOrder:undefined)));
  // Risk marker does not replace the dated booking, customer or pickup time.
- const followupRisk=liveClock&&(day>today||showingNextToday)&&Boolean(lateOrder||latePickupOrder);
+ const followupRisk=liveClock&&day>=today&&Boolean(shown)&&Boolean(lateOrder||latePickupOrder)&&shown?.id!==lateOrder?.id&&shown?.id!==latePickupOrder?.id;
  let matchingForClick=late&&lateOrder&&!matching.some(o=>o.id===lateOrder.id)?[lateOrder,...matching]:matching;
  if(showingNextToday&&lateOrder&&!matchingForClick.some(o=>o.id===lateOrder.id)){
   matchingForClick=[lateOrder,...matchingForClick];
  }
- if(fallbackPickup&&!matchingForClick.some(o=>o.id===fallbackPickup.id)&&!late){matchingForClick=[fallbackPickup,...matchingForClick];}
+ // Click targets are actual dated bookings only; unresolved old orders have a separate row action.
  const pickupLate=day===today&&liveClock&&shown?.status==='RESERVED'&&overduePickupNotice(shown,instant)!==null;
  const warning=riskItemIds.has(item.id)&&day===today&&Boolean(shown)&&!late&&!pickupLate;
- const blocked=!shown&&(['LAUNDRY','MAINTENANCE','MISSING'].includes(item.status)||!(item.replacementValue>0));
+ const physicallyOut=liveClock&&day>=today&&item.status==='RENTED'&&!shown;
+ const blocked=!shown&&(physicallyOut||['LAUNDRY','MAINTENANCE','MISSING'].includes(item.status)||!(item.replacementValue>0));
  const isPast=day<today;
  const visual=calendarVisualState({late,pickupLate,warning,orderStatus:shown?.status,blocked,isPast,
-   blockedLabel:blocked&&['LAUNDRY','MAINTENANCE','MISSING'].includes(item.status)?{
+   blockedLabel:physicallyOut?'Chưa trả':blocked&&['LAUNDRY','MAINTENANCE','MISSING'].includes(item.status)?{
      LAUNDRY:'Đang giặt',MAINTENANCE:'Bảo trì',MISSING:'Thất lạc'
    }[item.status as 'LAUNDRY'|'MAINTENANCE'|'MISSING']:'Chưa duyệt giá'});
  return {matching:matchingForClick,shown,late,pickupLate,warning,followupRisk,blocked,isPast,visual};

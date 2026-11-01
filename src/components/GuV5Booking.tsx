@@ -101,7 +101,13 @@ export function GuV5Booking({items,customers,api,initial,onClose,onSuccess,onCus
    if(!cid||!selected.length||!blocks)throw Error('Chọn khách, sản phẩm và ngày giờ hợp lệ.');
    if(needsPrepay&&!reservationProofId)throw Error('Cần chụp ảnh xác nhận tiền cọc/tiền thuê trước khi giữ lịch.');
    const r=await api<RentalOrder>('v5/orders',{method:'POST',body:JSON.stringify({customerId:cid,itemIds:selected,pickupAt,returnAt:scheduledReturnAt,note,createRequestId,bookingKind:needsPrepay?'RESERVE':'WALK_IN',reservationPaymentProofId:reservationProofId,paymentDraftId,rentalGroup,cameraPackageHours:cameraItems.length?cameraPackageHours:undefined,...(quickCustomer?{quickCustomer:{name:name.trim(),phone:digits(phone)}}:{})})});
-   await onSuccess(`Đã tạo đơn ${r.code}.`);onCreated?.(r.id);
+   // A WALK_IN is only completed when HANDOVER succeeds. Until then the
+   // order is a protected pending handover, not a future reservation.
+   // Order is already committed on the server. A later refresh error must not
+   // strand the walk-in without its handover screen or pretend POST failed.
+   try{await onSuccess(needsPrepay?`Đã giữ lịch ${r.code}.`:`Đã lập phiếu ${r.code}. CẦN CHỤP BÀN GIAO để hoàn tất giao hàng.`);}
+   catch(refreshError){console.error('Đơn đã lưu nhưng không thể làm mới danh sách',refreshError);}
+   onCreated?.(r.id);
  }catch(e){setError(e instanceof Error?e.message:'Tạo đơn thất bại.');}finally{setBusy(false);}};
  return <form className={`modal-body ${ui.bookingForm}`} noValidate onSubmit={e=>void submit(e)}>
   {error&&<div className="inline-alert danger-alert">{error}</div>}
@@ -157,6 +163,6 @@ export function GuV5Booking({items,customers,api,initial,onClose,onSuccess,onCus
 <GuSecureUpload purpose="reservation" draftId={paymentDraftId} onUploaded={setReservationProofId} label="Chụp chứng từ tiền thuê đã nhận"/></section>}
   <label className={`${ui.field} ${ui.noteField}`}><span>Ghi chú đơn</span><input className="input" value={note} onChange={e=>setNote(e.target.value)}/></label>
   {incomplete&&<p className="gu-booking-blockers" role="status">{incomplete}</p>}
-  <div className={`modal-actions ${ui.actions}`}><button type="button" className="btn btn-white" onClick={onClose}>Đóng</button><button type="submit" className="btn btn-dark" disabled={busy}>{busy?'Đang tạo…':needsPrepay?'Thu tiền thuê & giữ lịch':'Tạo đơn chờ bàn giao'}</button></div>
+  <div className={`modal-actions ${ui.actions}`}><button type="button" className="btn btn-white" onClick={onClose}>Đóng</button><button type="submit" className="btn btn-dark" disabled={busy}>{busy?'Đang tạo…':needsPrepay?'Thu tiền thuê & giữ lịch':'Tiếp tục · Chụp bàn giao'}</button></div>
  </form>;
 }

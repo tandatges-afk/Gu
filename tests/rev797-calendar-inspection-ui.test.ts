@@ -36,8 +36,8 @@ test('inspection states and issue photo use the existing persisted proof fields 
  assert.match(capture,/gu-capture-issue-evidence/);
  assert.match(capture,/gu-capture-issue-upload/);
  assert.match(capture,/type="file" accept="image\/\*" capture="environment"/);
- assert.match(capture,/issuePhotoUrl:pictures\[l\.itemId\+'\|issue'\]/);
- assert.match(capture,/!notes\[l\.itemId\]\?\.trim\(\)&&!pictures\[l\.itemId\+'\|issue'\]/);
+ assert.match(capture,/issuePhotoUrls:issuePictures\[l\.itemId\]/);
+ assert.match(capture,/!notes\[l\.itemId\]\?\.trim\(\)&&!\(issuePictures\[l\.itemId\]/);
  assert.match(capture,/placeholder="Vị trí, hiện trạng hoặc thông tin bổ sung/);
  assert.match(css,/\.gu-capture-issue\.is-missing\{background:#fff9f9/);
  assert.match(css,/\.gu-capture-issue-upload input\[type="file"\]/);
