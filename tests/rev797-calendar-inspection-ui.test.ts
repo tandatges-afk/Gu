@@ -52,7 +52,7 @@ test('calendar pending action has a taller shared desktop row and cannot overlap
 });
 
 test('walk-in label is limited to today and never hides an overdue pickup alert',()=>{
- assert.match(calendar,/const displayStateLabel=pickupLate\?'Quá giờ nhận':late\?'Trả trễ'/);
+ assert.match(calendar,/const displayStateLabel=late\?'Trả trễ':pickupLate\?\(isPast\?'Chưa nhận':'Quá giờ nhận'\)/);
  assert.match(calendar,/shown\?\.status==='RESERVED'&&isPast\?'Chưa nhận'/);
  assert.match(calendar,/shown\.bookingKind==='WALK_IN'&&day===today\?'Chờ bàn giao'/);
  assert.match(calendar,/RESERVED:'Đã giữ'/);
@@ -76,10 +76,15 @@ test('three-day calendar keeps historical booking, live missed pickup, and next-
  const nov2=calendarSlotState(item,day,[old],day,new Set(),now);
  const nov3=calendarSlotState(item,'2026-11-03',[old],day,new Set(),now);
  assert.equal(oct30.shown?.id,'old');assert.equal(oct30.isPast,true);
+ assert.equal(oct30.pickupLate,true,'uncollected past booking must be purple');
+ assert.equal(oct30.visual.className,'stateWarning');
  assert.equal(nov1.visual.label,'Đã qua');
  assert.equal(nov2.visual.label,'Quá giờ nhận');assert.equal(nov2.shown?.id,'old');
  assert.equal(nov2.matching.length,1);
  assert.equal(nov3.visual.label,'Còn trống');assert.equal(nov3.shown,undefined);
+ const oct31=calendarSlotState(item,'2026-10-31',[old],day,new Set(),now);
+ assert.equal(oct31.pickupLate,true);
+ assert.equal(oct31.visual.className,'stateWarning');
  const next=make('next','2026-11-02','2026-11-03','2026-11-02T06:00:00Z');
  const todayBooked=calendarSlotState(item,day,[old,next],day,new Set(),now);
  assert.equal(todayBooked.shown?.id,'next');assert.equal(todayBooked.matching.length,2);
@@ -87,4 +92,21 @@ test('three-day calendar keeps historical booking, live missed pickup, and next-
  const tomorrowBooked=calendarSlotState(item,'2026-11-03',[old,next],day,new Set(),now);
  assert.equal(tomorrowBooked.shown?.id,'next');assert.equal(tomorrowBooked.matching.length,1);
  assert.equal(tomorrowBooked.followupRisk,true);
+ assert.equal(tomorrowBooked.pickupLate,false,'a reservation not due yet remains amber');
+ assert.equal(tomorrowBooked.visual.className,'stateReserved');
+ const missed=make('missed','2026-11-02','2026-11-03','2026-11-01T17:47:00Z');
+ const missedTomorrow=calendarSlotState(item,'2026-11-03',[missed],day,new Set(),now);
+ assert.equal(missedTomorrow.pickupLate,true,'missed pickup stays purple during the actual reservation range');
+ assert.equal(missedTomorrow.visual.className,'stateWarning');
+ const future=make('future','2026-11-03','2026-11-04','2026-11-03T07:00:00Z');
+ const notYetDue=calendarSlotState(item,'2026-11-03',[future],day,new Set(),now);
+ assert.equal(notYetDue.pickupLate,false,'future pickup should stay amber until agreed time');
+ assert.equal(notYetDue.visual.className,'stateReserved');
+});
+
+
+test('pickup warnings share purple for historical / live / booked future days without reusing the amber reserved tone',()=>{
+ assert.match(css,/button\.calendar-cell\.gu-calendar-pickup-late\{background:#f0eafa!important;border:2px solid #9a7bc8!important/);
+ assert.match(css,/\.gu-calendar-pickup-late-legend\{[^\n]*background:#f0eafa/);
+ assert.match(calendar,/pickupLate\?\(isPast\?'Chưa nhận':'Quá giờ nhận'\)/);
 });

@@ -1412,10 +1412,10 @@ html,body{background:var(--paper);color:var(--ink)}
 
 
 /* GU live pickup alert: visually distinct from purple 20h stock risk and red return lateness. */
-button.calendar-cell.gu-calendar-pickup-late{background:#e3f4ff!important;border:2px solid #2187b4!important;color:#11486d!important;box-shadow:inset 0 0 0 1px #f5fcff!important}
-button.calendar-cell.gu-calendar-pickup-late .gu-calendar-cell-result,button.calendar-cell.gu-calendar-pickup-late .gu-calendar-cell-time{color:#0e557b!important;font-weight:850!important}
-.gu-calendar-pickup-late-legend{display:inline-flex;align-items:center;gap:5px;background:#e3f4ff;color:#115a81;border:1px solid #acd9ef;border-radius:6px;padding:6px 8px;font-size:11px;font-weight:700}
-.gu-calendar-pickup-late-legend i{width:7px;height:7px;border-radius:50%;background:#2187b4;display:inline-block}
+button.calendar-cell.gu-calendar-pickup-late{background:#f0eafa!important;border:2px solid #9a7bc8!important;color:#5e4094!important;box-shadow:inset 0 0 0 1px #fbf8ff!important}
+button.calendar-cell.gu-calendar-pickup-late .gu-calendar-cell-result,button.calendar-cell.gu-calendar-pickup-late .gu-calendar-cell-time{color:#5e4094!important;font-weight:850!important}
+.gu-calendar-pickup-late-legend{display:inline-flex;align-items:center;gap:5px;background:#f0eafa;color:#5e4094;border:1px solid #d5c9ed;border-radius:6px;padding:6px 8px;font-size:11px;font-weight:700}
+.gu-calendar-pickup-late-legend i{width:7px;height:7px;border-radius:50%;background:#9a7bc8;display:inline-block}
 
 /* GU future booking visibility: warn without replacing the dated reservation. */
 button.calendar-cell.gu-calendar-followup-risk{position:relative}

@@ -491,7 +491,7 @@ export default function Home() {
   // Keep both views on the exact same booking rules and click handlers.
   const renderCalendarCell=(item:InventoryItem,day:string,mobile=false)=>{
     const {matching,shown,late,pickupLate,warning:nextDayRisk,followupRisk,blocked,isPast,visual}=calendarSlotState(item,day,calendarActive,today,riskIds,Date.now());
-    const displayStateLabel=pickupLate?'Quá giờ nhận':late?'Trả trễ':
+    const displayStateLabel=late?'Trả trễ':pickupLate?(isPast?'Chưa nhận':'Quá giờ nhận'):
       shown?.status==='RESERVED'&&isPast?'Chưa nhận':
       shown?.status==='RESERVED'&&shown.bookingKind==='WALK_IN'&&day===today?'Chờ bàn giao':visual.label;
     const cameraAlert=shown&&page==='camera-calendar'?cameraLateAlert(shown,Date.now()):null;

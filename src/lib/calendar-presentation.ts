@@ -94,11 +94,18 @@ export function calendarSlotState(
   }
  }
  // Past and future dates keep only their real booking occupancy.
- const pickupLate=day===today&&liveClock&&shown?.status==='RESERVED'&&overduePickupNotice(shown,instant)!==null;
+ const isPast=day<today;
+ // A reservation missed its pickup if it was never handed over by the agreed
+ // clock time. Keep its warning on EVERY date actually covered by that order
+ // (including the historical pickup days), never on unrelated future days.
+ // Past booked days also remain visibly uncollected, even for legacy records
+ // without a reliable pickup timestamp.
+ const pickupLate=liveClock&&shown?.status==='RESERVED'&&
+  (isPast||overduePickupNotice(shown,instant)!==null)&&
+  (day===today||matching.some(o=>o.id===shown.id));
  const warning=riskItemIds.has(item.id)&&day===today&&Boolean(shown)&&!late&&!pickupLate;
  const physicallyOut=liveClock&&day>=today&&item.status==='RENTED'&&!shown;
  const blocked=!shown&&(physicallyOut||['LAUNDRY','MAINTENANCE','MISSING'].includes(item.status)||!(item.replacementValue>0));
- const isPast=day<today;
  const visual=calendarVisualState({late,pickupLate,warning,orderStatus:shown?.status,blocked,isPast,
    blockedLabel:physicallyOut?'Chưa trả':blocked&&['LAUNDRY','MAINTENANCE','MISSING'].includes(item.status)?{
      LAUNDRY:'Đang giặt',MAINTENANCE:'Bảo trì',MISSING:'Thất lạc'
