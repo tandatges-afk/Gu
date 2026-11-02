@@ -33,9 +33,13 @@ export async function GET(req:NextRequest){
     ORDER BY id LIMIT $1`,[MAX_ITEMS+1]),
    pgPool().query<{id:string;data:Omit<RentalOrder,'id'>}>(`SELECT id,data FROM gu_documents WHERE collection='orders'
     AND data->>'status' IN ('RESERVED','PICKED_UP')
-    AND (coalesce(data->>'returnDate','') >= $1 OR data->>'status'='PICKED_UP'
-      OR (data->>'status'='RESERVED' AND coalesce(data->>'pickupDate','')<$4))
-    AND coalesce(data->>'pickupDate','') <= $2
+    AND (
+      (coalesce(data->>'pickupDate','') <= $2 AND coalesce(data->>'returnDate','') >= $1)
+      OR ($1 <= $4 AND $4 <= $2 AND (
+        (data->>'status'='PICKED_UP' AND coalesce(data->>'returnDate','') < $4)
+        OR (data->>'status'='RESERVED' AND coalesce(data->>'pickupDate','') < $4)
+      ))
+    )
     ORDER BY id LIMIT $3`,[start,addDays(start,6),MAX_ORDERS+1,vietnamToday()]),
   ]);
   if(result[0].rows.length>MAX_ITEMS||result[1].rows.length>MAX_ORDERS)

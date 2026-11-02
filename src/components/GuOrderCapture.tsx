@@ -32,13 +32,14 @@ export function GuOrderCapture({orderId,api,onClose,onDone}:{orderId:string;api:
  const [sending,setSending]=useState<string|null>(null);
  const [busy,setBusy]=useState(false);
  const [error,setError]=useState('');
+ const [submitted,setSubmitted]=useState(false);
  const [depositDraftId]=useState(()=>crypto.randomUUID());
  const [depositProofId,setDepositProofId]=useState('');
  const [depositKind,setDepositKind]=useState<'CCCD'|'CASH'|'OTHER'>('CCCD');
  const [settling,setSettling]=useState(false);
  const [surcharge,setSurcharge]=useState('');
  const [surchargeReason,setSurchargeReason]=useState('');
- useEffect(()=>{let live=true;setOrder(null);setPictures({});setIssuePictures({});setConditions({});setNotes({});setError('');
+ useEffect(()=>{let live=true;setOrder(null);setPictures({});setIssuePictures({});setConditions({});setNotes({});setError('');setSubmitted(false);
   api<{order:RentalOrder;items:InventoryItem[]}>('v5/orders/'+orderId).then(result=>{if(live){setOrder(result.order);setItems(result.items);}}).catch(e=>{if(live)setError(e instanceof Error?e.message:'Không lấy được đơn.');});
   return()=>{live=false;};
  },[orderId,api]);
@@ -76,13 +77,19 @@ export function GuOrderCapture({orderId,api,onClose,onDone}:{orderId:string;api:
   }catch(e){setError(e instanceof Error?e.message:'Không thể tải ảnh.');}finally{setSending(null);}
  };
  const submit=async()=>{
-  if(!order||!phase||!canSend)return;setBusy(true);setError('');
+  if(!order||!phase||!canSend||submitted)return;setBusy(true);setError('');
+  let committed=false;
   try{
    const proofs=lines.map(l=>({itemId:l.itemId,shots:Object.fromEntries((order.photoTemplates?.[l.itemId]||[]).map(angle=>[angle,pictures[l.itemId+'|'+angle]||''])),condition:conditions[l.itemId]||'OK',note:notes[l.itemId]||'',issuePhotoUrl:(issuePictures[l.itemId]||[])[0]||'',issuePhotoUrls:issuePictures[l.itemId]||[]}));
    await api('v5/orders/'+orderId,{method:'PATCH',body:JSON.stringify({action:phase==='HANDOVER'?'HANDOVER':phase==='HANDOVER_EXTRA'?'HANDOVER_EXTRA':'RECEIVE',items:proofs,...((phase==='HANDOVER'||phase==='HANDOVER_EXTRA')&&depositProofId?{depositProofId,depositDraftId,depositKind,collateralAmount:cashAmount}:{})})});
-   const updated=await api<{order:RentalOrder}>('v5/orders/'+orderId);setOrder(updated.order);setPictures({});setIssuePictures({});
-   await onDone();if(phase==='RETURN'){setSettling(true);}else onClose();
-  }catch(e){setError(e instanceof Error?e.message:'Không hoàn thành kiểm nhận.');}finally{setBusy(false);}
+   // The transaction has committed. A following GET failure must never tell
+   // staff that the physical handover/return failed and encourage resubmission.
+   committed=true;setSubmitted(true);
+   const updated=await api<{order:RentalOrder}>('v5/orders/'+orderId);
+   setOrder(updated.order);setPictures({});setIssuePictures({});
+   void onDone().catch(err=>console.error('Đã lưu giao/nhận nhưng không làm mới được danh sách',err));
+   if(phase==='RETURN'){setSettling(true);setSubmitted(false);}else onClose();
+  }catch(e){setError(committed?'Máy chủ đã lưu giao/nhận thành công nhưng chưa tải lại được dữ liệu. Đóng và mở lại đơn để tiếp tục, KHÔNG gửi lần nữa.':e instanceof Error?e.message:'Không hoàn thành kiểm nhận.');}finally{setBusy(false);}
  };
  const closeCapture=()=>{
   if(!settling&&order?.status==='RESERVED'&&order.bookingKind==='WALK_IN'&&
@@ -127,7 +134,7 @@ export function GuOrderCapture({orderId,api,onClose,onDone}:{orderId:string;api:
    {phase==='HANDOVER'&&<section className="gu-v52-deposit-panel"><strong>{clothingPolicy||cameraOrder?'Chọn cọc / CCCD và chụp chứng từ trước khi giao':'Vật cọc khi giao (nếu có)'}</strong>{clothingPolicy&&<p>Cọc tiền theo từng món: trang phục 300.000đ, phụ kiện 200.000đ; hoặc giữ CCCD. Tổng cọc tiền: <b>{money(requiredSecurity)}</b>. Không cộng tiền cọc vào tiền thuê.</p>}<select className="input" value={depositKind} onChange={e=>{setDepositKind(e.target.value as 'CCCD'|'CASH'|'OTHER');setDepositProofId('');}}><option value="CCCD">CCCD / Giấy tờ</option><option value="CASH">Tiền cọc tài sản</option>{!clothingPolicy&&!cameraPolicy&&<option value="OTHER">Vật cọc khác</option>}</select>{clothingPolicy&&<p>{depositKind==='CASH'?`Xác nhận và chụp cọc ${money(requiredSecurity)}.`:'Chụp CCCD đã giữ; trả lại sau khi quyết toán.'}</p>}{cameraOrder&&<p>{cameraPolicy?`Cọc máy ảnh ${money(requiredSecurity)} hoặc CCCD. Cọc tiền tách khỏi doanh thu thuê. Thuê trực tiếp: hoàn cọc trừ tiền thuê và phí; đặt trước: hoàn cọc trừ phí phát sinh.`:'Đơn máy ảnh cũ: đối soát cọc thủ công, không tự đổi lịch sử.'}</p>}<GuSecureUpload purpose="deposit" draftId={depositDraftId} label="Chụp vật cọc / giấy tờ" onUploaded={setDepositProofId}/></section>}
    {phase==='HANDOVER_EXTRA'&&extraSecurity>0&&<section className="gu-v52-deposit-panel"><strong>Thu cọc bổ sung {money(extraSecurity)} cho món mới</strong><p>Cọc theo từng món. Chụp lại ảnh số tiền đã nhận, không dùng ảnh cọc ban đầu.</p><GuSecureUpload purpose="deposit" draftId={depositDraftId} label="Chụp cọc cho món bổ sung" onUploaded={setDepositProofId}/></section>}
    {phase==='RETURN'&&<details className="gu-v52-deposit-panel gu-optional-details"><summary>Kiểm tra chứng từ cọc / CCCD</summary>{(order.handoverDepositProofId||order.hadHandoverDeposit)?<><p>Đã nhận: {order.handoverDepositKind==='CCCD'?'CCCD / Giấy tờ':order.handoverDepositKind==='CASH'?(cameraOrder&&!cameraPolicy?'Tiền cọc · đơn cũ tự đối soát':money(order.handoverCashCollateralAmount||0)+' tiền cọc'):'Vật cọc khác'}. Kiểm tra và trao trả trực tiếp cho khách, không cần chụp lại.</p>{order.handoverDepositProofId?<GuSecurePhoto id={order.handoverDepositProofId} alt="Vật cọc khách khi giao"/>:<small>Ảnh đã được xóa sau khi Admin duyệt.</small>}</>:<p>Đơn này không lưu ảnh vật cọc.</p>}</details>}
-   <footer className="gu-capture-footer"><button type="button" className="btn btn-white" onClick={closeCapture}>Để sau · Chờ bàn giao</button><button type="button" className="btn btn-dark" disabled={!canSend} onClick={()=>void submit()}><CheckCircle2 size={18}/>{busy?'Đang lưu…':phase==='RETURN'?'Nhận đồ · mở thanh toán':'Xác nhận giao hàng'}</button></footer>
+   <footer className="gu-capture-footer"><button type="button" className="btn btn-white" onClick={closeCapture}>Để sau · Chờ bàn giao</button><button type="button" className="btn btn-dark" disabled={!canSend||submitted} onClick={()=>void submit()}><CheckCircle2 size={18}/>{busy?'Đang lưu…':phase==='RETURN'?'Nhận đồ · mở thanh toán':'Xác nhận giao hàng'}</button></footer>
   </>}
   {order&&settling&&<section className="gu-v52-settlement gu-settlement-v77" aria-label="Các bước quyết toán khi nhận trả">
    {(()=>{

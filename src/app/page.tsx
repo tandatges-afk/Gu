@@ -159,6 +159,7 @@ export default function Home() {
   const [calendarQuery,setCalendarQuery]=useState('');
   const [calendarReload,setCalendarReload]=useState(0);
   const [calendarOrderRows,setCalendarOrderRows]=useState<RentalOrder[]|null>(null);
+  const [calendarOrderScope,setCalendarOrderScope]=useState('');
   const [nearestLoading,setNearestLoading]=useState<string|null>(null);
   const [nearestResult,setNearestResult]=useState<{itemId:string;nextPickupDate:string|null;nextReturnDate:string|null;reason:string}|null>(null);
   const [taskView,setTaskView]=useState<'ALL'|'PICKUP_TODAY'|'RETURN_TODAY'|'OVERDUE'>('ALL');
@@ -307,7 +308,7 @@ export default function Home() {
   },[user,data?.me.role,page,api,minuteTick]);
   // Changing the calendar group resets to the globally sorted first page.
   useEffect(()=>{
-    setCalendarRemote([]);setCalendarOrderRows(null);setCalendarLoaded(false);
+    setCalendarRemote([]);setCalendarOrderRows(null);setCalendarOrderScope('');setCalendarLoaded(false);
     setCalendarPage(1);setCalendarTotalPages(1);setCalendarTotal(0);
     setCalendarCategory('ALL');setCalendarCreator('ALL');setNearestResult(null);
   },[page]);
@@ -315,7 +316,7 @@ export default function Home() {
   useEffect(()=>{
     if(!user||!['calendar','camera-calendar'].includes(page))return;
     const key=['cal-global',user.uid,page,calendarStart,calendarQuery.trim(),calendarCategory,calendarStatus,calendarCreator,calendarPage,catalogReload,calendarReload,
-      calendarStatus==='OVERDUE'||calendarStatus==='PICKUP_LATE'?minuteTick:''].join(':');
+      minuteTick].join(':');
     type CalPage={results:InventoryItem[];page:number;totalPages:number;total:number;hasMore:boolean};
     const previous=cached<CalPage>(key);
     const usePage=(r:CalPage)=>{
@@ -336,11 +337,13 @@ export default function Home() {
     if(!user||!['calendar','camera-calendar'].includes(page)||!calendarRemote.length)return;
     let cancelled=false;
     const ids=calendarRemote.map(i=>i.id).slice(0,30).join(',');
-    const key=['cal-orders',user.uid,page,calendarStart,ids,calendarReload].join(':');
+    const key=['cal-orders',user.uid,page,calendarStart,ids,calendarReload,minuteTick].join(':');
+    const scope=calendarStart+'|'+ids;
     const previous=cached<RentalOrder[]>(key);
-    if(previous){setCalendarOrderRows(previous.value);if(previous.fresh)return;}
+    if(previous){setCalendarOrderRows(previous.value);setCalendarOrderScope(scope);if(previous.fresh)return;}
+    else setCalendarOrderScope(''); // Never display stale orders while a new scoped request is loading.
     api<{orders:RentalOrder[]}>('calendar?start='+encodeURIComponent(calendarStart)+'&ids='+encodeURIComponent(ids))
-      .then(r=>{saveCache(key,r.orders);if(!cancelled)setCalendarOrderRows(r.orders);})
+      .then(r=>{saveCache(key,r.orders);if(!cancelled){setCalendarOrderRows(r.orders);setCalendarOrderScope(scope);}})
       .catch(e=>{if(!cancelled)setErr(e instanceof Error?e.message:'Không lấy được khóa lịch.');});
     return()=>{cancelled=true;};
   },[user,page,calendarStart,calendarRemote,calendarReload,api,minuteTick]);
@@ -444,7 +447,8 @@ export default function Home() {
   },[reportDaily,reportMode,today]);
   const chartMax=Math.max(1,...chartRows.map(r=>r.value));
   const calendarDays=Array.from({length:7},(_,i)=>addDays(calendarStart,i));
-  const calendarActive=calendarOrderRows??active;
+  const currentCalendarScope=calendarStart+'|'+(calendarLoaded?calendarRemote:[]).map(i=>i.id).slice(0,30).join(',');
+  const calendarActive=calendarOrderScope===currentCalendarScope?(calendarOrderRows??[]):[];
   const calendarOverdue=calendarActive.filter(isOverdue);
   // Unfinished orders are an operational queue, separate from dated calendar
   // occupancy. Build once per render so both desktop/mobile show the same alert.
@@ -496,10 +500,15 @@ export default function Home() {
       shown?.status==='RESERVED'&&shown.bookingKind==='WALK_IN'&&day===today?'Chờ bàn giao':visual.label;
     const cameraAlert=shown&&page==='camera-calendar'?cameraLateAlert(shown,Date.now()):null;
     const liveQuote=shown&&cameraAlert?cameraLiveQuote(shown,Date.now()):null;
-    const title=(shown?shown.customerName+' · '+shown.code+' · Hẹn: '+prettyDay(shown.pickupDate)+' → '+prettyDay(shown.returnDate)+' · Tạo bởi: '+creatorName(shown)+(cameraAlert?` · TRẢ TRỄ ${cameraAlert.lateMinutes} phút`:(late?' · TRẢ TRỄ':''))+(liveQuote?` · Tiền tạm tính ${money(liveQuote.total)} (đã gồm trễ ${money(liveQuote.lateFee)})`:'')+(pickupLate?' · KHÁCH QUÁ GIỜ NHẬN':'')+(nextDayRisk?' · 20H: CHƯA TRẢ, MAI CÓ ĐƠN':''):blocked?statusLabels[item.status]||'Chưa được định giá':isPast?'Ngày đã qua':day===today?'Giao đồ ngay':'Đặt trước')+(followupRisk?' · CHÚ Ý: ĐƠN TRƯỚC CHƯA HOÀN TẤT, CẦN KIỂM TRA TRƯỚC KHI GIAO':'');
+    const title=(shown?shown.customerName+' · '+shown.code+' · Hẹn: '+prettyDay(shown.pickupDate)+' → '+prettyDay(shown.returnDate)+' · Tạo bởi: '+creatorName(shown)+(cameraAlert?` · TRẢ TRỄ ${cameraAlert.lateMinutes} phút`:(late?' · TRẢ TRỄ':''))+(liveQuote?` · Tiền tạm tính ${money(liveQuote.total)} (đã gồm trễ ${money(liveQuote.lateFee)})`:'')+(pickupLate?' · KHÁCH QUÁ GIỜ NHẬN':'')+(nextDayRisk?' · 20H: CHƯA TRẢ, MAI CÓ ĐƠN':''):blocked?statusLabels[item.status]||'Chưa được định giá':isPast?'Ngày đã qua':day===today?'Giao đồ ngay':'Đặt trước')+(followupRisk?' · CHÚ Ý: ĐƠN TRƯỚC CHƯA HOÀN TẤT. Ô này cho phép ĐẶT TRƯỚC THEO NGÀY, KHÔNG PHẢI XÁC NHẬN HÀNG ĐANG SẴN SÀNG':'');
     const date=new Date(day+'T00:00:00Z');
     const week=['CN','T2','T3','T4','T5','T6','T7'][date.getUTCDay()];
-    return <button key={day} type="button" title={title} aria-label={`${prettyDay(day)}: ${displayStateLabel}. ${title}`} className={'calendar-cell '+calendarUi.slot+' '+calendarUi[visual.className]+' '+(mobile?'gu-calendar-mobile-cell ':'')+(followupRisk?'gu-calendar-followup-risk ':'')+(late?'gu-calendar-late ':pickupLate?'gu-calendar-pickup-late ':nextDayRisk?'gu-next-day-risk ':shown?(shown.status==='PICKED_UP'?'occupied-picked':'occupied-reserved'):blocked?'cell-blocked':'cell-free')} disabled={!shown&&(blocked||isPast)} onClick={()=>matching.length>1?setCalendarMatches(matching):shown?openDetail(shown):openBooking(day===today?'PICKUP':'RESERVE',item.id,day)}>
+    return <button key={day} type="button" title={title} aria-label={`${prettyDay(day)}: ${displayStateLabel}. ${title}`} className={'calendar-cell '+calendarUi.slot+' '+calendarUi[visual.className]+' '+(mobile?'gu-calendar-mobile-cell ':'')+(followupRisk?'gu-calendar-followup-risk ':'')+(late?'gu-calendar-late ':pickupLate?'gu-calendar-pickup-late ':nextDayRisk?'gu-next-day-risk ':shown?(shown.status==='PICKED_UP'?'occupied-picked':'occupied-reserved'):blocked?'cell-blocked':'cell-free')} disabled={!shown&&(blocked||isPast)} onClick={()=>{
+      if(matching.length>1){setCalendarMatches(matching);return;}
+      if(shown){openDetail(shown);return;}
+      if(followupRisk&&day>today&&!window.confirm('Sản phẩm có đơn cũ chưa tất toán hoặc chưa xác nhận trả. Bạn có thể tạo lịch tương lai nhưng PHẢI kiểm tra hàng thực tế trước khi bàn giao. Tiếp tục?'))return;
+      openBooking(day===today?'PICKUP':'RESERVE',item.id,day);
+    }}>
       {mobile&&<span className="gu-calendar-cell-date"><strong>{week}</strong><small>{day.slice(8,10)}/{day.slice(5,7)}</small></span>}
       {visual.className==='stateFree'?<span className={calendarUi.freeAction} aria-hidden="true">+</span>:<span className={'gu-calendar-cell-result '+calendarUi.stateLabel}>{displayStateLabel}</span>}
       {shown&&<span className={calendarUi.customer} title={shown.customerName}>{followupRisk&&shown.status==='RESERVED'?shown.customerName.split(' ').slice(-1)[0]:matching.length>1?matching.length+' lượt':shown.customerName.split(' ').slice(-1)[0]}</span>}

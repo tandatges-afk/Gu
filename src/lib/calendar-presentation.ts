@@ -72,20 +72,29 @@ export function calendarSlotState(
  // Prefer an actual upcoming RESERVED order over a previously overdue order
  // for the same item, even when that next booking is for TODAY. The unresolved
  // order remains available in the click chooser and as a visible risk marker.
- const nextReservation=liveClock&&day>=today&&(lateOrder||latePickupOrder)
-  ?matching.find(o=>o.status==='RESERVED'&&(lateOrder?o.id!==lateOrder.id:o.id!==latePickupOrder?.id))
+ // An already-overdue physical handover may coexist with the NEXT customer's
+ // reservation. Show the dated reservation, not the earlier customer's booking,
+ // but do not suppress the red operational warning for the overdue return.
+ // For non-live historical fixtures, retain original deterministic priority.
+ const nextReservation=liveClock&&day>=today&&Boolean(lateOrder||latePickupOrder)
+  ?matching.find(o=>o.status==='RESERVED'&&o.id!==latePickupOrder?.id)
   :undefined;
- const showingNextToday=day===today&&Boolean(nextReservation);
- // Today may contain an unresolved earlier rental. Show it as a current
- // OPERATIONAL alert only if no newer dated booking occupies today's cell.
- // Other days must show real dated reservations, never a projected old order.
- const late=wouldBeLate&&!showingNextToday&&(!liveClock||
-  matching.some(o=>o.id===lateOrder?.id)||(day===today&&matching.length===0));
- const shown=liveClock?(matching[0]||(day===today?(lateOrder||latePickupOrder):undefined)):
-  (nextReservation||(late&&lateOrder?lateOrder:matching[0]||
-  (lateOrder&&day>=lateOrder.pickupDate?lateOrder:undefined)));
- // Risk marker does not replace the dated booking, customer or pickup time.
- const followupRisk=liveClock&&day>=today&&Boolean(shown)&&Boolean(lateOrder||latePickupOrder)&&shown?.id!==lateOrder?.id&&shown?.id!==latePickupOrder?.id;
+ const shown=liveClock?(nextReservation||matching[0]||
+  (day===today?(lateOrder||latePickupOrder):undefined)):
+  (matching[0]||(wouldBeLate&&lateOrder?lateOrder:undefined));
+ // Return late is an alert for TODAY, never a forecast that every later day
+ // will be occupied. It remains visible even when today's cell shows the next
+ // reservation and the order chooser contains both customers.
+ const late=Boolean(lateOrder)&&day===today&&wouldBeLate;
+ // A future day can be reservable by its DATE even when today's physical item
+ // is still out. Show an explicit (!) warning rather than a false 'Chưa trả'
+ // reservation that blocks every date beyond the agreed return.
+ const heldBeforeDay=orders.some(o=>o.status==='PICKED_UP'&&isForItem(o)&&o.returnDate<day);
+ const physicallyOutWithoutBooking=item.status==='RENTED'&&matching.length===0;
+ const followupRisk=liveClock&&day>=today&&(
+  Boolean((lateOrder||latePickupOrder)&&shown?.id!==lateOrder?.id&&shown?.id!==latePickupOrder?.id)||
+  (day>today&&(heldBeforeDay||physicallyOutWithoutBooking))
+ );
  let matchingForClick=late&&lateOrder&&!matching.some(o=>o.id===lateOrder.id)?[lateOrder,...matching]:matching;
  if(liveClock&&day===today){
   // Keep both the due booking and unresolved previous booking accessible.
@@ -104,7 +113,10 @@ export function calendarSlotState(
   (isPast||overduePickupNotice(shown,instant)!==null)&&
   (day===today||matching.some(o=>o.id===shown.id));
  const warning=riskItemIds.has(item.id)&&day===today&&Boolean(shown)&&!late&&!pickupLate;
- const physicallyOut=liveClock&&day>=today&&item.status==='RENTED'&&!shown;
+ // Physical possession blocks immediate handover TODAY. For future dates
+ // the contract's interval locks are authoritative; warn but let staff inspect
+ // / create a future reservation subject to the server's conflict check.
+ const physicallyOut=liveClock&&day===today&&item.status==='RENTED'&&!shown;
  const blocked=!shown&&(physicallyOut||['LAUNDRY','MAINTENANCE','MISSING'].includes(item.status)||!(item.replacementValue>0));
  const visual=calendarVisualState({late,pickupLate,warning,orderStatus:shown?.status,blocked,isPast,
    blockedLabel:physicallyOut?'Chưa trả':blocked&&['LAUNDRY','MAINTENANCE','MISSING'].includes(item.status)?{

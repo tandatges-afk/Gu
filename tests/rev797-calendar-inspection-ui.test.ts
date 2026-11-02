@@ -110,3 +110,23 @@ test('pickup warnings share purple for historical / live / booked future days wi
  assert.match(css,/\.gu-calendar-pickup-late-legend\{[^\n]*background:#f0eafa/);
  assert.match(calendar,/pickupLate\?\(isPast\?'Chưa nhận':'Quá giờ nhận'\)/);
 });
+
+test('6092285 audit: calendar APIs and UI use bounded historical alerts and fresh matching scopes',()=>{
+ const pageRoute=load('src/app/api/calendar/page/route.ts');
+ const detailRoute=load('src/app/api/calendar/route.ts');
+ const smart=load('src/lib/smart-calendar.ts');
+ assert.match(pageRoute,/\$1 <= \$4 AND \$4 <= \$2/,'old operational alerts only belong to current-week query');
+ assert.match(detailRoute,/jsonb_array_elements/,'unresolved old orders must be individually retrievable');
+ assert.match(detailRoute,/start<=today&&today<=dates\[6\]/);
+ assert.match(smart,/calendarSlotState\(item,today,relevant,today/,'filter must reuse today slot urgency');
+ assert.match(calendar,/setCalendarOrderScope\(scope\)/,'stale request cannot present unrelated page order list');
+ assert.match(calendar,/calendarOrderScope===currentCalendarScope/);
+ assert.match(calendar,/calendarReload,minuteTick/);
+ assert.match(calendar,/followupRisk&&day>today&&!window\.confirm/,'future risky booking needs explicit warning');
+});
+
+test('6092285 audit: successful physical handover is never reported as failed by a later refresh',()=>{
+ assert.match(capture,/committed=true;setSubmitted\(true\)/);
+ assert.match(capture,/KHÔNG gửi lần nữa/);
+ assert.match(capture,/void onDone\(\)\.catch/);
+});

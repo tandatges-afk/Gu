@@ -23,3 +23,21 @@ test('không tra ngày quá khứ hoặc đơn vượt 30 ngày',()=>{
   assert.throws(()=>validateSmartRange('2026-10-14','2026-10-14','2026-10-15'));
   assert.throws(()=>validateSmartRange('2026-10-15','2026-11-18','2026-10-15'));
 });
+
+test('future-only filters do not classify October overdue pickup as December booking',()=>{
+ const old={...base,status:'RESERVED' as const,pickupDate:'2026-10-30',returnDate:'2026-10-31',pickupAt:'2026-10-30T09:04:00Z'};
+ const now=Date.parse('2026-11-02T03:30:00Z');
+ assert.equal(calendarItemState(item,[old],'2026-12-01',7,'2026-11-02',now),'FREE');
+ assert.equal(calendarItemState(item,[old],'2026-11-02',7,'2026-11-02',now),'PICKUP_LATE');
+});
+
+test('global future-week pagination does not include old overdue orders under status filters',async()=>{
+ const {globalCalendarPage}=await import('../src/lib/calendar-global-page.ts');
+ const i={...item,id:'ABCDEFGHIJKL',name:'Váy xanh',category:'Áo dài',sku:'GU-00001',color:'',dailyRate:50000,
+   createdAt:'2026-10-30',size:'',bufferDays:0} as InventoryItem;
+ const old={...base,id:'past',status:'RESERVED' as const,pickupDate:'2026-10-30',returnDate:'2026-10-31',
+   pickupAt:'2026-10-30T09:00:00Z'};
+ const page=globalCalendarPage({items:[i],orders:[old],start:'2026-12-01',today:'2026-11-02',
+   group:'CLOTHING',page:1,status:'PICKUP_LATE'});
+ assert.equal(page.total,0,'December should not list October missed pickups as December bookings');
+});

@@ -17,6 +17,8 @@ test('mobile day buttons remain square and at least 44px across', () => {
 });
 
 test('compact calendar preserves order detail and quick create interaction', () => {
-  assert.match(page, /onClick=\{\(\)=>matching\.length>1\?setCalendarMatches\(matching\):shown\?openDetail\(shown\):openBooking\(/);
+  assert.match(page, /if\(matching\.length>1\)\{setCalendarMatches\(matching\);return;\}/);
+  assert.match(page, /if\(shown\)\{openDetail\(shown\);return;\}/);
+  assert.match(page, /openBooking\(day===today\?'PICKUP':'RESERVE',item\.id,day\)/);
   assert.match(page, /title=\{title\} aria-label=/);
 });

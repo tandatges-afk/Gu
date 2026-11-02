@@ -1,7 +1,8 @@
 import {NextRequest,NextResponse} from 'next/server';
 import {db} from '@/lib/firebase-admin';
+import {pgPool} from '@/lib/pg-firestore';
 import {staffUser,handleError,ApiError} from '@/lib/http';
-import {addDays,slotId} from '@/lib/rental';
+import {addDays,slotId,vietnamToday} from '@/lib/rental';
 import type {RentalOrder} from '@/lib/types';
 export const runtime='nodejs';
 
@@ -25,6 +26,25 @@ export async function GET(req:NextRequest){
   // Include overdue pickups even after scheduled slots; only for visible products.
   const items=await db().getAll(...itemIds.map(id=>db().collection('items').doc(id)));
   for(const item of items)if(item.data()?.status==='RENTED'&&item.data()?.currentOrderId)ordersIds.push(String(item.data()?.currentOrderId));
+  const today=vietnamToday();
+  if(start<=today&&today<=dates[6]){
+   // Date-interval locks expire after the booking. Unresolved reservations
+   // still need to open from the operational alert on TODAY. Keep this query
+   // scoped to the visible item IDs and do not pollute future-only weeks.
+   const unresolved=await pgPool().query<{id:string}>(`SELECT id FROM gu_documents
+    WHERE collection='orders' AND data->>'status' IN ('RESERVED','PICKED_UP')
+      AND ((data->>'status'='RESERVED' AND coalesce(data->>'pickupDate','') < $1)
+        OR (data->>'status'='PICKED_UP' AND coalesce(data->>'returnDate','') < $1))
+      AND EXISTS (
+        SELECT 1 FROM jsonb_array_elements(CASE
+          WHEN jsonb_typeof(data->'lines')='array' THEN data->'lines'
+          ELSE '[]'::jsonb END) AS line
+        WHERE line->>'itemId'=ANY($2::text[])
+      )
+    ORDER BY id LIMIT 201`,[today,itemIds]);
+   if(unresolved.rows.length>200)throw new ApiError(503,'Quá nhiều đơn tồn đọng cần đối soát.');
+   ordersIds.push(...unresolved.rows.map(row=>row.id));
+  }
   const unique=[...new Set(ordersIds)].filter(id=>/^[a-zA-Z0-9]{10,64}$/.test(id));
   if(unique.length>200)throw new ApiError(503,'Quá nhiều đơn trong trang lịch, hãy thu hẹp số sản phẩm.');
   const orders:RentalOrder[]=[];

@@ -48,3 +48,44 @@ test('No labels Hôm nay/Mai/Mốt inside the date headers; available cells only
  assert.match(css,/\.grid :global\(\.calendar-row\)>\.dayTrack/);
  assert.doesNotMatch(css,/\.toneToday\{[^\n]*box-shadow:/);
 });
+
+// Audit 6092285: operational alerts must not occupy all future dates.
+test('future booking cell is consistent with FREE status while an earlier customer is still out', async()=>{
+ const {calendarItemState}=await import('../src/lib/smart-calendar.ts');
+ const itemOut=item('future-out','RENTED');
+ const old={...order(itemOut.id,'PICKED_UP','2026-11-02','2026-11-03'),
+   id:'old-held',returnAt:'2026-11-03T03:25:00Z'};
+ const now=Date.parse('2026-11-02T03:30:00Z');
+ const future=calendarSlotState(itemOut,'2026-11-06',[old],'2026-11-02',new Set(),now);
+ assert.equal(future.blocked,false,'future date outside the contract must not be disabled by physical status alone');
+ assert.equal(future.visual.className,'stateFree');
+ assert.equal(future.followupRisk,true,'physical handover is still unresolved: show risk marker');
+ assert.equal(calendarItemState(itemOut,[old],'2026-11-06',7,'2026-11-02',now),'FREE');
+});
+
+test('today next reservation stays visible beside an overdue previous handover',()=>{
+ const i=item('shared-next','RENTED');
+ const now=Date.parse('2026-11-02T03:30:00Z'); // 10:30 Vietnam
+ const old={...order(i.id,'PICKED_UP','2026-11-01','2026-11-02'),
+   id:'old-held',customerName:'Khách cũ',returnAt:'2026-11-02T01:00:00Z'};
+ const next={...order(i.id,'RESERVED','2026-11-02','2026-11-03'),
+   id:'new-booking',customerName:'Khách mới',scheduledPickupAt:'2026-11-02T04:00:00Z'};
+ const slot=calendarSlotState(i,'2026-11-02',[old,next],'2026-11-02',new Set(),now);
+ assert.equal(slot.shown?.id,'new-booking','next customer cannot disappear behind older handover');
+ assert.equal(slot.late,true,'red alert must not disappear when a new reservation exists');
+ assert.equal(slot.followupRisk,true,'staff must see the stock conflict');
+ assert.equal(slot.visual.className,'stateOverdue');
+ assert.deepEqual(new Set(slot.matching.map(o=>o.id)),new Set(['old-held','new-booking']));
+});
+
+test('historical overdue order does not impersonate future December bookings',async()=>{
+ const {calendarItemState}=await import('../src/lib/smart-calendar.ts');
+ const old={...order('old-only','PICKED_UP','2026-10-30','2026-10-31'),id:'old-oct',returnAt:'2026-10-31T09:01:00Z'};
+ const i=item('old-only','RENTED');
+ const now=Date.parse('2026-11-02T03:30:00Z');
+ assert.equal(calendarItemState(i,[old],'2026-12-01',7,'2026-11-02',now),'FREE');
+ const slot=calendarSlotState(i,'2026-12-01',[old],'2026-11-02',new Set(),now);
+ assert.equal(slot.shown,undefined);
+ assert.equal(slot.visual.className,'stateFree');
+ assert.equal(slot.followupRisk,true,'warn about unresolved possession, never invent a December rental');
+});
