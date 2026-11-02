@@ -1466,3 +1466,47 @@ button.calendar-cell.gu-calendar-followup-risk.occupied-reserved{
 .gu-mobile-calendar-product-info .gu-calendar-pending-action{
  display:inline-flex;max-width:100%;min-height:32px;white-space:normal;overflow-wrap:anywhere
 }
+
+/* GU ISSUE PHOTO REMOVE UX v1 — compact circle with 44px hit area
+   The hit target is transparent; only the 26px icon badge is visible.
+   Explicit scoped overrides protect against generic button styles. */
+.gu-capture-dialog .gu-capture-issue-thumb{position:relative;isolation:isolate}
+.gu-capture-dialog .gu-capture-issue-thumb > button.gu-capture-issue-remove{
+  -webkit-appearance:none!important;appearance:none!important;
+  position:absolute!important;z-index:2!important;top:0!important;right:0!important;
+  display:grid!important;place-items:center!important;
+  box-sizing:border-box!important;width:44px!important;height:44px!important;
+  min-width:44px!important;max-width:44px!important;
+  min-height:44px!important;max-height:44px!important;
+  margin:0!important;padding:0!important;border:0!important;
+  border-radius:0!important;background:transparent!important;
+  box-shadow:none!important;outline:0;cursor:pointer;
+  color:#fff!important;line-height:1!important;
+  -webkit-tap-highlight-color:transparent;
+}
+.gu-capture-dialog .gu-capture-issue-thumb .gu-capture-issue-remove-glyph{
+  display:grid!important;place-items:center!important;flex:none!important;
+  box-sizing:border-box!important;width:26px!important;height:26px!important;
+  min-width:26px!important;min-height:26px!important;
+  border:1px solid rgba(255,255,255,.9)!important;
+  border-radius:50%!important;background:rgba(36,47,61,.88)!important;
+  color:#fff!important;box-shadow:0 2px 8px rgba(0,0,0,.23)!important;
+  transition:background-color .15s ease,transform .15s ease;
+}
+.gu-capture-dialog .gu-capture-issue-remove-glyph > svg{
+  width:15px!important;height:15px!important;display:block!important;
+  stroke:#fff!important;stroke-width:2.6px!important;
+  fill:none!important;pointer-events:none;
+}
+@media(hover:hover){
+  .gu-capture-dialog .gu-capture-issue-remove:not(:disabled):hover .gu-capture-issue-remove-glyph{
+    background:#ad2746!important;transform:scale(1.06);
+  }
+}
+.gu-capture-dialog .gu-capture-issue-remove:focus-visible{
+  outline:2px solid #1c7eaf!important;outline-offset:-2px!important;border-radius:8px!important;
+}
+.gu-capture-dialog .gu-capture-issue-remove:disabled{cursor:wait!important;opacity:.5!important}
+@media(prefers-reduced-motion:reduce){
+  .gu-capture-dialog .gu-capture-issue-remove-glyph{transition:none!important}
+}

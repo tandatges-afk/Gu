@@ -117,7 +117,7 @@ export function GuOrderCapture({orderId,api,onClose,onDone}:{orderId:string;api:
         {(issuePictures[line.itemId]||[]).length>0&&<div className="gu-capture-issue-thumbs" aria-label={'Các ảnh vấn đề của '+line.name}>
          {(issuePictures[line.itemId]||[]).map((url,index)=><div className="gu-capture-issue-thumb" key={url}>
           <img src={url} alt={'Ảnh vấn đề '+(index+1)+' của '+line.name}/>
-          <button type="button" className="gu-capture-issue-remove" aria-label={'Xóa ảnh vấn đề '+(index+1)+' của '+line.name} title="Xóa ảnh chụp sai" disabled={Boolean(sending)||busy} onClick={()=>setIssuePictures(old=>({...old,[line.itemId]:(old[line.itemId]||[]).filter((_,i)=>i!==index)}))}><X size={15}/></button>
+          <button type="button" className="gu-capture-issue-remove" aria-label={'Xóa ảnh vấn đề '+(index+1)+' của '+line.name} title="Xóa ảnh chụp sai" disabled={Boolean(sending)||busy} onClick={()=>setIssuePictures(old=>({...old,[line.itemId]:(old[line.itemId]||[]).filter((_,i)=>i!==index)}))}><span className="gu-capture-issue-remove-glyph" aria-hidden="true"><X size={15} strokeWidth={2.6}/></span></button>
          </div>)}
         </div>}
         {(issuePictures[line.itemId]||[]).length<8&&<label className={'gu-capture-issue-upload'+((issuePictures[line.itemId]||[]).length?' has-photo':'')+(sending===line.itemId+'|issue'||busy?' is-busy':'')}>
