@@ -14,6 +14,16 @@ export function billableBlocks(start:string,end:string):number {
   if(blocks>30)throw new Error('Mỗi lượt thuê tối đa 30 chu kỳ 24 giờ.');
   return Math.max(1,blocks);
 }
+/** 10-minute tolerance exists ONLY for the first 24-hour boundary of clothing/accessories.
+ * No grace is added to subsequent 48h, 72h, ... boundaries. Booking duration and
+ * overlap locks intentionally still use billableBlocks() WITHOUT a tolerance.
+ */
+export function actualReturnBlocks(start:string,end:string):number {
+ const a=Date.parse(start),b=Date.parse(end);
+ if(!Number.isFinite(a)||!Number.isFinite(b)||b<=a)throw new Error('Giờ trả phải sau giờ bắt đầu thuê.');
+ if(b-a<=DAY_MS+10*60_000)return 1;
+ return billableBlocks(start,end);
+}
 export function rentalKind(category:string):RentalKind {return /phụ\s*kiện|phu\s*kien|accessor/i.test(category)?'ACCESSORY':'CLOTHING';}
 export function rentForBlocks(kind:RentalKind,blocks:number):number {
   if(!Number.isInteger(blocks)||blocks<1||blocks>30)throw new Error('Số chu kỳ phải từ 1 đến 30.');

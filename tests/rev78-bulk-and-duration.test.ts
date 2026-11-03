@@ -23,10 +23,10 @@ test('Rev7.8: 100 inventory rows per save with duplicate detection unchanged',()
  const bulk=source('src/app/api/items/bulk/route.ts');
  assert.match(bulk,/runTransaction/);assert.match(bulk,/MAX_BULK_ITEMS/);assert.match(bulk,/jsonBody\(req,256_000\)/);
 });
-test('Rev7.8: clothes 1 day = exactly 24h after handover, even if early or late and crossing midnight',()=>{
+test('GU new policy: later pickup cannot extend a 24h contracted booking; early pickup starts early',()=>{
  const sample=order('CLOTHING',0,1);
  assert.equal(expectedReturnAfterHandover(sample,start),add(start,24));
- assert.equal(expectedReturnAfterHandover(sample,add(planned,2)),add(planned,26));
+ assert.equal(expectedReturnAfterHandover(sample,add(planned,2)),add(planned,24));
 });
 test('Rev7.8: clothes multiple days respect exact 24-hour cycles',()=>{
  for(const days of [1,2,5,30]){
@@ -45,7 +45,7 @@ test('Rev7.8: each camera package expires at handover + selected hours, overtime
 test('Rev7.8: concurrency-safe rebasing keeps original appointment and updates job/return date atomically',()=>{
  const api=source('src/app/api/v5/orders/[id]/route.ts');
  const locks=source('src/lib/v5-server.ts');
- for(const token of ['rebaseHandoverIntervals(tx,order,now,actualReturnAt)','writeRebasedSlots()','scheduledPickupAt:order.scheduledPickupAt||order.pickupAt','returnAt:actualReturnAt','returnDate:vnDayKey(actualReturnAt)'])assert.ok(api.includes(token),token);
+ for(const token of ['rebaseHandoverIntervals(tx,order,billingStart,actualReturnAt)','writeRebasedSlots()','scheduledPickupAt:order.scheduledPickupAt||order.pickupAt','returnAt:actualReturnAt','returnDate:vnDayKey(actualReturnAt)'])assert.ok(api.includes(token),token);
  for(const token of ['tx.get(slot.ref)','legacy[i].exists','overlap(other.start,other.end','tx.delete(slot.ref)'])assert.ok(locks.includes(token),token);
 });
 test('Rev7.8: compact list supports search/filter/collapse and has higher density',()=>{

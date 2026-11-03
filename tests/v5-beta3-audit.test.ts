@@ -45,7 +45,7 @@ test('staff can capture proofs within full order detail, Admin-only approval rem
  assert.match(capture,/phase==='RETURN'/);
 });
 test('handover atomically rebases reserved intervals while preserving scheduledPickupAt',()=>{
- assert.match(route,/rebaseHandoverIntervals\(tx,order,now,actualReturnAt\)/);
+ assert.match(route,/rebaseHandoverIntervals\(tx,order,billingStart,actualReturnAt\)/);
  assert.match(route,/writeRebasedSlots\(\)/);
  assert.match(route,/scheduledPickupAt:order\.scheduledPickupAt\|\|order\.pickupAt/);
  assert.match(route,/handoverProof:\{status:'SUBMITTED',by:me\.uid,byName:me\.name,at:now/);

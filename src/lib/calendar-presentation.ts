@@ -10,10 +10,12 @@ export function calendarDayTone(day:string,today:string):CalendarDayTone{
 }
 
 export type CalendarVisualClass='stateWarning'|'stateOverdue'|'statePicked'|'stateReserved'|'stateBlocked'|'statePast'|'stateFree';
-export function calendarVisualState(input:{late:boolean;pickupLate?:boolean;warning:boolean;orderStatus?:string;blocked:boolean;isPast:boolean;blockedLabel?:string}):{className:CalendarVisualClass;label:string}{
+export function calendarVisualState(input:{late:boolean;pickupLate?:boolean;warning:boolean;orderStatus?:string;blocked:boolean;isPast:boolean;noShow?:boolean;blockedLabel?:string}):{className:CalendarVisualClass;label:string}{
+ if(input.noShow)return {className:'stateBlocked',label:'Không đến lấy · Đã hủy'};
  if(input.late)return {className:'stateOverdue',label:'Trả trễ'};
  if(input.pickupLate)return {className:'stateWarning',label:'Quá giờ nhận'};
  if(input.warning)return {className:'stateWarning',label:'Cảnh báo'};
+ if(input.orderStatus==='CANCELLED')return {className:'stateBlocked',label:'Không đến lấy · Đã hủy'};
  if(input.orderStatus==='PICKED_UP')return {className:'statePicked',label:'Đã lấy'};
  if(input.orderStatus==='RESERVED')return {className:'stateReserved',label:'Đã giữ'};
  if(input.blocked)return {className:'stateBlocked',label:input.blockedLabel||'Không sẵn sàng'};
@@ -24,6 +26,7 @@ export function calendarVisualState(input:{late:boolean;pickupLate?:boolean;warn
 import type {InventoryItem,RentalOrder} from './types.ts';
 import {cameraLateAlert} from './camera-live-status.ts';
 import {overduePickupNotice,overdueReturnNotice,vnClock} from './return-risk.ts';
+import {noShowExpired} from './gu-v52-workflow.ts';
 
 /**
  * One source of truth for the desktop and mobile calendar cells AND for sorting.
@@ -46,6 +49,7 @@ export function calendarSlotState(
   day>=(o.lines.find(l=>l.itemId===item.id)?.startDate||o.pickupDate)
  ).sort((a,b)=>(a.status==='PICKED_UP'?0:1)-(b.status==='PICKED_UP'?0:1)||
   String(a.pickupAt||'').localeCompare(String(b.pickupAt||''))||a.id.localeCompare(b.id));
+ const noShow=orders.find(o=>o.status==='CANCELLED'&&o.cancelReason==='NO_SHOW'&&isForItem(o)&&day>=o.pickupDate&&day<=o.returnDate);
  const instant=new Date(nowMs);
  // The caller may render a historical or simulated calendar. Do not apply
  // real-time pickup/return deadlines to a different "today" reference.
@@ -80,8 +84,8 @@ export function calendarSlotState(
   ?matching.find(o=>o.status==='RESERVED'&&o.id!==latePickupOrder?.id)
   :undefined;
  const shown=liveClock?(nextReservation||matching[0]||
-  (day===today?(lateOrder||latePickupOrder):undefined)):
-  (matching[0]||(wouldBeLate&&lateOrder?lateOrder:undefined));
+  (day===today?(lateOrder||latePickupOrder):undefined)||noShow):
+  (matching[0]||(wouldBeLate&&lateOrder?lateOrder:noShow));
  // Return late is an alert for TODAY, never a forecast that every later day
  // will be occupied. It remains visible even when today's cell shows the next
  // reservation and the order chooser contains both customers.
@@ -96,6 +100,7 @@ export function calendarSlotState(
   (day>today&&(heldBeforeDay||physicallyOutWithoutBooking))
  );
  let matchingForClick=late&&lateOrder&&!matching.some(o=>o.id===lateOrder.id)?[lateOrder,...matching]:matching;
+ if(noShow&&!matchingForClick.length)matchingForClick=[noShow];
  if(liveClock&&day===today){
   // Keep both the due booking and unresolved previous booking accessible.
   for(const overdue of [lateOrder,latePickupOrder]){
@@ -118,7 +123,8 @@ export function calendarSlotState(
  // / create a future reservation subject to the server's conflict check.
  const physicallyOut=liveClock&&day===today&&item.status==='RENTED'&&!shown;
  const blocked=!shown&&(physicallyOut||['LAUNDRY','MAINTENANCE','MISSING'].includes(item.status)||!(item.replacementValue>0));
- const visual=calendarVisualState({late,pickupLate,warning,orderStatus:shown?.status,blocked,isPast,
+ const expiredUncollected=liveClock&&Boolean(shown)&&noShowExpired(shown!,nowMs);
+ const visual=calendarVisualState({late:late&&!expiredUncollected,pickupLate:pickupLate&&!expiredUncollected,warning,noShow:expiredUncollected,orderStatus:shown?.status,blocked,isPast,
    blockedLabel:physicallyOut?'Chưa trả':blocked&&['LAUNDRY','MAINTENANCE','MISSING'].includes(item.status)?{
      LAUNDRY:'Đang giặt',MAINTENANCE:'Bảo trì',MISSING:'Thất lạc'
    }[item.status as 'LAUNDRY'|'MAINTENANCE'|'MISSING']:'Chưa duyệt giá'});

@@ -15,6 +15,7 @@ export function expectedReturnAfterHandover(
  const bookedEnd=Date.parse(order.returnAt||'');
  if(!Number.isFinite(start)||!Number.isFinite(bookedStart)||!Number.isFinite(bookedEnd)||bookedEnd<=bookedStart)
   throw new Error('Giờ thuê đã đặt không hợp lệ, cần kiểm tra lịch với Admin.');
+ const billingStart=Math.min(start,bookedStart);
  const camera=order.rentalGroup==='CAMERA'||order.lines.some(line=>isCameraCategory(line.category||''));
  let duration:number;
  if(camera){
@@ -26,5 +27,5 @@ export function expectedReturnAfterHandover(
   if(days<1||days>30)throw new Error('Số ngày thuê đã chốt không hợp lệ.');
   duration=days*DAY_MS;
  }
- return new Date(start+duration).toISOString();
+ return new Date(billingStart+duration).toISOString();
 }

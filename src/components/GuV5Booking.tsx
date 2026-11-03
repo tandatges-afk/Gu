@@ -110,6 +110,10 @@ export function GuV5Booking({items,customers,api,initial,onClose,onSuccess,onCus
    onCreated?.(r.id);
  }catch(e){setError(e instanceof Error?e.message:'Tạo đơn thất bại.');}finally{setBusy(false);}};
  return <form className={`modal-body ${ui.bookingForm}`} noValidate onSubmit={e=>void submit(e)}>
+  <div className={ui.flowGuide} role="note" aria-label="Các bước tạo đơn">
+   <strong>{needsPrepay?'Đặt trước · Giữ lịch':'Giao ngay · Chờ bàn giao'}</strong>
+   <span>{needsPrepay?'1. Khách & sản phẩm  →  2. Thời gian & thanh toán  →  3. Xác nhận giữ lịch  →  4. Bàn giao khi khách đến':'1. Khách & sản phẩm  →  2. Thời gian & cọc  →  3. Chụp ảnh & xác nhận giao'}</span>
+  </div>
   {error&&<div className="inline-alert danger-alert">{error}</div>}
   <section className={ui.section} aria-labelledby="gu-booking-customer-title">
    <div className={ui.sectionHeading}>
@@ -145,7 +149,7 @@ export function GuV5Booking({items,customers,api,initial,onClose,onSuccess,onCus
      {returnIssue&&<p className="gu-vn-date-error" role="alert">{returnIssue}</p>}</div>
    </div>
    {rentalGroup==='CLOTHING'&&<label className={ui.field}><span>Thời lượng (mỗi ngày là 24 giờ liên tục)</span><select className="input" value={rentalDaysSelected} onChange={e=>{setRentalDaysSelected(Number(e.target.value));setReturnOverride('');}}>{Array.from({length:30},(_,i)=><option value={i+1} key={i+1}>{i+1} ngày ({(i+1)*24} giờ)</option>)}</select></label>}
-   <p className={ui.empty}>Hạn trả mặc định tính theo gói thuê. Có thể cuộn để chỉnh giờ trả: trang phục tự tính lại số ngày; máy ảnh không được vượt gói đã chọn. Nhấn “Đặt lại theo gói thuê” để khôi phục. Khi giao thực tế, hệ thống tính lại mốc trả theo gói và kiểm tra trùng lịch.</p>
+   <p className={ui.empty}>Hạn trả mặc định tính theo gói thuê. Có thể cuộn để chỉnh giờ trả: trang phục tự tính lại số ngày; máy ảnh không được vượt gói đã chọn. Nhấn “Đặt lại theo gói thuê” để khôi phục. Khách đến muộn vẫn tính giờ thuê từ giờ hẹn; khách đến sớm tính từ giờ bàn giao thực tế. Hạn trả điều chỉnh theo quy tắc này và luôn kiểm tra trùng lịch.</p>
   </section>
   <section className={ui.section} aria-labelledby="gu-booking-product-title">
    <div className={ui.sectionHeading}><h3 id="gu-booking-product-title">Sản phẩm thuê</h3><span className={ui.count}>{selected.length} đã chọn</span></div>

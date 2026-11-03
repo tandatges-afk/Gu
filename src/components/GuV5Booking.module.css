@@ -94,3 +94,9 @@
 .resetReturn{border:0;background:transparent;color:#245f87;font-size:11px;font-weight:750;text-align:left;justify-self:start;padding:3px 0;cursor:pointer}
 .resetReturn:hover{text-decoration:underline}
 @media(max-width:680px){.field :global(.gu-vn-datetime){min-height:42px;height:auto}.field :global(.gu-vn-datetime) > :global(.gu-vn-clock){min-width:70px;flex-basis:70px}}
+
+/* Clear operational context above the booking form; no extra modal transitions. */
+.flowGuide{display:grid;gap:6px;padding:12px 15px;border-radius:13px;border:1px solid #b9d2dc;background:linear-gradient(120deg,#eff7f8,#fafcfd)}
+.flowGuide strong{font-size:13px;color:#174d5b;letter-spacing:.1px}
+.flowGuide span{font-size:11.5px;line-height:1.65;color:#3d6371;font-weight:600}
+@media(max-width:680px){.flowGuide{padding:11px 12px}.flowGuide span{font-size:11px}}

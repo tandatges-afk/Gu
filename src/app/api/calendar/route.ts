@@ -45,6 +45,18 @@ export async function GET(req:NextRequest){
    if(unresolved.rows.length>200)throw new ApiError(503,'Quá nhiều đơn tồn đọng cần đối soát.');
    ordersIds.push(...unresolved.rows.map(row=>row.id));
   }
+  // Cancelled no-shows have no active interval locks. Fetch only historically
+  // relevant no-show orders, so their booked dates remain grey and read-only.
+  const missed=await pgPool().query<{id:string}>(`SELECT id FROM gu_documents
+   WHERE collection='orders' AND data->>'status'='CANCELLED'
+    AND data->>'cancelReason'='NO_SHOW'
+    AND data->>'pickupDate' <= $1 AND data->>'returnDate' >= $2
+    AND EXISTS(SELECT 1 FROM jsonb_array_elements(CASE
+      WHEN jsonb_typeof(data->'lines')='array' THEN data->'lines'
+      ELSE '[]'::jsonb END) line WHERE line->>'itemId'=ANY($3::text[]))
+   ORDER BY id LIMIT 201`,[dates[6],start,itemIds]);
+  if(missed.rows.length>200)throw new ApiError(503,'Quá nhiều đơn không đến lấy cần kiểm tra.');
+  ordersIds.push(...missed.rows.map(row=>row.id));
   const unique=[...new Set(ordersIds)].filter(id=>/^[a-zA-Z0-9]{10,64}$/.test(id));
   if(unique.length>200)throw new ApiError(503,'Quá nhiều đơn trong trang lịch, hãy thu hẹp số sản phẩm.');
   const orders:RentalOrder[]=[];
@@ -52,7 +64,7 @@ export async function GET(req:NextRequest){
    const snaps=await db().getAll(...unique.slice(i,i+100).map(id=>db().collection('orders').doc(id)));
    orders.push(...snaps.filter(d=>d.exists).map(d=>({id:d.id,...d.data()} as RentalOrder)));
   }
-  return NextResponse.json({orders:orders.filter(o=>me.role==='admin'||o.status!=='RETURNED'&&o.status!=='CANCELLED'&&o.status!=='VOIDED'),start},
+  return NextResponse.json({orders:orders.filter(o=>me.role==='admin'||o.status!=='RETURNED'&&(o.status!=='CANCELLED'||o.cancelReason==='NO_SHOW')&&o.status!=='VOIDED'),start},
    {headers:{'Cache-Control':'private, no-store'}});
  }catch(e){return handleError(e,'GET /api/calendar');}
 }

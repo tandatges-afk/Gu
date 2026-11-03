@@ -17,8 +17,9 @@ import {FieldValue,type Transaction} from '@/lib/pg-firestore';
 import {addCompletedRound,type InspectionRound} from '@/lib/evidence-retention-rules';
 import {runEvidenceCleanup} from '@/lib/evidence-retention';
 import {queueSensitiveEvidenceCleanup,runSensitiveEvidenceCleanup} from '@/lib/sensitive-evidence-cleanup';
-import {finalRent,handoverBillingStart} from '@/lib/gu-v52-workflow';
+import {finalRent,handoverBillingStart,noShowExpired} from '@/lib/gu-v52-workflow';
 import {expectedReturnAfterHandover} from '@/lib/handover-return-time';
+import {actualReturnBlocks} from '@/lib/hourly-pricing';
 import {readVerifiedEvidence} from '@/lib/secure-evidence';
 import {parseInspectionPhotoUrl} from '@/lib/inspection-photo-url';
 import type {RentalOrder,InventoryItem} from '@/lib/types';
@@ -109,19 +110,23 @@ export async function PATCH(req:NextRequest,ctx:{params:Promise<{id:string}>}){
      return; // previous transaction already committed the order and its cash ledger
     }
    }
-   if(['CANCELLED','VOIDED'].includes(order.status)||(order.status==='RETURNED'&&!['PAY','VOID','AUTO_RESOLVE_CAMERA_LATE','REVIEW_PHOTOS','REFUND_RETURN','REFUND_RESERVATION','APPLY_SURCHARGE','RETURN_COLLATERAL','FINALIZE_LEGACY_RETURN'].includes(action)))throw new ApiError(409,'Đơn đã đóng.');
+   if((['CANCELLED','VOIDED'].includes(order.status)&&!(order.status==='CANCELLED'&&order.cancelReason==='NO_SHOW'&&action==='VOID'&&me.role==='admin'&&order.paid===0))||(order.status==='RETURNED'&&!['PAY','VOID','AUTO_RESOLVE_CAMERA_LATE','REVIEW_PHOTOS','REFUND_RETURN','REFUND_RESERVATION','APPLY_SURCHARGE','RETURN_COLLATERAL','FINALIZE_LEGACY_RETURN'].includes(action)))throw new ApiError(409,'Đơn đã đóng.');
    const itemRefs=order.lines.map(l=>db().collection('items').doc(l.itemId));
    if(action==='HANDOVER'){
     if(order.status!=='RESERVED')throw new ApiError(409,'Đơn đã được giao hoặc đóng.');
     // Every booked package starts when the product is physically handed over.
     // Rebase all reservation locks under the same PG transaction; reject conflicts.
+    // A reserved package expires at the originally scheduled end. Do not silently
+    // turn an expired, never-picked-up reservation into an active rental.
+    if(noShowExpired(order,Date.parse(now)))throw new ApiError(409,'Đã hết thời hạn gói thuê mà khách chưa đến lấy. Chuyển xử lý đơn không nhận, không được bàn giao tiếp.');
     let actualReturnAt:string;
     try{actualReturnAt=expectedReturnAfterHandover(order,now);}
     catch(error){throw new ApiError(409,error instanceof Error?error.message:'Không tính được giờ trả thực tế.');}
     const proofs=readProof(b.items,order,me.uid,me.name,'HANDOVER',now);
     const snaps=await Promise.all(itemRefs.map(r=>tx.get(r)));
     await verifyProofUploads(tx,proofs,'handover',me.uid,id);
-    const writeRebasedSlots=await rebaseHandoverIntervals(tx,order,now,actualReturnAt);
+    const billingStart=handoverBillingStart({bookingKind:order.bookingKind,scheduledPickupAt:order.scheduledPickupAt,pickupAt:order.pickupAt,actualHandoverAt:now});
+    const writeRebasedSlots=await rebaseHandoverIntervals(tx,order,billingStart,actualReturnAt);
     const depositProofId=String(b.depositProofId||'');
     const depositKind=String(b.depositKind||'');
     if(depositProofId&&!['CCCD','CASH','OTHER'].includes(depositKind))throw new ApiError(400,'Chọn loại vật cọc đã nhận.');
@@ -134,9 +139,8 @@ export async function PATCH(req:NextRequest,ctx:{params:Promise<{id:string}>}){
     const cashCollateral=(clothingPolicy||cameraPolicy)&&depositKind==='CASH'?collateralRequired:0;
     if((clothingPolicy||cameraPolicy)&&Number(b.collateralAmount)!==cashCollateral)throw new ApiError(409,`Cọc bảo đảm theo quy định là ${cashCollateral.toLocaleString('vi-VN')}đ, hoặc CCCD.`);
     if(snaps.some(s=>!s.exists||s.data()?.status!=='AVAILABLE'))throw new ApiError(409,'Có món đang cho thuê hoặc chưa giặt.');
-    const billingStart=handoverBillingStart({bookingKind:order.bookingKind,scheduledPickupAt:order.scheduledPickupAt,pickupAt:order.pickupAt,actualHandoverAt:now});
     // The agreed package price remains unchanged until RECEIVE calculates actual overtime.
-    const actualLines=order.lines.map(l=>({...l,startAt:billingStart,startDate:vnDayKey(now)}));
+    const actualLines=order.lines.map(l=>({...l,startAt:billingStart,startDate:vnDayKey(billingStart)}));
     const actualTotal=order.total;
     writeRebasedSlots();
     if(depositEvidence)tx.update(depositEvidence.ref,{consumedOrderId:id,consumedAt:now});
@@ -202,7 +206,9 @@ export async function PATCH(req:NextRequest,ctx:{params:Promise<{id:string}>}){
     const nextDue=rent+compensation+(order.otherFeeTotal||0);
     const refundPending=Math.max(0,(order.paid||0)-nextDue);
     const release=await removeOrderIntervals(tx,order);
-    const actualBlocks=billableBlocks(order.lines[0]?.startAt||fallbackStart,endTime);
+    const actualBlocks=orderGroup(order)==='CAMERA'
+      ?billableBlocks(order.lines[0]?.startAt||fallbackStart,endTime)
+      :actualReturnBlocks(order.lines[0]?.startAt||fallbackStart,endTime);
     const returnProof={status:'SUBMITTED' as const,by:me.uid,byName:me.name,at:endTime,items:proofs};
     const revised={...order,status:'RETURNED' as const,returnStage:'APPROVED' as const,returnProof,total:rent,compensationTotal:compensation,lateFeeTotal:0,rentalDays:actualBlocks,returnedAt:now,refundPending,photoReviewStatus:'PENDING' as const,cameraLatePendingItemIds:pendingCameraIds,cameraLateFeePending:pendingCameraIds.length>0,cameraOvertimeFeeTotal:quote.reduce((sum,v)=>sum+v.cameraLateFee,0),updatedAt:now};
     // Register each completed handover+return pair immediately upon physical return.

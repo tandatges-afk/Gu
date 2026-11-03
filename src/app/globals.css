@@ -1510,3 +1510,17 @@ button.calendar-cell.gu-calendar-followup-risk.occupied-reserved{
 @media(prefers-reduced-motion:reduce){
   .gu-capture-dialog .gu-capture-issue-remove-glyph{transition:none!important}
 }
+
+/* GU V1 settlement clarity: visible instructions, no oversized card. */
+.gu-settlement-guidance{margin:0 0 12px;padding:12px 14px;background:#f2f7f7;color:#254d55;border:1px solid #d4e3e5;border-radius:12px;font-size:13px;line-height:1.55;font-weight:600}
+.gu-live-rent-notice{padding:10px 12px;background:#fff6e5;color:#7b4b09;border:1px solid #edce8b;border-radius:10px}
+
+button.calendar-cell.gu-calendar-pickup-late{background:#f0eafa!important;border:2px solid #9a7bc8!important;color:#594093!important;}
+.gu-calendar-pickup-late-legend{background:#f0eafa;border:1px solid #9a7bc8;color:#594093}
+
+.gu-settlement-roadmap{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px;margin-bottom:8px}
+.gu-settlement-roadmap>span{min-width:0;text-align:center;border:1px solid #d5e4e9;border-radius:10px;padding:9px 7px;background:#f4f8f9;color:#3f5e6a;font-weight:750;font-size:11px;line-height:1.45}
+.gu-settlement-roadmap>span:first-child{color:#176143;background:#e9f6ee;border-color:#bfe2ce}
+@media(max-width:550px){.gu-settlement-roadmap{grid-template-columns:1fr;gap:5px}.gu-settlement-roadmap>span{text-align:left;padding:8px 10px}}
+
+.gu-no-show-review{display:grid;gap:10px;padding:12px 14px;border:1px solid #e2e5e8;border-radius:12px;background:#f7f8fa;color:#52616e}.gu-no-show-review p{margin:0;font-size:12px;line-height:1.6}.gu-no-show-review .btn{justify-self:start}
