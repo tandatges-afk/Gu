@@ -245,3 +245,30 @@ td b{font-size:12.5px;color:#233d48}
  .gu-order-compact .gu-order-more>summary small{display:none}
  .gu-order-more-item>summary small{max-width:30%;font-size:10px}
 }
+
+/* GU 2026-11-03 compact return settlement: exactly two visible steps. */
+.gu-settlement-simple{padding:12px 16px 8px!important;gap:10px!important;background:#fff}
+.gu-settlement-simple .gu-simple-received{display:flex;align-items:center;gap:7px;margin:0;color:#18704b;font-size:12px;font-weight:750}
+.gu-settlement-simple .gu-simple-step{gap:9px;padding:13px 14px;border-radius:12px;background:#fff;border:1px solid #dce7e8}
+.gu-settlement-simple .gu-settlement-step-heading{align-items:center;gap:9px}
+.gu-settlement-simple .gu-settlement-step-heading h3{font-size:15px;margin:0;line-height:1.4}
+.gu-settlement-simple .gu-step-number{flex:0 0 27px;width:27px;height:27px;min-width:27px;display:grid;place-items:center;border-radius:8px;font-size:13px}
+.gu-settlement-simple .gu-simple-collateral{display:flex;align-items:center;gap:8px;margin:0;color:#224d54;font-size:13px;line-height:1.5}
+.gu-settlement-simple .gu-simple-collateral svg{flex-shrink:0}
+.gu-settlement-simple .gu-simple-proof{padding:7px 10px;border-radius:9px;margin:0}
+.gu-settlement-simple .gu-simple-proof summary{min-height:28px;display:list-item}
+.gu-settlement-simple .gu-simple-evidence-check{display:flex;align-items:center;gap:10px;min-height:44px;padding:9px 10px;border-radius:9px;background:#eef7f3;color:#1a5944;font-weight:700;font-size:13px;cursor:pointer}
+.gu-settlement-simple .gu-simple-evidence-check input{flex-shrink:0;width:19px;height:19px;accent-color:#24765c}
+.gu-settlement-simple .gu-simple-muted{margin:0;color:#667a82;font-size:12px;line-height:1.55}
+.gu-settlement-simple .gu-simple-verified{display:flex;align-items:center;gap:7px;color:#20704d;font-weight:700;font-size:13px;line-height:1.4}
+.gu-settlement-simple .gu-simple-money{grid-template-columns:repeat(3,minmax(0,1fr));gap:7px}
+.gu-settlement-simple .gu-simple-money>div{padding:10px 11px;border-radius:9px;gap:3px}
+.gu-settlement-simple .gu-simple-money span{font-size:11px}
+.gu-settlement-simple .gu-simple-money strong{font-size:17px}
+.gu-settlement-simple .gu-simple-confirm{width:100%;min-height:44px;justify-content:center}
+.gu-settlement-simple .gu-simple-extra{margin:0;border:0;border-top:1px solid #e5eded;border-radius:0;padding:8px 0 0;background:transparent}
+.gu-settlement-simple .gu-simple-extra summary{font-size:12px;color:#617580;font-weight:650}
+.gu-settlement-simple .gu-simple-bottom{display:flex;justify-content:flex-end;padding:4px 0 0;gap:6px}
+.gu-settlement-simple .gu-simple-bottom .btn{min-height:40px}
+@media(max-width:650px){.gu-settlement-simple{padding:10px 11px!important;gap:9px!important}.gu-settlement-simple .gu-simple-step{padding:11px}.gu-settlement-simple .gu-simple-money{grid-template-columns:repeat(3,minmax(0,1fr));gap:4px}.gu-settlement-simple .gu-simple-money>div{display:flex;flex-direction:column;align-items:flex-start;gap:3px;padding:8px 7px}.gu-settlement-simple .gu-simple-money strong{font-size:14px;white-space:normal;text-align:left}.gu-settlement-simple .gu-simple-bottom .btn{width:auto;min-width:110px}}
+.gu-settlement-simple section[aria-label="Thu tiền đơn thuê"]>div:first-child{display:none}

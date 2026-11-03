@@ -28,8 +28,27 @@ test('capture settlement and order details are condensed without losing audit de
  const review=read('src/components/GuV5Review.tsx');
  assert.match(cap,/gu-settlement-money/);
  assert.match(cap,/gu-settlement-step/);
- assert.match(cap,/Còn việc cần xử lý/);
+ assert.match(cap,/Quyết toán hai bước/);
+ assert.match(cap,/evidenceChecked/);
  assert.match(review,/gu-quick-money/);
  assert.match(review,/Chi tiết thu \/ hoàn tiền/);
- assert.match(cap,/summary>Kiểm tra ảnh cọc \/ CCCD đã giữ/);
+ assert.match(cap,/summary>Xem ảnh chứng từ/);
+ assert.doesNotMatch(cap,/gu-settlement-roadmap/);
+});
+
+
+test('return settlement shows precisely two steps, verifies evidence before payment and preserves collateral confirmation',()=>{
+ const cap=read('src/components/GuOrderCapture.tsx');
+ const start=cap.indexOf('aria-label="Quyết toán hai bước"');
+ assert.ok(start>0);
+ const settlement=cap.slice(start);
+ assert.equal((settlement.match(/className="gu-settlement-step gu-simple-step"/g)||[]).length,2);
+ assert.match(settlement,/Bước 1 Kiểm tra chứng từ/);
+ assert.match(settlement,/Bước 2 Xác nhận thanh toán/);
+ assert.match(settlement,/checked=\{evidenceChecked\}/);
+ assert.match(settlement,/remaining>0\?\(evidenceReady\?/);
+ assert.match(settlement,/disabled=\{busy\|\|!evidenceReady/);
+ assert.match(settlement,/onClick=\{\(\)=>void confirmCollateral\(\)\}/);
+ assert.doesNotMatch(settlement,/gu-settlement-roadmap/);
+ assert.doesNotMatch(settlement,/gu-settlement-guidance/);
 });

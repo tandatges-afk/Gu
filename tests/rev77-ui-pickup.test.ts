@@ -33,9 +33,10 @@ test('Rev7.7: no stray zero in payment, settlement remains an explicit two-step 
  const capture=ts('src/components/GuOrderCapture.tsx');
  const css=ts('src/app/gu-redesign.css');
  assert.match(pay,/Boolean\(useSecurity&&order\.handoverCashCollateralAmount/);
- assert.match(capture,/Thu tiền còn thiếu/);
- assert.match(capture,/Hoàn cọc \/ trả CCCD/);
- assert.match(capture,/Còn việc cần xử lý/);
+ assert.match(capture,/Bước 1 Kiểm tra chứng từ/);
+ assert.match(capture,/Bước 2 Xác nhận thanh toán/);
+ assert.match(capture,/gu-simple-confirm/);
+ assert.doesNotMatch(capture,/gu-settlement-roadmap/);
  assert.match(css,/\.login-box \.gu-password-field>\.input\{[^}]*margin:0!important/);
  assert.match(css,/\.gu-settlement-money/);
 });

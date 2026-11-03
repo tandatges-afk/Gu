@@ -54,7 +54,8 @@ test('camera payment cannot collect an outdated pre-return amount once time is o
  assert.match(detail,/cameraLiveQuote\(order,cameraClock\)/);
  assert.match(detail,/!cameraAlert&&extraCashNeeded>0/);
  assert.match(capture,/cameraOvertimeFeeTotal/);
- assert.match(capture,/settling\?'Nhận trả · Quyết toán'/);
+ assert.match(capture,/settling\?'Quyết toán'/);
+ assert.match(capture,/Quyết toán hai bước/);
 });
 
 test('camera live estimate honors persisted billing start even for reserved orders',()=>{
